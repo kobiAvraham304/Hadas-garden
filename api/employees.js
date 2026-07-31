@@ -1,167 +1,164 @@
 const {
-  normalizePhone,
-  parseBody,
-  supabaseFetch,
-  requireManager,
-  send,
-  handleError,
-} = require('../lib/api-utils');
+  requireSession, parseBody, normalizePhone, db, assertDb, hashPassword,
+  revokeUserSessions, emitEvent, audit, send, handleError, httpError,
+} = require('../lib/server');
+const { timeToMinutes } = require('../lib/schedule');
 
-const PROFILE_FIELDS = [
-  'full_name', 'role', 'job_title', 'primary_class_id', 'can_lead',
-  'weekly_hours', 'default_start', 'default_end', 'fixed_day_off', 'active',
-];
+const ALLOWED_ROLES = new Set(['admin','scheduler','employee']);
 
-function profilePayload(body) {
+function employeePayload(body) {
   const payload = {};
-  for (const key of PROFILE_FIELDS) {
-    if (Object.prototype.hasOwnProperty.call(body, key)) payload[key] = body[key] === '' ? null : body[key];
+  const fields = ['full_name','job_title','primary_class_id','weekly_hours','employment_percent','default_start','default_end','fixed_day_off','active','started_at','ended_at'];
+  for (const field of fields) if (body[field] !== undefined) payload[field] = body[field] === '' ? null : body[field];
+  if (body.can_lead !== undefined) payload.can_lead = Boolean(body.can_lead);
+  if (payload.full_name !== undefined) {
+    payload.full_name = String(payload.full_name || '').trim();
+    if (!payload.full_name) throw httpError(400,'יש להזין שם מלא');
   }
-  if (payload.role && !['admin', 'scheduler', 'employee'].includes(payload.role)) {
-    throw Object.assign(new Error('תפקיד המערכת אינו תקין'), { status: 400 });
+  if (payload.fixed_day_off !== undefined && payload.fixed_day_off !== null) {
+    payload.fixed_day_off = Number(payload.fixed_day_off);
+    if (!Number.isInteger(payload.fixed_day_off) || payload.fixed_day_off < 0 || payload.fixed_day_off > 6) throw httpError(400,'יום חופשי אינו תקין');
   }
+  if (payload.weekly_hours !== undefined && payload.weekly_hours !== null) {
+    payload.weekly_hours = Number(payload.weekly_hours);
+    if (!Number.isFinite(payload.weekly_hours) || payload.weekly_hours < 0 || payload.weekly_hours > 60) throw httpError(400,'מספר השעות השבועיות אינו תקין');
+  }
+  if (payload.employment_percent !== undefined && payload.employment_percent !== null) {
+    payload.employment_percent = Number(payload.employment_percent);
+    if (!Number.isFinite(payload.employment_percent) || payload.employment_percent < 0 || payload.employment_percent > 200) throw httpError(400,'אחוז המשרה אינו תקין');
+  }
+  if (payload.default_start && payload.default_end && timeToMinutes(payload.default_end) <= timeToMinutes(payload.default_start)) throw httpError(400,'שעת הסיום חייבת להיות לאחר שעת ההתחלה');
+  if (payload.started_at && payload.ended_at && payload.ended_at < payload.started_at) throw httpError(400,'תאריך הסיום אינו יכול להיות לפני תאריך ההתחלה');
   return payload;
 }
 
 async function replaceConstraints(employeeId, constraints, actorId) {
-  await supabaseFetch(`/rest/v1/hadas_employee_class_constraints?employee_id=eq.${encodeURIComponent(employeeId)}`, {
-    method: 'DELETE',
-    useSecret: true,
-    headers: { Prefer: 'return=minimal' },
+  if (!Array.isArray(constraints)) return;
+  const rows = constraints.filter((item) => item.class_id && ['preferred','avoid','forbidden'].includes(item.constraint_type)).map((item) => {
+    const validFrom=item.valid_from || null, validTo=item.valid_to || null;
+    if (validFrom && validTo && validTo < validFrom) throw httpError(400,'תאריך סיום האילוץ אינו יכול להיות לפני תאריך ההתחלה');
+    return {
+      employee_id:employeeId,
+      class_id:item.class_id,
+      constraint_type:item.constraint_type,
+      valid_from:validFrom,
+      valid_to:validTo,
+      reason:String(item.reason || '').trim() || null,
+      created_by:actorId,
+    };
   });
-  if (!Array.isArray(constraints) || !constraints.length) return;
-  const rows = constraints.map((item) => ({
-    employee_id: employeeId,
-    class_id: item.class_id,
-    constraint_type: item.constraint_type,
-    valid_from: item.valid_from || null,
-    valid_to: item.valid_to || null,
-    reason: item.reason || null,
-    created_by: actorId,
-  }));
-  await supabaseFetch('/rest/v1/hadas_employee_class_constraints', {
-    method: 'POST',
-    useSecret: true,
-    headers: { Prefer: 'return=minimal' },
-    body: rows,
-  });
+  const duplicateKeys=new Set();
+  for(const row of rows){
+    const key=[row.class_id,row.constraint_type,row.valid_from||'',row.valid_to||''].join('|');
+    if(duplicateKeys.has(key)) throw httpError(400,'קיים אילוץ כפול לאותה כיתה ותקופה');
+    duplicateKeys.add(key);
+  }
+  assertDb(await db().from('hadas_employee_class_constraints').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן אילוצים');
+  if (rows.length) assertDb(await db().from('hadas_employee_class_constraints').insert(rows), 'לא ניתן לשמור אילוצים');
 }
 
-async function upsertPrivate(employeeId, adminNotes) {
-  if (adminNotes === undefined) return;
-  await supabaseFetch('/rest/v1/hadas_employee_private?on_conflict=employee_id', {
-    method: 'POST',
-    useSecret: true,
-    headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: { employee_id: employeeId, admin_notes: adminNotes || null },
-  });
+async function upsertPrivate(employeeId, notes) {
+  if (notes === undefined) return;
+  assertDb(await db().from('hadas_employee_private').upsert({ employee_id:employeeId, admin_notes:String(notes || '') }, { onConflict:'employee_id' }), 'לא ניתן לשמור הערה ניהולית');
 }
 
-module.exports = async function handler(req, res) {
+async function ensureAdminRemains(userIdToChange, nextRole, nextActive) {
+  const target = assertDb(await db().from('hadas_users').select('id,role,active').eq('id',userIdToChange).maybeSingle(), 'המשתמשת לא נמצאה');
+  if (!target || target.role !== 'admin' || (nextRole === 'admin' && nextActive !== false)) return;
+  const activeAdmins = assertDb(await db().from('hadas_users').select('id').eq('role','admin').eq('active',true), 'לא ניתן לבדוק מנהלות') || [];
+  if (activeAdmins.length <= 1) throw httpError(409,'חייבת להישאר לפחות מנהלת פעילה אחת במערכת');
+}
+
+module.exports = async function handler(req,res) {
   try {
-    const caller = await requireManager(req);
+    const caller = await requireSession(req,{ manager:true });
     const body = parseBody(req);
 
     if (req.method === 'POST') {
-      const fullName = String(body.full_name || '').trim();
       const phone = normalizePhone(body.phone);
-      const requestedPassword = String(body.password || 'hadas');
-      const password = requestedPassword === 'hadas' ? 'hadas1' : requestedPassword;
-      if (!fullName) return send(res, 400, { ok: false, error: 'יש להזין שם מלא' });
-      if (password.length < 6) return send(res, 400, { ok: false, error: 'הסיסמה חייבת לכלול לפחות 6 תווים' });
-
-      const { data: authUser } = await supabaseFetch('/auth/v1/admin/users', {
-        method: 'POST',
-        useSecret: true,
-        body: {
-          phone,
-          password,
-          phone_confirm: true,
-          user_metadata: { full_name: fullName },
-        },
-      });
-      const id = authUser.id || authUser.user?.id;
-      if (!id) throw new Error('לא התקבל מזהה לעובדת החדשה');
-
-      const profile = {
-        id,
-        phone,
-        full_name: fullName,
-        role: body.role || 'employee',
-        job_title: body.job_title || 'אשת צוות',
-        primary_class_id: body.primary_class_id || null,
-        can_lead: Boolean(body.can_lead),
-        weekly_hours: body.weekly_hours || null,
-        default_start: body.default_start || '07:30',
-        default_end: body.default_end || '15:30',
-        fixed_day_off: body.fixed_day_off === '' || body.fixed_day_off === undefined || body.fixed_day_off === null ? null : Number(body.fixed_day_off),
-        active: true,
-        must_change_password: true,
-      };
-
+      const role = ALLOWED_ROLES.has(body.role) ? body.role : 'employee';
+      const payload = employeePayload({ ...body, active:true });
+      payload.contact_phone = phone;
+      const employee = assertDb(await db().from('hadas_employees').insert(payload).select('*').single(), 'לא ניתן ליצור עובדת');
       try {
-        await supabaseFetch('/rest/v1/hadas_profiles', {
-          method: 'POST', useSecret: true, headers: { Prefer: 'return=minimal' }, body: profile,
-        });
-        await replaceConstraints(id, body.constraints, caller.profile.id);
-        await upsertPrivate(id, body.admin_notes);
+        const user = assertDb(await db().from('hadas_users').insert({
+          employee_id:employee.id,
+          phone,
+          password_hash:await hashPassword('hadas'),
+          role,
+          active:true,
+          must_change_password:true,
+        }).select('id').single(), 'לא ניתן ליצור משתמשת');
+        await replaceConstraints(employee.id,body.constraints,caller.employee.id);
+        await upsertPrivate(employee.id,body.admin_notes);
+        await audit(caller.employee.id,'create','employee',employee.id,{ role });
+        await emitEvent('employees');
+        return send(res,201,{ ok:true,id:employee.id,userId:user.id });
       } catch (error) {
-        // ניקוי משתמש Auth במקרה שהכנסת הפרופיל נכשלה.
-        try { await supabaseFetch(`/auth/v1/admin/users/${id}`, { method: 'DELETE', useSecret: true }); } catch {}
+        await db().from('hadas_employees').delete().eq('id',employee.id);
         throw error;
       }
-
-      return send(res, 201, { ok: true, id });
     }
 
     if (req.method === 'PATCH') {
-      const id = String(body.id || '');
-      if (!id) return send(res, 400, { ok: false, error: 'חסר מזהה עובדת' });
+      const employeeId = String(body.id || '');
+      if (!employeeId) throw httpError(400,'חסר מזהה עובדת');
+      const employee = assertDb(await db().from('hadas_employees').select('*').eq('id',employeeId).maybeSingle(), 'העובדת לא נמצאה');
+      if (!employee) throw httpError(404,'העובדת לא נמצאה');
+      const user = assertDb(await db().from('hadas_users').select('*').eq('employee_id',employeeId).maybeSingle(), 'המשתמשת לא נמצאה');
+      if (!user) throw httpError(404,'לא נמצא משתמש לכרטיס העובדת');
 
-      const { data: existingRows } = await supabaseFetch(`/rest/v1/hadas_profiles?id=eq.${encodeURIComponent(id)}&select=*&limit=1`, { useSecret: true });
-      const existing = Array.isArray(existingRows) ? existingRows[0] : null;
-      if (!existing) return send(res, 404, { ok: false, error: 'העובדת לא נמצאה' });
+      const nextRole = body.role !== undefined ? body.role : user.role;
+      const nextActive = body.active !== undefined ? Boolean(body.active) : user.active;
+      if (!ALLOWED_ROLES.has(nextRole)) throw httpError(400,'הרשאה לא תקינה');
+      await ensureAdminRemains(user.id,nextRole,nextActive);
+      if (employeeId === caller.employee.id && nextActive === false) throw httpError(400,'לא ניתן להשבית את המשתמשת המחוברת');
 
-      const update = profilePayload(body);
-      if (body.phone) {
+      const employeeUpdate = employeePayload(body);
+      const userUpdate = {};
+      if (body.phone !== undefined) {
         const phone = normalizePhone(body.phone);
-        if (phone !== existing.phone) {
-          await supabaseFetch(`/auth/v1/admin/users/${id}`, {
-            method: 'PUT', useSecret: true, body: { phone, phone_confirm: true },
-          });
-          update.phone = phone;
-        }
+        userUpdate.phone = phone;
+        employeeUpdate.contact_phone = phone;
       }
-
+      if (body.role !== undefined) userUpdate.role = nextRole;
+      if (body.active !== undefined) {
+        userUpdate.active = nextActive;
+        employeeUpdate.active = nextActive;
+        if (!nextActive) employeeUpdate.ended_at = body.ended_at || new Date().toISOString().slice(0,10);
+        else if (body.ended_at === undefined) employeeUpdate.ended_at = null;
+      }
       if (body.reset_password) {
-        await supabaseFetch(`/auth/v1/admin/users/${id}`, {
-          method: 'PUT', useSecret: true, body: { password: 'hadas1' },
-        });
-        update.must_change_password = true;
+        userUpdate.password_hash = await hashPassword('hadas');
+        userUpdate.must_change_password = true;
+        userUpdate.password_changed_at = null;
       }
 
-      if (Object.keys(update).length) {
-        await supabaseFetch(`/rest/v1/hadas_profiles?id=eq.${encodeURIComponent(id)}`, {
-          method: 'PATCH', useSecret: true, headers: { Prefer: 'return=minimal' }, body: update,
-        });
-      }
-      if (Array.isArray(body.constraints)) await replaceConstraints(id, body.constraints, caller.profile.id);
-      await upsertPrivate(id, body.admin_notes);
-      return send(res, 200, { ok: true });
+      if (Object.keys(employeeUpdate).length) assertDb(await db().from('hadas_employees').update(employeeUpdate).eq('id',employeeId), 'לא ניתן לעדכן עובדת');
+      if (Object.keys(userUpdate).length) assertDb(await db().from('hadas_users').update(userUpdate).eq('id',user.id), 'לא ניתן לעדכן הרשאה');
+      if (Array.isArray(body.constraints)) await replaceConstraints(employeeId,body.constraints,caller.employee.id);
+      await upsertPrivate(employeeId,body.admin_notes);
+      if (body.reset_password || body.active === false) await revokeUserSessions(user.id);
+      await audit(caller.employee.id,'update','employee',employeeId,{ fields:Object.keys(body) });
+      await emitEvent('employees');
+      return send(res,200,{ ok:true });
     }
 
     if (req.method === 'DELETE') {
-      const id = String(body.id || req.query?.id || '');
-      if (!id) return send(res, 400, { ok: false, error: 'חסר מזהה עובדת' });
-      if (id === caller.profile.id) return send(res, 400, { ok: false, error: 'לא ניתן להשבית את המשתמשת המחוברת' });
-      await supabaseFetch(`/rest/v1/hadas_profiles?id=eq.${encodeURIComponent(id)}`, {
-        method: 'PATCH', useSecret: true, headers: { Prefer: 'return=minimal' }, body: { active: false },
-      });
-      return send(res, 200, { ok: true });
+      const employeeId = String(body.id || req.query?.id || '');
+      if (!employeeId) throw httpError(400,'חסר מזהה עובדת');
+      if (employeeId === caller.employee.id) throw httpError(400,'לא ניתן להשבית את המשתמשת המחוברת');
+      const user = assertDb(await db().from('hadas_users').select('*').eq('employee_id',employeeId).maybeSingle(), 'המשתמשת לא נמצאה');
+      if (!user) throw httpError(404,'המשתמשת לא נמצאה');
+      await ensureAdminRemains(user.id,user.role,false);
+      assertDb(await db().from('hadas_users').update({ active:false }).eq('id',user.id), 'לא ניתן להשבית משתמשת');
+      assertDb(await db().from('hadas_employees').update({ active:false,ended_at:new Date().toISOString().slice(0,10) }).eq('id',employeeId), 'לא ניתן להשבית עובדת');
+      await revokeUserSessions(user.id);
+      await audit(caller.employee.id,'deactivate','employee',employeeId);
+      await emitEvent('employees');
+      return send(res,200,{ ok:true });
     }
 
-    return send(res, 405, { ok: false, error: 'Method not allowed' });
-  } catch (error) {
-    handleError(res, error);
-  }
+    return send(res,405,{ ok:false,error:'Method not allowed' });
+  } catch (error) { handleError(res,error); }
 };

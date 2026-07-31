@@ -1,1035 +1,199 @@
-/* מערכת השיבוצים של מעון הדס — גרסה 0.1.0 */
+/* מערכת השיבוצים של מעון הדס — גרסה 0.2.0 */
+const $=(selector,root=document)=>root.querySelector(selector);
+const $$=(selector,root=document)=>[...root.querySelectorAll(selector)];
+const DAY_NAMES=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+const ROLE_LABELS={admin:'מנהלת מעון',scheduler:'אחראית שיבוץ',employee:'עובדת'};
+const SHIFT_ROLE_LABELS={teacher:'גננת',lead:'מובילה',staff:'אשת צוות',replacement:'מחליפה'};
+const SHIFT_STATUS_LABELS={draft:'טיוטה',temporary:'זמני',final:'סופי'};
+const REQUEST_LABELS={leave:'חופשה',day_off:'יום חופשי',late_start:'התחלה מאוחרת',early_finish:'סיום מוקדם',sick:'מחלה',swap:'החלפת שיבוץ',other:'אחר'};
+const REQUEST_STATUS_LABELS={pending:'ממתינה',approved:'אושרה',rejected:'נדחתה',applied:'הוזרמה',cancelled:'בוטלה'};
+const ATTENDANCE_LABELS={scheduled:'טרם עודכן',present:'נכחה',late:'איחרה',left_early:'יצאה מוקדם',absent:'נעדרה',sick:'מחלה',replacement:'החליפה עובדת'};
+const EVENT_LABELS={holiday:'חופשה/חג',meeting:'ישיבה',training:'הדרכה',birthday:'יום הולדת',activity:'פעילות',other:'אחר'};
+const PRIORITY_LABELS={normal:'רגילה',important:'חשובה',urgent:'דחופה'};
 
-const $ = (selector, root = document) => root.querySelector(selector);
-const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
-
-const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-const ROLE_LABELS = { admin: 'מנהלת מעון', scheduler: 'אחראית שיבוץ', employee: 'עובדת' };
-const SHIFT_ROLE_LABELS = { teacher: 'גננת', lead: 'מובילה', staff: 'אשת צוות', replacement: 'מחליפה' };
-const SHIFT_STATUS_LABELS = { draft: 'טיוטה', temporary: 'זמני', final: 'סופי' };
-const REQUEST_LABELS = {
-  leave: 'חופשה', day_off: 'יום חופשי', late_start: 'התחלה מאוחרת',
-  early_finish: 'סיום מוקדם', sick: 'מחלה', swap: 'החלפת שיבוץ', other: 'אחר',
-};
-const REQUEST_STATUS_LABELS = {
-  pending: 'ממתינה', approved: 'אושרה', rejected: 'נדחתה', applied: 'הוזרמה לשיבוץ', cancelled: 'בוטלה',
-};
-const ATTENDANCE_LABELS = {
-  scheduled: 'טרם עודכן', present: 'נכחה', late: 'איחרה', left_early: 'יצאה מוקדם',
-  absent: 'נעדרה', sick: 'מחלה', replacement: 'החליפה עובדת',
-};
-
-const state = {
-  client: null,
-  session: null,
-  profile: null,
-  classes: [],
-  profiles: [],
-  constraints: [],
-  privateRows: [],
-  settings: { opening_time: '07:30:00', closing_time: '15:30:00', required_staff: 4, closing_required_staff: 3 },
-  weekStart: startOfWeek(new Date()),
-  shifts: [],
-  requests: [],
-  attendance: [],
-  todayShifts: [],
-  attendanceDateShifts: [],
-  attendanceDateRows: [],
-  realtimeChannel: null,
-  reloadTimer: null,
+const state={
+  config:null,storageClient:null,csrfToken:'',profile:null,classes:[],employees:[],constraints:[],settings:{},
+  shifts:[],todayShifts:[],attendance:[],requests:[],acknowledgements:[],announcements:[],announcementReads:[],
+  tasks:[],taskAssignees:[],calendarEvents:[],documents:[],weekStart:startOfWeek(new Date()),attendanceDate:dateISO(new Date()),
+  realtimeChannel:null,reloadTimer:null,pollTimer:null,suggestionsContext:null,
 };
 
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+function escapeHtml(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
+function dateISO(date){const d=new Date(date);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function parseLocalDate(value){return new Date(`${value}T12:00:00`);}
+function addDays(date,days){const d=new Date(date);d.setDate(d.getDate()+days);return d;}
+function startOfWeek(date){const d=new Date(date);d.setHours(12,0,0,0);d.setDate(d.getDate()-d.getDay());return d;}
+function formatDate(value,options={day:'2-digit',month:'2-digit',year:'numeric'}){return new Intl.DateTimeFormat('he-IL',options).format(typeof value==='string'?parseLocalDate(value):value);}
+function trimTime(value){return value?String(value).slice(0,5):'';}
+function timeToMinutes(value){if(!value)return 0;const [h,m]=String(value).slice(0,5).split(':').map(Number);return h*60+m;}
+function overlaps(aStart,aEnd,bStart,bEnd){return timeToMinutes(aStart)<timeToMinutes(bEnd)&&timeToMinutes(aEnd)>timeToMinutes(bStart);}
+function isManager(){return ['admin','scheduler'].includes(state.profile?.role);}
+function employeeById(id){return state.employees.find(item=>item.id===id);}
+function classById(id){return state.classes.find(item=>item.id===id);}
+function showToast(message,type=''){const toast=$('#toast');toast.textContent=message;toast.className=`toast ${type}`.trim();clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>toast.classList.add('hidden'),3800);}
+function setScreen(id){for(const screen of ['loadingScreen','loginScreen','passwordScreen','appShell'])$(`#${screen}`).classList.toggle('hidden',screen!==id);}
+function setBusy(button,busy,text='שומר…'){if(!button)return;if(busy){button.dataset.originalText=button.textContent;button.disabled=true;button.textContent=text;}else{button.disabled=false;button.textContent=button.dataset.originalText||button.textContent;}}
+function formObject(form){return Object.fromEntries(new FormData(form).entries());}
+function toIsoDateTime(local){return local?new Date(local).toISOString():null;}
+
+async function apiFetch(url,options={}){
+  const method=options.method||'GET';
+  const headers={Accept:'application/json',...(options.headers||{})};
+  if(options.body!==undefined){headers['Content-Type']='application/json';}
+  if(method!=='GET'&&state.csrfToken)headers['X-CSRF-Token']=state.csrfToken;
+  const response=await fetch(url,{method,headers,credentials:'same-origin',cache:'no-store',body:options.body===undefined?undefined:JSON.stringify(options.body)});
+  let data={};try{data=await response.json();}catch{}
+  if(response.status===401){state.profile=null;setScreen('loginScreen');throw new Error(data.error||'ההתחברות פגה');}
+  if(!response.ok){const error=new Error(data.error||'הפעולה נכשלה');error.data=data;error.status=response.status;throw error;}
+  return data;
 }
 
-function dateISO(date) {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+async function init(){
+  bindEvents();
+  try{
+    const configResponse=await fetch('/api/config',{cache:'no-store'});state.config=await configResponse.json();
+    if(!configResponse.ok)throw new Error(state.config.error||'לא ניתן לטעון הגדרות');
+    if(window.supabase){state.storageClient=window.supabase.createClient(state.config.supabaseUrl,state.config.supabasePublishableKey,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});}
+    try{
+      const me=await apiFetch('/api/auth-me');state.csrfToken=me.csrfToken;state.profile=me.profile;
+      if(state.profile.must_change_password)return setScreen('passwordScreen');
+      await enterApp();
+    }catch(error){if(error.status!==401)console.warn(error);setScreen('loginScreen');}
+  }catch(error){setScreen('loginScreen');showToast(error.message,'error');}
 }
 
-function parseLocalDate(value) {
-  return new Date(`${value}T12:00:00`);
+function bindEvents(){
+  $('#loginForm').addEventListener('submit',handleLogin);$('#passwordForm').addEventListener('submit',handlePasswordChange);$('#logoutBtn').addEventListener('click',logout);
+  $$('.nav-btn').forEach(btn=>btn.addEventListener('click',()=>switchTab(btn.dataset.tab)));
+  $('#prevWeekBtn').addEventListener('click',()=>setWeek(addDays(state.weekStart,-7)));$('#nextWeekBtn').addEventListener('click',()=>setWeek(addDays(state.weekStart,7)));$('#todayWeekBtn').addEventListener('click',()=>setWeek(startOfWeek(new Date())));
+  $('#copyWeekBtn').addEventListener('click',copyPreviousWeek);$('#addShiftBtn').addEventListener('click',()=>openShiftDialog());
+  $('#publishTemporaryBtn').addEventListener('click',()=>publishWeek('temporary'));$('#publishFinalBtn').addEventListener('click',()=>publishWeek('final'));$('#ackScheduleBtn').addEventListener('click',acknowledgeSchedule);
+  $('#settingsBtn').addEventListener('click',openSettings);$('#printBtn').addEventListener('click',()=>window.print());$('#imageBtn').addEventListener('click',downloadScheduleImage);
+  $('#attendanceDate').addEventListener('change',async(e)=>{state.attendanceDate=e.target.value;await refreshAll();});
+  $('#newEmployeeBtn').addEventListener('click',()=>openEmployeeDialog());$('#newRequestBtn').addEventListener('click',openRequestDialog);$('#newAnnouncementBtn').addEventListener('click',()=>openDialogForm('#announcementDialog','#announcementForm'));$('#newTaskBtn').addEventListener('click',()=>openTaskDialog());$('#newCalendarBtn').addEventListener('click',()=>openCalendarDialog());$('#newDocumentBtn').addEventListener('click',()=>openDialogForm('#documentDialog','#documentForm'));
+  $('#shiftForm').addEventListener('submit',saveShift);$('#employeeForm').addEventListener('submit',saveEmployee);$('#requestForm').addEventListener('submit',saveRequest);$('#announcementForm').addEventListener('submit',saveAnnouncement);$('#taskForm').addEventListener('submit',saveTask);$('#calendarForm').addEventListener('submit',saveCalendarEvent);$('#documentForm').addEventListener('submit',saveDocument);$('#settingsForm').addEventListener('submit',saveSettings);
+  $('#requestForm [name="request_type"]').addEventListener('change',updateRequestFields);$('#requestForm [name="target_employee_id"]').addEventListener('change',populateTargetShifts);$('#requestForm [name="shift_id"]').addEventListener('change',syncRequestDateFromShift);$('#taskForm [name="target_type"]').addEventListener('change',populateTaskTarget);
+  $$('.close-dialog').forEach(btn=>btn.addEventListener('click',()=>btn.closest('dialog').close()));
+  $('#scheduleExport').addEventListener('click',handleScheduleClick);$('#employeesList').addEventListener('click',handleEmployeeClick);$('#requestsList').addEventListener('click',handleRequestClick);$('#attendanceList').addEventListener('click',handleAttendanceClick);$('#announcementsList').addEventListener('click',handleAnnouncementClick);$('#tasksList').addEventListener('click',handleTaskClick);$('#calendarList').addEventListener('click',handleCalendarClick);$('#documentsList').addEventListener('click',handleDocumentClick);$('#suggestionsList').addEventListener('click',handleSuggestionClick);
 }
 
-function addDays(date, days) {
-  const result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
+async function handleLogin(event){event.preventDefault();const button=event.currentTarget.querySelector('button');setBusy(button,true,'מתחברת…');try{const body=formObject(event.currentTarget);const data=await apiFetch('/api/auth-login',{method:'POST',body});state.csrfToken=data.csrfToken;state.profile=data.profile;if(state.profile.must_change_password)setScreen('passwordScreen');else await enterApp();}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function handlePasswordChange(event){event.preventDefault();const body=formObject(event.currentTarget);if(body.password!==body.confirmPassword)return showToast('הסיסמאות אינן זהות','error');const button=event.currentTarget.querySelector('button');setBusy(button,true);try{const data=await apiFetch('/api/auth-change-password',{method:'POST',body:{password:body.password}});state.csrfToken=data.csrfToken;state.profile=data.profile;await enterApp();showToast('הסיסמה נשמרה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function logout(){try{await apiFetch('/api/auth-logout',{method:'POST',body:{}});}catch{}state.profile=null;state.csrfToken='';if(state.realtimeChannel&&state.storageClient)state.storageClient.removeChannel(state.realtimeChannel);clearInterval(state.pollTimer);setScreen('loginScreen');}
+
+async function enterApp(){setScreen('appShell');applyPermissions();$('#attendanceDate').value=state.attendanceDate;await refreshAll();subscribeRealtime();}
+function applyPermissions(){$$('.manager-only').forEach(el=>el.classList.toggle('hidden',!isManager()));$$('.employee-only').forEach(el=>el.classList.toggle('hidden',isManager()));$('#userName').textContent=state.profile.full_name;$('#userRole').textContent=`${ROLE_LABELS[state.profile.role]||state.profile.role} · ${state.profile.job_title}`;}
+function switchTab(tab){$$('.nav-btn').forEach(btn=>btn.classList.toggle('active',btn.dataset.tab===tab));$$('.panel').forEach(panel=>panel.classList.toggle('active',panel.id===`${tab}Panel`));}
+async function setWeek(date){state.weekStart=startOfWeek(date);await refreshAll();}
+
+async function refreshAll(){
+  try{
+    const data=await apiFetch(`/api/data?week_start=${dateISO(state.weekStart)}&attendance_date=${state.attendanceDate}`);
+    Object.assign(state,{profile:data.profile,classes:data.classes,employees:data.employees,constraints:data.constraints,settings:data.settings,shifts:data.shifts,todayShifts:data.todayShifts||[],attendance:data.attendance,requests:data.requests,acknowledgements:data.acknowledgements,announcements:data.announcements,announcementReads:data.announcementReads,tasks:data.tasks,taskAssignees:data.taskAssignees,calendarEvents:data.calendarEvents,documents:data.documents});
+    applyPermissions();populateSelects();renderAll();
+  }catch(error){showToast(error.message,'error');}
 }
 
-function startOfWeek(date) {
-  const result = new Date(date);
-  result.setHours(12, 0, 0, 0);
-  result.setDate(result.getDate() - result.getDay());
-  return result;
-}
-
-function formatDate(value, options = { day: '2-digit', month: '2-digit', year: 'numeric' }) {
-  return new Intl.DateTimeFormat('he-IL', options).format(typeof value === 'string' ? parseLocalDate(value) : value);
-}
-
-function trimTime(value) {
-  return value ? String(value).slice(0, 5) : '';
-}
-
-function timeToMinutes(value) {
-  if (!value) return 0;
-  const [hours, minutes] = String(value).slice(0, 5).split(':').map(Number);
-  return hours * 60 + minutes;
-}
-
-function minutesBetween(start, end) {
-  return Math.max(0, timeToMinutes(end) - timeToMinutes(start));
-}
-
-function overlaps(aStart, aEnd, bStart, bEnd) {
-  return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart);
-}
-
-function normalizePhone(input) {
-  const digits = String(input || '').replace(/\D/g, '');
-  if (digits.startsWith('972')) return `+${digits}`;
-  if (digits.startsWith('0')) return `+972${digits.slice(1)}`;
-  if (digits.length === 9 && digits.startsWith('5')) return `+972${digits}`;
-  return String(input || '').trim();
-}
-
-function isManager() {
-  return ['admin', 'scheduler'].includes(state.profile?.role);
-}
-
-function profileById(id) {
-  return state.profiles.find((profile) => profile.id === id);
-}
-
-function classById(id) {
-  return state.classes.find((item) => item.id === id);
-}
-
-function hasApprovedAbsence(employeeId, date) {
-  return state.requests.some((request) =>
-    request.requester_id === employeeId
-    && request.request_date === date
-    && ['leave', 'day_off', 'sick'].includes(request.request_type)
-    && ['approved', 'applied'].includes(request.status)
-  );
-}
-
-function showToast(message, type = '') {
-  const toast = $('#toast');
-  toast.textContent = message;
-  toast.className = `toast ${type}`.trim();
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toast.classList.add('hidden'), 3600);
-}
-
-function setScreen(screen) {
-  for (const id of ['loadingScreen', 'loginScreen', 'passwordScreen', 'appShell']) {
-    $(`#${id}`).classList.toggle('hidden', id !== screen);
-  }
-}
-
-function setBusy(button, busy, busyText = 'שומר…') {
-  if (!button) return;
-  if (busy) {
-    button.dataset.originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = busyText;
-  } else {
-    button.disabled = false;
-    button.textContent = button.dataset.originalText || button.textContent;
-  }
-}
-
-async function init() {
-  bindStaticEvents();
-  try {
-    const response = await fetch('/api/config');
-    const config = await response.json();
-    if (!response.ok) throw new Error(config.error || 'לא ניתן לטעון את הגדרות המערכת');
-    if (!window.supabase) throw new Error('ספריית Supabase לא נטענה');
-
-    state.client = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-    });
-
-    state.client.auth.onAuthStateChange((_event, session) => {
-      state.session = session;
-    });
-
-    const { data, error } = await state.client.auth.getSession();
-    if (error) throw error;
-    state.session = data.session;
-    if (!state.session) return setScreen('loginScreen');
-    await enterApp();
-  } catch (error) {
-    console.error(error);
-    setScreen('loginScreen');
-    showToast(error.message, 'error');
-  }
-}
-
-function bindStaticEvents() {
-  $('#loginForm').addEventListener('submit', handleLogin);
-  $('#passwordForm').addEventListener('submit', handlePasswordChange);
-  $('#logoutBtn').addEventListener('click', logout);
-
-  $$('.nav-btn').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.tab)));
-  $('#prevWeekBtn').addEventListener('click', () => changeWeek(-7));
-  $('#nextWeekBtn').addEventListener('click', () => changeWeek(7));
-  $('#todayWeekBtn').addEventListener('click', () => setWeek(startOfWeek(new Date())));
-  $('#addShiftBtn').addEventListener('click', () => openShiftDialog());
-  $('#publishTemporaryBtn').addEventListener('click', () => publishWeek('temporary'));
-  $('#publishFinalBtn').addEventListener('click', () => publishWeek('final'));
-  $('#ackScheduleBtn').addEventListener('click', acknowledgeSchedule);
-  $('#printBtn').addEventListener('click', () => window.print());
-  $('#imageBtn').addEventListener('click', downloadScheduleImage);
-  $('#newEmployeeBtn').addEventListener('click', () => openEmployeeDialog());
-  $('#newRequestBtn').addEventListener('click', openRequestDialog);
-  $('#attendanceDate').addEventListener('change', () => loadAttendanceDate($('#attendanceDate').value));
-
-  $('#shiftForm').addEventListener('submit', saveShift);
-  $('#employeeForm').addEventListener('submit', saveEmployee);
-  $('#requestForm').addEventListener('submit', saveRequest);
-  $('#requestForm [name="request_type"]').addEventListener('change', updateRequestFormFields);
-  $('#requestForm [name="target_employee_id"]').addEventListener('change', populateTargetShifts);
-
-  $$('.close-dialog').forEach((button) => button.addEventListener('click', () => button.closest('dialog').close()));
-
-  $('#scheduleExport').addEventListener('click', handleScheduleClick);
-  $('#employeesList').addEventListener('click', handleEmployeeClick);
-  $('#requestsList').addEventListener('click', handleRequestClick);
-  $('#attendanceList').addEventListener('click', handleAttendanceClick);
-  $('#suggestionsList').addEventListener('click', handleSuggestionClick);
-}
-
-async function handleLogin(event) {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector('button[type="submit"]');
-  setBusy(button, true, 'מתחברת…');
-  try {
-    const form = new FormData(event.currentTarget);
-    const phone = normalizePhone(form.get('phone'));
-    const enteredPassword = String(form.get('password') || '');
-    const password = enteredPassword === 'hadas' ? 'hadas1' : enteredPassword;
-    const { data, error } = await state.client.auth.signInWithPassword({ phone, password });
-    if (error) throw error;
-    state.session = data.session;
-    await enterApp();
-  } catch (error) {
-    showToast(authErrorMessage(error), 'error');
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-function authErrorMessage(error) {
-  const text = String(error?.message || '');
-  if (/invalid login credentials/i.test(text)) return 'מספר הטלפון או הסיסמה שגויים';
-  if (/phone provider is not enabled/i.test(text)) return 'יש להפעיל Phone provider בהגדרות Supabase Auth';
-  return text || 'ההתחברות נכשלה';
-}
-
-async function enterApp() {
-  setScreen('loadingScreen');
-  const { data, error } = await state.client.from('hadas_profiles').select('*').eq('id', state.session.user.id).maybeSingle();
-  if (error) throw error;
-  if (!data || !data.active) {
-    await state.client.auth.signOut();
-    throw new Error('המשתמשת אינה פעילה במערכת');
-  }
-  state.profile = data;
-  if (data.must_change_password) return setScreen('passwordScreen');
-
-  setScreen('appShell');
-  applyPermissions();
-  $('#attendanceDate').value = dateISO(new Date());
-  await refreshAll();
-  subscribeRealtime();
-}
-
-async function handlePasswordChange(event) {
-  event.preventDefault();
-  const form = new FormData(event.currentTarget);
-  const password = String(form.get('password') || '');
-  const confirmPassword = String(form.get('confirmPassword') || '');
-  if (password !== confirmPassword) return showToast('הסיסמאות אינן זהות', 'error');
-  const button = event.currentTarget.querySelector('button');
-  setBusy(button, true, 'שומרת…');
-  try {
-    const loginPhone = state.profile.phone;
-    await apiFetch('/api/change-password', { method: 'POST', body: { password } });
-    await state.client.auth.signOut({ scope: 'local' });
-    const { data: loginData, error: loginError } = await state.client.auth.signInWithPassword({ phone: loginPhone, password });
-    if (loginError) throw loginError;
-    state.session = loginData.session;
-    state.profile.must_change_password = false;
-    event.currentTarget.reset();
-    setScreen('appShell');
-    applyPermissions();
-    $('#attendanceDate').value = dateISO(new Date());
-    await refreshAll();
-    subscribeRealtime();
-    showToast('הסיסמה נשמרה בהצלחה', 'success');
-  } catch (error) {
-    showToast(error.message, 'error');
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-async function logout() {
-  if (state.realtimeChannel) await state.client.removeChannel(state.realtimeChannel);
-  state.realtimeChannel = null;
-  await state.client.auth.signOut();
-  state.session = null;
-  state.profile = null;
-  setScreen('loginScreen');
-}
-
-function applyPermissions() {
-  $$('.manager-only').forEach((element) => element.classList.toggle('hidden', !isManager()));
-  $('#userName').textContent = state.profile.full_name;
-  $('#userRole').textContent = `${ROLE_LABELS[state.profile.role] || state.profile.role} · ${state.profile.job_title}`;
-  if (!isManager() && $('.nav-btn[data-tab="employees"]').classList.contains('active')) switchTab('dashboard');
-}
-
-function switchTab(tab) {
-  $$('.nav-btn').forEach((button) => button.classList.toggle('active', button.dataset.tab === tab));
-  $$('.panel').forEach((panel) => panel.classList.toggle('active', panel.id === `${tab}Panel`));
-  if (tab === 'attendance') loadAttendanceDate($('#attendanceDate').value || dateISO(new Date()));
-}
-
-async function apiFetch(url, options = {}) {
-  const { data } = await state.client.auth.getSession();
-  state.session = data.session;
-  if (!state.session) throw new Error('ההתחברות פגה. יש להתחבר מחדש');
-  const response = await fetch(url, {
-    method: options.method || 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${state.session.access_token}`,
-    },
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+function subscribeRealtime(){
+  if(!state.storageClient)return;
+  if(state.realtimeChannel)state.storageClient.removeChannel(state.realtimeChannel);
+  state.realtimeChannel=state.storageClient.channel('hadas-public-refresh').on('postgres_changes',{event:'INSERT',schema:'public',table:'hadas_realtime_events'},()=>{
+    clearTimeout(state.reloadTimer);state.reloadTimer=setTimeout(()=>refreshAll(),450);
+  }).subscribe(status=>{
+    const live=$('#liveStatus');
+    if(status==='SUBSCRIBED')live.innerHTML='<span></span> מתעדכן בזמן אמת';
+    else if(['CHANNEL_ERROR','TIMED_OUT'].includes(status))live.textContent='עדכון חי נותק — קיים רענון אוטומטי';
   });
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'הפעולה נכשלה');
-  return result;
+  clearInterval(state.pollTimer);state.pollTimer=setInterval(()=>refreshAll(),60000);
 }
 
-async function refreshAll() {
-  try {
-    await loadCoreData();
-    await Promise.all([loadWeekData(), loadTodayData(), loadRequests(), loadAttendanceDate($('#attendanceDate').value || dateISO(new Date()))]);
-    renderAll();
-  } catch (error) {
-    console.error(error);
-    showToast(error.message, 'error');
-  }
+function populateSelects(){
+  const classOptions=state.classes.filter(c=>c.active).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  const employeeOptions=state.employees.filter(e=>e.active).map(e=>`<option value="${e.id}">${escapeHtml(e.full_name)} — ${escapeHtml(e.job_title)}</option>`).join('');
+  $('#shiftForm [name="class_id"]').innerHTML=classOptions;$('#shiftForm [name="employee_id"]').innerHTML=employeeOptions;
+  $('#employeeForm [name="primary_class_id"]').innerHTML=`<option value="">ללא כיתה קבועה</option>${classOptions}`;
+  $('#requestForm [name="target_employee_id"]').innerHTML=`<option value="">בחרי עובדת</option>${state.employees.filter(e=>e.active&&e.id!==state.profile.id).map(e=>`<option value="${e.id}">${escapeHtml(e.full_name)}</option>`).join('')}`;
+  for(const form of ['announcementForm','calendarForm','documentForm'])$(`#${form} [name="class_id"]`).innerHTML=`<option value="">${form==='announcementForm'?'כל המעון':'ללא'}</option>${classOptions}`;
+  populateTaskTarget();
 }
 
-async function loadCoreData() {
-  const queries = [
-    state.client.from('hadas_classes').select('*').eq('active', true).order('sort_order'),
-    state.client.from('hadas_profiles').select('*').order('full_name'),
-    state.client.from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
-  ];
-  if (isManager()) {
-    queries.push(state.client.from('hadas_employee_class_constraints').select('*'));
-    queries.push(state.client.from('hadas_employee_private').select('*'));
-  }
-  const results = await Promise.all(queries);
-  for (const result of results) if (result.error) throw result.error;
-  state.classes = results[0].data || [];
-  state.profiles = results[1].data || [];
-  state.settings = results[2].data || state.settings;
-  state.constraints = isManager() ? (results[3].data || []) : [];
-  state.privateRows = isManager() ? (results[4].data || []) : [];
+function renderAll(){renderDashboard();renderSchedule();renderRequests();renderAttendance();renderAnnouncements();renderTasks();renderCalendar();renderDocuments();if(isManager())renderEmployees();}
+
+function shiftLineHtml(shift){const employee=employeeById(shift.employee_id);return `<div class="employee-line"><span><strong>${escapeHtml(employee?.full_name||'עובדת')}</strong><small>${SHIFT_ROLE_LABELS[shift.shift_role]}${shift.public_note?` · ${escapeHtml(shift.public_note)}`:''}</small></span><span>${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</span></div>`;}
+function renderDashboard(){
+  const today=dateISO(new Date());const shifts=state.todayShifts.length?state.todayShifts:state.shifts.filter(s=>s.shift_date===today);const staffed=new Set(shifts.map(s=>s.employee_id));
+  const my=shifts.filter(s=>s.employee_id===state.profile.id);const pending=state.requests.filter(r=>r.status==='pending').length;const dueTasks=state.taskAssignees.filter(a=>a.employee_id===state.profile.id&&a.status!=='done').length;const unread=state.announcements.filter(a=>!state.announcementReads.some(r=>r.announcement_id===a.id&&r.employee_id===state.profile.id)).length;
+  const classCards=state.classes.filter(c=>c.active).map(c=>{const rows=shifts.filter(s=>s.class_id===c.id);const result=coverageFor(rows);return `<article class="class-card"><div class="card-heading"><h3>${escapeHtml(c.name)}</h3><span class="status-chip ${result.ok?'ok':'error'}">${result.ok?'תקין':'דורש טיפול'}</span></div>${rows.length?rows.map(shiftLineHtml).join(''):'<div class="empty-state">אין שיבוץ להיום</div>'}<p class="small-note">${result.count} משובצות · ${result.closing} בסגירה · ${result.leader?'יש גננת/מובילה':'חסרה גננת/מובילה'}</p></article>`;}).join('');
+  $('#dashboardPanel').innerHTML=`<div class="section-heading"><div><h2>שלום ${escapeHtml(state.profile.full_name)}</h2><p class="muted">${formatDate(today,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div></div><div class="dashboard-grid"><article class="summary-card"><span class="caption">השיבוץ שלי היום</span><span class="metric">${my.length||'—'}</span><small>${my.length?my.map(s=>`${classById(s.class_id)?.name||''} ${trimTime(s.start_time)}–${trimTime(s.end_time)}`).join(' · '):'אין שיבוץ'}</small></article><article class="summary-card"><span class="caption">עובדות משובצות</span><span class="metric">${staffed.size}</span><small>בכל המעון היום</small></article><article class="summary-card"><span class="caption">בקשות ממתינות</span><span class="metric">${pending}</span><small>${isManager()?'דורשות טיפול':'הבקשות שלך והחלפות'}</small></article><article class="summary-card"><span class="caption">משימות פתוחות</span><span class="metric">${dueTasks}</span><small>${unread} הודעות שלא נקראו</small></article></div><div class="section-heading" style="margin-top:24px"><div><h2>מצב הכיתות היום</h2></div></div><div class="dashboard-grid">${classCards}</div><article class="summary-card release-card" style="margin-top:20px"><strong>מה חדש בגרסה 0.2.0</strong><p>כניסה ללא מייל, ניהול עובדות, שיבוץ חי, הצעת מחליפות, הודעות, משימות, לוח שנה ומסמכים פרטיים.</p></article>`;
+}
+function coverageFor(rows){const count=new Set(rows.map(s=>s.employee_id)).size;const closingTime=trimTime(state.settings.closing_time||'15:30');const closing=new Set(rows.filter(s=>timeToMinutes(s.end_time)>=timeToMinutes(closingTime)).map(s=>s.employee_id)).size;const leader=rows.some(s=>['teacher','lead'].includes(s.shift_role));return{count,closing,leader,ok:count>=Number(state.settings.required_staff||4)&&closing>=Number(state.settings.closing_required_staff||3)&&leader};}
+
+function weekDates(){return Array.from({length:6},(_,i)=>addDays(state.weekStart,i));}
+function validateScheduleClient(){
+  const errors=[],warnings=[];const open=timeToMinutes(state.settings.opening_time||'07:30'),close=timeToMinutes(state.settings.closing_time||'15:30'),slot=Number(state.settings.validation_slot_minutes||30),closingWindow=Number(state.settings.closing_window_minutes||30);
+  for(const date of weekDates().map(dateISO))for(const c of state.classes.filter(x=>x.active))for(let m=open;m<close;m+=slot){const end=Math.min(m+slot,close);const startT=`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`,endT=`${String(Math.floor(end/60)).padStart(2,'0')}:${String(end%60).padStart(2,'0')}`;const rows=state.shifts.filter(s=>s.shift_date===date&&s.class_id===c.id&&overlaps(s.start_time,s.end_time,startT,endT));const count=new Set(rows.map(s=>s.employee_id)).size;const required=m>=close-closingWindow?Number(state.settings.closing_required_staff||3):Number(state.settings.required_staff||4);if(count<required)errors.push(`${c.name} · ${formatDate(date)} · ${startT}: ${count}/${required} נשות צוות`);if(!rows.some(s=>['teacher','lead'].includes(s.shift_role)))errors.push(`${c.name} · ${formatDate(date)} · ${startT}: חסרה גננת או מובילה`);}
+  for(const employee of state.employees.filter(e=>e.active&&e.weekly_hours!=null)){const mins=state.shifts.filter(s=>s.employee_id===employee.id).reduce((sum,s)=>sum+timeToMinutes(s.end_time)-timeToMinutes(s.start_time),0);const delta=Math.round((mins/60-Number(employee.weekly_hours))*10)/10;if(Math.abs(delta)>=2)warnings.push(`${employee.full_name}: ${delta>0?'חריגה':'חסרות'} ${Math.abs(delta)} שעות`);}
+  return{errors:[...new Set(errors)],warnings:[...new Set(warnings)]};
+}
+function renderSchedule(){
+  const dates=weekDates();$('#weekLabel').textContent=`${formatDate(dates[0])}–${formatDate(dates[5])}`;const validation=validateScheduleClient();$('#scheduleWarnings').innerHTML=`<div class="warning-summary"><span class="warning-pill ${validation.errors.length?'error':'ok'}">${validation.errors.length?`${validation.errors.length} שגיאות`:'אין שגיאות'}</span><span class="warning-pill ${validation.warnings.length?'warn':'ok'}">${validation.warnings.length?`${validation.warnings.length} התראות שעות`:'שעות תקינות'}</span></div>${validation.errors.slice(0,8).map(x=>`<div class="warning-item error">${escapeHtml(x)}</div>`).join('')}${validation.warnings.slice(0,6).map(x=>`<div class="warning-item warn">${escapeHtml(x)}</div>`).join('')}`;
+  const header=dates.map(d=>`<th class="schedule-day-header">${DAY_NAMES[d.getDay()]}<small>${formatDate(d,{day:'2-digit',month:'2-digit'})}</small></th>`).join('');
+  const rows=state.classes.filter(c=>c.active).map(c=>`<tr><td class="class-name">${escapeHtml(c.name)}</td>${dates.map(d=>{const date=dateISO(d);const shifts=state.shifts.filter(s=>s.class_id===c.id&&s.shift_date===date);return `<td><div class="schedule-cell">${shifts.map(s=>`<article class="shift-item shift-row status-${s.status}" data-shift-id="${s.id}"><strong>${escapeHtml(employeeById(s.employee_id)?.full_name||'')}</strong><small>${SHIFT_ROLE_LABELS[s.shift_role]} · ${trimTime(s.start_time)}–${trimTime(s.end_time)}</small>${s.public_note?`<small>${escapeHtml(s.public_note)}</small>`:''}<span class="status-chip ${s.status}">${SHIFT_STATUS_LABELS[s.status]}</span>${isManager()?`<button class="delete-shift" data-action="delete-shift" data-id="${s.id}" title="מחיקה">×</button>`:''}</article>`).join('')||'<div class="empty-state">אין שיבוץ</div>'}${isManager()?`<button class="ghost-btn small-btn" data-action="suggest" data-date="${date}" data-class-id="${c.id}">מציאת מחליפה</button>`:''}</div></td>`;}).join('')}</tr>`).join('');
+  $('#scheduleExport').innerHTML=`<table class="schedule-table"><thead><tr><th class="class-name">כיתה</th>${header}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-async function loadWeekData() {
-  const start = dateISO(state.weekStart);
-  const end = dateISO(addDays(state.weekStart, 5));
-  const [shiftResult, hadas_attendanceResult] = await Promise.all([
-    state.client.from('hadas_shifts').select('*').gte('shift_date', start).lte('shift_date', end).order('shift_date').order('start_time'),
-    state.client.from('hadas_attendance').select('*').gte('attendance_date', start).lte('attendance_date', end),
-  ]);
-  if (shiftResult.error) throw shiftResult.error;
-  if (hadas_attendanceResult.error) throw hadas_attendanceResult.error;
-  state.shifts = shiftResult.data || [];
-  state.attendance = hadas_attendanceResult.data || [];
-}
+async function handleScheduleClick(event){const deleteBtn=event.target.closest('[data-action="delete-shift"]');if(deleteBtn){event.stopPropagation();if(confirm('למחוק את השיבוץ?')){await apiFetch('/api/shifts',{method:'DELETE',body:{id:deleteBtn.dataset.id}});await refreshAll();}return;}const suggest=event.target.closest('[data-action="suggest"]');if(suggest)return showSuggestions(suggest.dataset.date,suggest.dataset.classId);const item=event.target.closest('[data-shift-id]');if(item&&isManager())openShiftDialog(state.shifts.find(s=>s.id===item.dataset.shiftId));}
+function openShiftDialog(shift={}){const form=$('#shiftForm');form.reset();form.elements.id.value=shift.id||'';form.elements.shift_date.value=shift.shift_date||dateISO(state.weekStart);form.elements.class_id.value=shift.class_id||state.classes[0]?.id||'';form.elements.employee_id.value=shift.employee_id||state.employees.find(e=>e.active)?.id||'';form.elements.start_time.value=trimTime(shift.start_time)||'07:30';form.elements.end_time.value=trimTime(shift.end_time)||'15:30';form.elements.shift_role.value=shift.shift_role||'staff';form.elements.status.value=shift.status||'draft';form.elements.public_note.value=shift.public_note||'';form.elements.override_day_off.value='false';$('#shiftDialog').showModal();}
+async function saveShift(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form);data.override_day_off=data.override_day_off==='true';setBusy(button,true);try{try{await apiFetch('/api/shifts',{method:data.id?'PATCH':'POST',body:data});}catch(error){if(error.status===409&&/יום החופשי/.test(error.message)&&confirm(`${error.message}\nלשמור בכל זאת?`)){data.override_day_off=true;await apiFetch('/api/shifts',{method:data.id?'PATCH':'POST',body:data});}else throw error;}$('#shiftDialog').close();await refreshAll();showToast('השיבוץ נשמר','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function publishWeek(status,force=false){try{const data=await apiFetch('/api/shifts',{method:'POST',body:{action:'publish',week_start:dateISO(state.weekStart),status,force}});showToast(status==='final'?'השיבוץ פורסם כסופי':'השיבוץ פורסם כזמני','success');await refreshAll();return data;}catch(error){if(status==='temporary'&&error.data?.canForce&&confirm(`${error.message}\nלפרסם זמנית למרות השגיאות?`))return publishWeek(status,true);showToast(error.message,'error');}}
+async function copyPreviousWeek(){if(!confirm('להעתיק את השיבוץ מהשבוע הקודם כטיוטה?'))return;try{await apiFetch('/api/shifts',{method:'POST',body:{action:'copy_previous',week_start:dateISO(state.weekStart)}});await refreshAll();showToast('השבוע הועתק','success');}catch(error){if(/כבר קיימים/.test(error.message)&&confirm('כבר קיימים שיבוצים. למחוק אותם ולהעתיק מחדש?')){await apiFetch('/api/shifts',{method:'POST',body:{action:'copy_previous',week_start:dateISO(state.weekStart),force:true}});await refreshAll();}else showToast(error.message,'error');}}
+async function acknowledgeSchedule(){try{await apiFetch('/api/shifts',{method:'POST',body:{action:'ack',week_start:dateISO(state.weekStart)}});await refreshAll();showToast('אישור הקריאה נשמר','success');}catch(error){showToast(error.message,'error');}}
+async function downloadScheduleImage(){if(!window.html2canvas)return showToast('רכיב שמירת התמונה לא נטען','error');const canvas=await window.html2canvas($('#scheduleExport'),{scale:1.5,backgroundColor:'#ffffff'});const link=document.createElement('a');link.download=`שיבוץ-הדס-${dateISO(state.weekStart)}.png`;link.href=canvas.toDataURL('image/png');link.click();}
 
-async function loadTodayData() {
-  const today = dateISO(new Date());
-  const { data, error } = await state.client.from('hadas_shifts').select('*').eq('shift_date', today).order('start_time');
-  if (error) throw error;
-  state.todayShifts = data || [];
-}
+async function showSuggestions(date,classId){state.suggestionsContext={date,classId,start:'07:30',end:'15:30',role:'staff'};$('#suggestionsList').innerHTML='<div class="empty-state">מחפש עובדות פנויות…</div>';$('#suggestionsDialog').showModal();try{const result=await apiFetch(`/api/suggestions?date=${date}&class_id=${classId}&start_time=07:30&end_time=15:30&shift_role=staff`);$('#suggestionsList').innerHTML=result.candidates.length?result.candidates.map(c=>`<article class="suggestion-card"><div class="card-heading"><div><h3>${escapeHtml(c.full_name)}</h3><p class="muted">${escapeHtml(c.job_title)}</p></div><span class="score-chip">ציון ${c.score}</span></div><ul class="reason-list">${c.reasons.map(r=>`<li>${escapeHtml(r)}</li>`).join('')}</ul><button class="primary-btn" data-action="use-suggestion" data-id="${c.employee_id}" data-role="${c.suggested_role}">שיבוץ העובדת</button></article>`).join(''):'<div class="empty-state">לא נמצאה מחליפה זמינה.</div>';}catch(error){$('#suggestionsList').innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;}}
+async function handleSuggestionClick(event){const btn=event.target.closest('[data-action="use-suggestion"]');if(!btn)return;const c=state.suggestionsContext;try{await apiFetch('/api/shifts',{method:'POST',body:{shift_date:c.date,class_id:c.classId,employee_id:btn.dataset.id,start_time:c.start,end_time:c.end,shift_role:btn.dataset.role,status:'draft',public_note:'שובצה כהחלפה'}});$('#suggestionsDialog').close();await refreshAll();showToast('המחליפה שובצה','success');}catch(error){showToast(error.message,'error');}}
 
-async function loadRequests() {
-  const { data, error } = await state.client.from('hadas_requests').select('*').order('created_at', { ascending: false });
-  if (error) throw error;
-  state.requests = data || [];
-}
+function renderEmployees(){const rows=state.employees.map(e=>`<tr><td><strong>${escapeHtml(e.full_name)}</strong><small>${escapeHtml(e.job_title)}</small></td><td>${escapeHtml(e.phone||'')}</td><td>${escapeHtml(classById(e.primary_class_id)?.name||'ללא')}</td><td>${ROLE_LABELS[e.role]||e.role}</td><td>${e.weekly_hours??'—'}</td><td><span class="status-chip ${e.active?'ok':'error'}">${e.active?'פעילה':'לא פעילה'}</span></td><td><div class="card-actions"><button class="ghost-btn small-btn" data-action="edit-employee" data-id="${e.id}">עריכה</button><button class="secondary-btn small-btn" data-action="reset-password" data-id="${e.id}">איפוס סיסמה</button><button class="${e.active?'danger-btn':'primary-btn'} small-btn" data-action="${e.active?'deactivate-employee':'activate-employee'}" data-id="${e.id}">${e.active?'השבתה':'הפעלה'}</button></div></td></tr>`).join('');$('#employeesList').innerHTML=`<div class="table-scroll"><table class="data-table"><thead><tr><th>עובדת</th><th>טלפון</th><th>כיתה</th><th>הרשאה</th><th>שעות</th><th>מצב</th><th>פעולות</th></tr></thead><tbody>${rows}</tbody></table></div>`;}
+function renderConstraintFields(employeeId){$('#constraintsFields').innerHTML=state.classes.filter(c=>c.active).map(c=>{const item=state.constraints.find(x=>x.employee_id===employeeId&&x.class_id===c.id)||{};return `<div class="constraint-row" data-class-id="${c.id}"><strong>${escapeHtml(c.name)}</strong><select class="constraint-type"><option value="">ללא</option><option value="preferred" ${item.constraint_type==='preferred'?'selected':''}>עדיפות</option><option value="avoid" ${item.constraint_type==='avoid'?'selected':''}>עדיף להימנע</option><option value="forbidden" ${item.constraint_type==='forbidden'?'selected':''}>אסור</option></select><input class="constraint-from" type="date" value="${item.valid_from||''}" title="מתאריך"/><input class="constraint-to" type="date" value="${item.valid_to||''}" title="עד תאריך"/><input class="constraint-reason" value="${escapeHtml(item.reason||'')}" placeholder="סיבה"/></div>`;}).join('');}
+function collectConstraints(){return $$('.constraint-row').map(row=>({class_id:row.dataset.classId,constraint_type:$('.constraint-type',row).value,valid_from:$('.constraint-from',row).value||null,valid_to:$('.constraint-to',row).value||null,reason:$('.constraint-reason',row).value||null})).filter(x=>x.constraint_type);}
+function openEmployeeDialog(id){const form=$('#employeeForm');form.reset();const e=id?employeeById(id):null;form.elements.id.value=e?.id||'';form.elements.full_name.value=e?.full_name||'';form.elements.phone.value=e?.phone||'';form.elements.job_title.value=e?.job_title||'אשת צוות';form.elements.role.value=e?.role||'employee';form.elements.primary_class_id.value=e?.primary_class_id||'';form.elements.can_lead.value=String(Boolean(e?.can_lead));form.elements.weekly_hours.value=e?.weekly_hours??'';form.elements.employment_percent.value=e?.employment_percent??'';form.elements.fixed_day_off.value=e?.fixed_day_off??'';form.elements.default_start.value=trimTime(e?.default_start)||'07:30';form.elements.default_end.value=trimTime(e?.default_end)||'15:30';form.elements.admin_notes.value=e?.admin_notes||'';renderConstraintFields(e?.id);$('#employeeDialog').showModal();}
+async function saveEmployee(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form);data.can_lead=data.can_lead==='true';data.constraints=collectConstraints();setBusy(button,true);try{await apiFetch('/api/employees',{method:data.id?'PATCH':'POST',body:data});$('#employeeDialog').close();await refreshAll();showToast('כרטיס העובדת נשמר','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function handleEmployeeClick(event){const btn=event.target.closest('[data-action]');if(!btn)return;const id=btn.dataset.id;try{if(btn.dataset.action==='edit-employee')return openEmployeeDialog(id);if(btn.dataset.action==='reset-password'){if(!confirm('לאפס את הסיסמה ל-hadas ולנתק את העובדת?'))return;await apiFetch('/api/employees',{method:'PATCH',body:{id,reset_password:true}});}if(btn.dataset.action==='deactivate-employee'){if(!confirm('להשבית את העובדת? ההיסטוריה תישמר.'))return;await apiFetch('/api/employees',{method:'DELETE',body:{id}});}if(btn.dataset.action==='activate-employee')await apiFetch('/api/employees',{method:'PATCH',body:{id,active:true}});await refreshAll();showToast('העובדת עודכנה','success');}catch(error){showToast(error.message,'error');}}
 
-async function loadAttendanceDate(date) {
-  if (!state.client || !date) return;
-  const [shiftResult, hadas_attendanceResult] = await Promise.all([
-    state.client.from('hadas_shifts').select('*').eq('shift_date', date).order('start_time'),
-    state.client.from('hadas_attendance').select('*').eq('attendance_date', date),
-  ]);
-  if (shiftResult.error) return showToast(shiftResult.error.message, 'error');
-  if (hadas_attendanceResult.error) return showToast(hadas_attendanceResult.error.message, 'error');
-  state.attendanceDateShifts = shiftResult.data || [];
-  state.attendanceDateRows = hadas_attendanceResult.data || [];
-  renderAttendance();
-}
+function openRequestDialog(){const form=$('#requestForm');form.reset();form.elements.request_date.value=dateISO(new Date());updateRequestShiftOptions();updateRequestFields();$('#requestDialog').showModal();}
+function updateRequestFields(){const form=$('#requestForm'),type=form.elements.request_type.value,needsShift=['late_start','early_finish','swap'].includes(type);$$('.request-start').forEach(e=>e.classList.toggle('hidden',type!=='late_start'));$$('.request-end').forEach(e=>e.classList.toggle('hidden',type!=='early_finish'));$$('.shift-choice-field').forEach(e=>e.classList.toggle('hidden',!needsShift));$$('.swap-field').forEach(e=>e.classList.toggle('hidden',type!=='swap'));form.elements.shift_id.required=needsShift;form.elements.target_employee_id.required=type==='swap';form.elements.target_shift_id.required=type==='swap';form.elements.requested_start.required=type==='late_start';form.elements.requested_end.required=type==='early_finish';}
+function updateRequestShiftOptions(){const mine=state.shifts.filter(s=>s.employee_id===state.profile.id);$('#requestForm [name="shift_id"]').innerHTML=`<option value="">בחרי שיבוץ</option>${mine.map(s=>`<option value="${s.id}">${formatDate(s.shift_date)} · ${classById(s.class_id)?.name||''} · ${trimTime(s.start_time)}–${trimTime(s.end_time)}</option>`).join('')}`;populateTargetShifts();}
+function syncRequestDateFromShift(){const form=$('#requestForm'),shift=state.shifts.find(s=>s.id===form.elements.shift_id.value);if(shift)form.elements.request_date.value=shift.shift_date;}
+function populateTargetShifts(){const id=$('#requestForm [name="target_employee_id"]').value;$('#requestForm [name="target_shift_id"]').innerHTML=`<option value="">בחרי שיבוץ</option>${state.shifts.filter(s=>s.employee_id===id).map(s=>`<option value="${s.id}">${formatDate(s.shift_date)} · ${classById(s.class_id)?.name||''} · ${trimTime(s.start_time)}–${trimTime(s.end_time)}</option>`).join('')}`;}
+async function saveRequest(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form);setBusy(button,true,'שולחת…');try{await apiFetch('/api/requests',{method:'POST',body:{action:'create',...data}});$('#requestDialog').close();await refreshAll();showToast('הבקשה נשלחה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+function renderRequests(){$('#requestsList').innerHTML=state.requests.length?state.requests.map(r=>{const requester=employeeById(r.requester_id),target=employeeById(r.target_employee_id);return `<article class="request-card"><div class="card-heading"><div><h3>${REQUEST_LABELS[r.request_type]}</h3><p class="muted">${escapeHtml(requester?.full_name||'')} · ${formatDate(r.request_date)}</p></div><span class="status-chip ${r.status==='rejected'?'error':r.status==='applied'?'ok':'warn'}">${REQUEST_STATUS_LABELS[r.status]}</span></div><div class="meta-grid"><div class="meta-item"><small>פירוט</small>${escapeHtml(r.reason||'ללא')}</div><div class="meta-item"><small>החלפה עם</small>${escapeHtml(target?.full_name||'לא רלוונטי')}${r.request_type==='swap'?` · ${r.target_approved?'אישרה':'טרם אישרה'}`:''}</div></div>${r.manager_note?`<div class="manager-note"><strong>הערת מנהלת:</strong> ${escapeHtml(r.manager_note)}</div>`:''}<div class="card-actions">${r.request_type==='swap'&&r.target_employee_id===state.profile.id&&!r.target_approved&&r.status==='pending'?`<button class="secondary-btn" data-action="target_accept" data-id="${r.id}">אני מסכימה</button>`:''}${r.requester_id===state.profile.id&&r.status==='pending'?`<button class="ghost-btn" data-action="cancel" data-id="${r.id}">ביטול</button>`:''}${isManager()&&r.status==='pending'?`<button class="primary-btn" data-action="approve" data-id="${r.id}">אישור</button><button class="danger-btn" data-action="reject" data-id="${r.id}">דחייה</button>`:''}${isManager()&&r.status==='approved'?`<button class="primary-btn" data-action="apply" data-id="${r.id}">הזרמה לשיבוץ</button>`:''}</div></article>`;}).join(''):'<div class="empty-state">אין בקשות.</div>';}
+async function handleRequestClick(event){const btn=event.target.closest('[data-action]');if(!btn)return;let body={id:btn.dataset.id,action:btn.dataset.action};if(btn.dataset.action==='approve'||btn.dataset.action==='reject'){body={...body,action:'decide',status:btn.dataset.action==='approve'?'approved':'rejected',manager_note:prompt('הערה לעובדת (אפשר להשאיר ריק):')||''};}if(btn.dataset.action==='apply'&&!confirm('להזרים את הבקשה לשיבוץ בפועל?'))return;try{await apiFetch('/api/requests',{method:'POST',body});await refreshAll();showToast('הבקשה עודכנה','success');}catch(error){showToast(error.message,'error');}}
 
-function subscribeRealtime() {
-  if (state.realtimeChannel) state.client.removeChannel(state.realtimeChannel);
-  const tables = ['hadas_profiles', 'hadas_shifts', 'hadas_attendance', 'hadas_requests', 'hadas_schedule_acknowledgements'];
-  let channel = state.client.channel(`hadas-live-${state.profile.id}`);
-  for (const table of tables) {
-    channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, scheduleRealtimeReload);
-  }
-  state.realtimeChannel = channel.subscribe((status) => {
-    const live = $('#liveStatus');
-    if (status === 'SUBSCRIBED') {
-      live.innerHTML = '<span></span> מתעדכן בזמן אמת';
-    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-      live.textContent = 'החיבור לעדכונים בזמן אמת נותק';
-    }
-  });
-}
+function renderAttendance(){const shifts=state.shifts.filter(s=>s.shift_date===state.attendanceDate&&(isManager()||s.employee_id===state.profile.id));$('#attendanceList').innerHTML=shifts.length?shifts.map(s=>{const row=state.attendance.find(a=>a.shift_id===s.id);return `<article class="attendance-card" data-shift-id="${s.id}"><div class="card-heading"><div><h3>${escapeHtml(employeeById(s.employee_id)?.full_name||'')}</h3><p class="muted">${escapeHtml(classById(s.class_id)?.name||'')} · ${trimTime(s.start_time)}–${trimTime(s.end_time)}</p></div><span class="role-chip">${SHIFT_ROLE_LABELS[s.shift_role]}</span></div>${isManager()?`<div class="form-grid"><label>מצב<select class="attendance-status">${Object.entries(ATTENDANCE_LABELS).map(([v,l])=>`<option value="${v}" ${(row?.status||'scheduled')===v?'selected':''}>${l}</option>`).join('')}</select></label><label>התחלה בפועל<input class="attendance-start" type="time" value="${trimTime(row?.actual_start)||trimTime(s.start_time)}"/></label><label>סיום בפועל<input class="attendance-end" type="time" value="${trimTime(row?.actual_end)||trimTime(s.end_time)}"/></label><label>הערה<input class="attendance-note" value="${escapeHtml(row?.note||'')}"/></label></div><button class="primary-btn" data-action="save-attendance">שמירה</button>`:`<div class="meta-grid"><div class="meta-item"><small>מצב</small>${ATTENDANCE_LABELS[row?.status||'scheduled']}</div><div class="meta-item"><small>בפועל</small>${trimTime(row?.actual_start)||'—'}–${trimTime(row?.actual_end)||'—'}</div></div>`}</article>`;}).join(''):`<div class="empty-state">אין שיבוצים בתאריך ${formatDate(state.attendanceDate)}.</div>`;}
+async function handleAttendanceClick(event){const btn=event.target.closest('[data-action="save-attendance"]');if(!btn)return;const card=btn.closest('[data-shift-id]');try{await apiFetch('/api/attendance',{method:'POST',body:{shift_id:card.dataset.shiftId,status:$('.attendance-status',card).value,actual_start:$('.attendance-start',card).value,actual_end:$('.attendance-end',card).value,note:$('.attendance-note',card).value}});await refreshAll();showToast('הנוכחות נשמרה','success');}catch(error){showToast(error.message,'error');}}
 
-function scheduleRealtimeReload() {
-  clearTimeout(state.reloadTimer);
-  state.reloadTimer = setTimeout(async () => {
-    await refreshAll();
-    showToast('המערכת התעדכנה', 'success');
-  }, 450);
-}
+function openDialogForm(dialogSelector,formSelector){const form=$(formSelector);form.reset();$(dialogSelector).showModal();}
+function renderAnnouncements(){$('#announcementsList').innerHTML=state.announcements.length?state.announcements.map(a=>{const read=state.announcementReads.some(r=>r.announcement_id===a.id&&r.employee_id===state.profile.id);const readCount=state.announcementReads.filter(r=>r.announcement_id===a.id).length;return `<article class="announcement-card ${a.announcement_type}"><div class="card-heading"><div><h3>${escapeHtml(a.title)}${!read?'<span class="unread-dot"></span>':''}</h3><p class="muted">${formatDate(a.published_at,{day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}</p></div><span class="status-chip ${a.announcement_type==='urgent'?'error':a.announcement_type==='important'?'warn':'ok'}">${a.announcement_type==='urgent'?'דחוף':a.announcement_type==='important'?'חשוב':'מידע'}</span></div><p>${escapeHtml(a.body).replaceAll('\n','<br>')}</p><div class="card-actions">${!read?`<button class="primary-btn" data-action="read" data-id="${a.id}">קראתי</button>`:''}${isManager()?`<span class="small-note">נקראה על ידי ${readCount}</span><button class="danger-btn" data-action="delete" data-id="${a.id}">הסרה</button>`:''}</div></article>`;}).join(''):'<div class="empty-state">אין הודעות.</div>';}
+async function saveAnnouncement(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form);data.expires_at=toIsoDateTime(data.expires_at);setBusy(button,true);try{await apiFetch('/api/announcements',{method:'POST',body:data});$('#announcementDialog').close();await refreshAll();showToast('ההודעה פורסמה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function handleAnnouncementClick(event){const btn=event.target.closest('[data-action]');if(!btn)return;try{if(btn.dataset.action==='delete'&&!confirm('להסיר את ההודעה?'))return;await apiFetch('/api/announcements',{method:btn.dataset.action==='delete'?'DELETE':'POST',body:{action:btn.dataset.action,id:btn.dataset.id}});await refreshAll();}catch(error){showToast(error.message,'error');}}
 
-function renderAll() {
-  renderDashboard();
-  renderSchedule();
-  renderEmployees();
-  renderRequests();
-  renderAttendance();
-  populateCommonSelects();
-}
+function populateTaskTarget(){const form=$('#taskForm'),type=form.elements.target_type.value;form.elements.target_id.disabled=type==='all';form.elements.target_id.innerHTML=type==='class'?`<option value="">בחרי כיתה</option>${state.classes.filter(c=>c.active).map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('')}`:type==='employee'?`<option value="">בחרי עובדת</option>${state.employees.filter(e=>e.active).map(e=>`<option value="${e.id}">${escapeHtml(e.full_name)}</option>`).join('')}`:'<option value="">כל העובדות</option>';}
+function openTaskDialog(){const form=$('#taskForm');form.reset();populateTaskTarget();$('#taskDialog').showModal();}
+function renderTasks(){$('#tasksList').innerHTML=state.tasks.filter(t=>t.active).length?state.tasks.filter(t=>t.active).map(t=>{const assignments=state.taskAssignees.filter(a=>a.task_id===t.id),mine=assignments.find(a=>a.employee_id===state.profile.id),done=assignments.filter(a=>a.status==='done').length,percent=assignments.length?Math.round(done/assignments.length*100):0;return `<article class="task-card"><div class="card-heading"><div><h3>${escapeHtml(t.title)}</h3><p class="muted">עדיפות ${PRIORITY_LABELS[t.priority]}${t.due_at?` · עד ${formatDate(t.due_at,{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})}`:''}</p></div><span class="status-chip ${t.priority==='urgent'?'error':t.priority==='important'?'warn':'ok'}">${mine?.status==='done'?'בוצע':'פתוח'}</span></div><p>${escapeHtml(t.description||'ללא פירוט')}</p>${isManager()?`<div class="small-note">${done} מתוך ${assignments.length} ביצעו</div><div class="progress-track"><span style="width:${percent}%"></span></div>`:''}<div class="card-actions">${mine?`<button class="${mine.status==='done'?'ghost-btn':'primary-btn'}" data-action="${mine.status==='done'?'reopen':'complete'}" data-id="${t.id}">${mine.status==='done'?'פתיחה מחדש':'סימון בוצע'}</button>`:''}${isManager()?`<button class="danger-btn" data-action="delete" data-id="${t.id}">הסרה</button>`:''}</div></article>`;}).join(''):'<div class="empty-state">אין משימות.</div>';}
+async function saveTask(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form);data.due_at=toIsoDateTime(data.due_at);setBusy(button,true);try{await apiFetch('/api/tasks',{method:'POST',body:data});$('#taskDialog').close();await refreshAll();showToast('המשימה נוצרה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function handleTaskClick(event){const btn=event.target.closest('[data-action]');if(!btn)return;if(btn.dataset.action==='delete'&&!confirm('להסיר את המשימה?'))return;try{await apiFetch('/api/tasks',{method:btn.dataset.action==='delete'?'DELETE':'POST',body:{action:btn.dataset.action,id:btn.dataset.id}});await refreshAll();}catch(error){showToast(error.message,'error');}}
 
-function populateCommonSelects() {
-  const classOptions = state.classes.map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
-  const profileOptions = state.profiles.filter((item) => item.active).map((item) => `<option value="${item.id}">${escapeHtml(item.full_name)} — ${escapeHtml(item.job_title)}</option>`).join('');
-  $('#shiftForm [name="class_id"]').innerHTML = classOptions;
-  $('#shiftForm [name="employee_id"]').innerHTML = profileOptions;
-  $('#employeeForm [name="primary_class_id"]').innerHTML = `<option value="">ללא כיתה קבועה</option>${classOptions}`;
-  $('#requestForm [name="target_employee_id"]').innerHTML = `<option value="">בחרי עובדת</option>${state.profiles.filter((item) => item.active && item.id !== state.profile.id).map((item) => `<option value="${item.id}">${escapeHtml(item.full_name)}</option>`).join('')}`;
-}
+function openCalendarDialog(){const form=$('#calendarForm');form.reset();form.elements.event_date.value=dateISO(new Date());$('#calendarDialog').showModal();}
+function renderCalendar(){$('#calendarList').innerHTML=state.calendarEvents.length?state.calendarEvents.map(e=>`<article class="timeline-item"><div class="timeline-date">${formatDate(e.event_date,{weekday:'short',day:'numeric',month:'short'})}</div><div class="timeline-content"><h3>${escapeHtml(e.title)}</h3><p>${EVENT_LABELS[e.event_type]}${e.start_time?` · ${trimTime(e.start_time)}${e.end_time?`–${trimTime(e.end_time)}`:''}`:''}${e.class_id?` · ${escapeHtml(classById(e.class_id)?.name||'')}`:''}</p>${e.description?`<p>${escapeHtml(e.description)}</p>`:''}</div>${isManager()?`<div class="card-actions"><button class="danger-btn small-btn" data-action="delete" data-id="${e.id}">מחיקה</button></div>`:''}</article>`).join(''):'<div class="empty-state">אין אירועים בטווח הקרוב.</div>';}
+async function saveCalendarEvent(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form);setBusy(button,true);try{await apiFetch('/api/calendar',{method:'POST',body:data});$('#calendarDialog').close();await refreshAll();showToast('האירוע נשמר','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function handleCalendarClick(event){const btn=event.target.closest('[data-action="delete"]');if(!btn||!confirm('למחוק את האירוע?'))return;try{await apiFetch('/api/calendar',{method:'DELETE',body:{id:btn.dataset.id}});await refreshAll();}catch(error){showToast(error.message,'error');}}
 
-function renderDashboard() {
-  const today = dateISO(new Date());
-  const myShifts = state.todayShifts.filter((shift) => shift.employee_id === state.profile.id);
-  const staffedEmployees = new Set(state.todayShifts.map((shift) => shift.employee_id));
-  const activeEmployees = state.profiles.filter((profile) => profile.active);
-  const unassigned = activeEmployees.filter((profile) => !staffedEmployees.has(profile.id) && profile.fixed_day_off !== new Date().getDay() && !hasApprovedAbsence(profile.id, today));
-  const classCards = state.classes.map((classItem) => {
-    const hadas_shifts = state.todayShifts.filter((shift) => shift.class_id === classItem.id);
-    const unique = new Set(hadas_shifts.map((shift) => shift.employee_id)).size;
-    const closing = new Set(hadas_shifts.filter((shift) => timeToMinutes(shift.end_time) >= timeToMinutes(state.settings.closing_time)).map((shift) => shift.employee_id)).size;
-    const hasLeader = hadas_shifts.some((shift) => ['teacher', 'lead'].includes(shift.shift_role));
-    const ok = unique >= state.settings.required_staff && closing >= state.settings.closing_required_staff && hasLeader;
-    return `
-      <article class="class-card">
-        <div class="card-heading"><h3>${escapeHtml(classItem.name)}</h3><span class="status-chip ${ok ? 'ok' : 'error'}">${ok ? 'תקין' : 'דורש טיפול'}</span></div>
-        ${hadas_shifts.length ? hadas_shifts.map(shiftLineHtml).join('') : '<div class="empty-state">אין שיבוץ להיום</div>'}
-        <p class="small-note">${unique} נשות צוות · ${closing} עד הסגירה · ${hasLeader ? 'יש גננת/מובילה' : 'חסרה גננת/מובילה'}</p>
-      </article>`;
-  }).join('');
+function fileSize(size){const n=Number(size||0);if(n<1024)return`${n} B`;if(n<1024*1024)return`${(n/1024).toFixed(1)} KB`;return`${(n/1024/1024).toFixed(1)} MB`;}
+function renderDocuments(){$('#documentsList').innerHTML=state.documents.length?state.documents.map(d=>`<article class="document-card"><div class="card-heading"><div><h3>${escapeHtml(d.title)}</h3><p class="muted">${escapeHtml(d.file_name)} · ${fileSize(d.size_bytes)}</p></div><span class="role-chip">מסמך</span></div>${d.description?`<p>${escapeHtml(d.description)}</p>`:''}<div class="card-actions"><button class="primary-btn" data-action="download" data-id="${d.id}">הורדה</button>${isManager()?`<button class="danger-btn" data-action="delete" data-id="${d.id}">הסרה</button>`:''}</div></article>`).join(''):'<div class="empty-state">אין מסמכים.</div>';}
+async function saveDocument(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form),file=form.elements.file.files[0];if(!file)return;if(!state.storageClient)return showToast('רכיב העלאת הקבצים לא נטען. רעננו את הדף ונסו שוב.','error');setBusy(button,true,'מעלה…');try{const prepared=await apiFetch('/api/documents',{method:'POST',body:{action:'prepare',file_name:file.name,mime_type:file.type,size_bytes:file.size}});const upload=await state.storageClient.storage.from('hadas-documents').uploadToSignedUrl(prepared.path,prepared.token,file,{contentType:file.type});if(upload.error)throw upload.error;await apiFetch('/api/documents',{method:'POST',body:{action:'confirm',title:data.title,description:data.description,visibility:data.visibility,class_id:data.class_id||null,file_name:file.name,storage_path:prepared.path,mime_type:file.type,size_bytes:file.size}});$('#documentDialog').close();await refreshAll();showToast('המסמך הועלה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function handleDocumentClick(event){const btn=event.target.closest('[data-action]');if(!btn)return;try{if(btn.dataset.action==='download'){const data=await apiFetch(`/api/documents?id=${btn.dataset.id}`);window.location.href=data.url;}else{if(!confirm('להסיר את המסמך?'))return;await apiFetch('/api/documents',{method:'DELETE',body:{id:btn.dataset.id}});await refreshAll();}}catch(error){showToast(error.message,'error');}}
 
-  $('#dashboardPanel').innerHTML = `
-    <div class="section-heading"><div><h2>שלום ${escapeHtml(state.profile.full_name)}</h2><p class="muted">${formatDate(today, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div></div>
-    <div class="dashboard-grid">
-      <article class="summary-card"><span class="caption">השיבוץ שלי היום</span><span class="metric">${myShifts.length || '—'}</span><small>${myShifts.length ? myShifts.map((s) => `${classById(s.class_id)?.name || ''} ${trimTime(s.start_time)}–${trimTime(s.end_time)}`).join(' · ') : 'לא קיים שיבוץ'}</small></article>
-      <article class="summary-card"><span class="caption">עובדות משובצות היום</span><span class="metric">${staffedEmployees.size}</span><small>בכל כיתות המעון</small></article>
-      <article class="summary-card"><span class="caption">בקשות ממתינות</span><span class="metric">${state.requests.filter((request) => request.status === 'pending').length}</span><small>בקשות שטרם טופלו</small></article>
-      <article class="summary-card"><span class="caption">עובדות ללא שיבוץ</span><span class="metric">${unassigned.length}</span><small>${isManager() ? unassigned.slice(0, 4).map((p) => p.full_name).join(', ') || 'אין' : 'מוצג לאחראיות השיבוץ'}</small></article>
-    </div>
-    <div class="section-heading" style="margin-top:24px"><div><h2>מצב הכיתות היום</h2><p class="muted">כוח אדם לפי השיבוץ שפורסם.</p></div></div>
-    <div class="dashboard-grid">${classCards}</div>
-  `;
-}
-
-function shiftLineHtml(shift) {
-  const profile = profileById(shift.employee_id);
-  return `<div class="employee-line"><span><strong>${escapeHtml(profile?.full_name || 'עובדת')}</strong><small>${SHIFT_ROLE_LABELS[shift.shift_role]}${shift.public_note ? ` · ${escapeHtml(shift.public_note)}` : ''}</small></span><span>${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</span></div>`;
-}
-
-function weekDates() {
-  return Array.from({ length: 6 }, (_, index) => addDays(state.weekStart, index));
-}
-
-function validateSchedule() {
-  const warnings = [];
-  const cellStatus = new Map();
-  for (const date of weekDates()) {
-    const iso = dateISO(date);
-    for (const classItem of state.classes) {
-      const key = `${iso}:${classItem.id}`;
-      const hadas_shifts = state.shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id);
-      const unique = new Set(hadas_shifts.map((shift) => shift.employee_id)).size;
-      const closing = new Set(hadas_shifts.filter((shift) => timeToMinutes(shift.end_time) >= timeToMinutes(state.settings.closing_time)).map((shift) => shift.employee_id)).size;
-      const hasLeader = hadas_shifts.some((shift) => ['teacher', 'lead'].includes(shift.shift_role));
-      const problems = [];
-      if (unique < Number(state.settings.required_staff)) problems.push(`רק ${unique} מתוך ${state.settings.required_staff} נשות צוות`);
-      if (closing < Number(state.settings.closing_required_staff)) problems.push(`רק ${closing} נשות צוות נשארות עד ${trimTime(state.settings.closing_time)}`);
-      if (!hasLeader) problems.push('אין גננת או מובילה');
-
-      for (const shift of hadas_shifts) {
-        const profile = profileById(shift.employee_id);
-        if (profile?.fixed_day_off === date.getDay()) problems.push(`${profile.full_name} משובצת ביום החופשי הקבוע שלה`);
-        const forbidden = activeConstraint(shift.employee_id, classItem.id, iso, 'forbidden');
-        if (forbidden) problems.push(`${profile?.full_name || 'עובדת'} מוגבלת משיבוץ בכיתה`);
-      }
-
-      const severity = problems.length ? 'error' : 'ok';
-      cellStatus.set(key, { severity, problems, unique, closing, hasLeader });
-      for (const problem of problems) warnings.push({ severity: 'error', text: `${DAY_NAMES[date.getDay()]} ${formatDate(date, { day: '2-digit', month: '2-digit' })} · ${classItem.name}: ${problem}` });
-    }
-  }
-
-  for (const profile of state.profiles.filter((item) => item.active && item.weekly_hours)) {
-    const assignedMinutes = state.shifts.filter((shift) => shift.employee_id === profile.id).reduce((sum, shift) => sum + minutesBetween(shift.start_time, shift.end_time), 0);
-    const assignedHours = assignedMinutes / 60;
-    if (assignedHours > Number(profile.weekly_hours) + 0.25) {
-      warnings.push({ severity: 'warning', text: `${profile.full_name} שובצה ${assignedHours.toFixed(1)} שעות לעומת ${profile.weekly_hours} שעות שבועיות.` });
-    }
-  }
-
-  return { warnings, cellStatus };
-}
-
-function renderSchedule() {
-  const dates = weekDates();
-  const { warnings, cellStatus } = validateSchedule();
-  $('#weekLabel').textContent = `${formatDate(dates[0])}–${formatDate(dates[5])}`;
-  $('#scheduleWarnings').innerHTML = warnings.length
-    ? warnings.map((warning) => `<div class="warning-row ${warning.severity}">${escapeHtml(warning.text)}</div>`).join('')
-    : '<div class="notice success">לא נמצאו חריגות בסיסיות בשיבוץ השבועי.</div>';
-
-  const header = dates.map((date) => `<th>${DAY_NAMES[date.getDay()]}<br><small>${formatDate(date, { day: '2-digit', month: '2-digit' })}</small></th>`).join('');
-  const rows = state.classes.map((classItem) => {
-    const cells = dates.map((date) => {
-      const iso = dateISO(date);
-      const hadas_shifts = state.shifts.filter((shift) => shift.class_id === classItem.id && shift.shift_date === iso);
-      const status = cellStatus.get(`${iso}:${classItem.id}`);
-      const hadas_shiftsHtml = hadas_shifts.map((shift) => {
-        const profile = profileById(shift.employee_id);
-        return `<article class="shift-item" data-shift-id="${shift.id}">
-          ${isManager() ? `<button class="delete-shift" data-action="delete-shift" data-id="${shift.id}" aria-label="מחיקה">×</button>` : ''}
-          <strong>${escapeHtml(profile?.full_name || 'עובדת לא מוכרת')}</strong>
-          <small>${SHIFT_ROLE_LABELS[shift.shift_role]} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</small>
-          <small><span class="status-chip ${shift.status}">${SHIFT_STATUS_LABELS[shift.status]}</span>${shift.public_note ? ` · ${escapeHtml(shift.public_note)}` : ''}</small>
-          ${isManager() ? `<button class="mini-btn edit-shift-btn" data-action="edit-shift" data-id="${shift.id}">עריכה</button>` : ''}
-        </article>`;
-      }).join('');
-      return `<td><div class="schedule-cell">
-        <div class="card-heading"><span class="status-chip ${status?.severity === 'ok' ? 'ok' : 'error'}">${status?.unique || 0} צוות</span><small>${status?.closing || 0} עד סגירה</small></div>
-        ${hadas_shiftsHtml || '<p class="muted">אין שיבוץ</p>'}
-        ${isManager() ? `<div class="cell-footer"><button class="mini-btn" data-action="add-cell" data-date="${iso}" data-class-id="${classItem.id}">+ שיבוץ</button><button class="mini-btn" data-action="suggest" data-date="${iso}" data-class-id="${classItem.id}">הצעי מחליפה</button></div>` : ''}
-      </div></td>`;
-    }).join('');
-    return `<tr><td class="class-name">${escapeHtml(classItem.name)}</td>${cells}</tr>`;
-  }).join('');
-
-  $('#scheduleExport').innerHTML = `<table class="schedule-table"><thead><tr><th class="class-name">כיתה</th>${header}</tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-function activeConstraint(employeeId, classId, date, type = null) {
-  return state.constraints.find((item) => {
-    if (item.employee_id !== employeeId || item.class_id !== classId) return false;
-    if (type && item.constraint_type !== type) return false;
-    if (item.valid_from && date < item.valid_from) return false;
-    if (item.valid_to && date > item.valid_to) return false;
-    return true;
-  });
-}
-
-async function handleScheduleClick(event) {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
-  const action = button.dataset.action;
-  if (action === 'add-cell') openShiftDialog({ date: button.dataset.date, classId: button.dataset.classId });
-  if (action === 'edit-shift') openShiftDialog({ shiftId: button.dataset.id });
-  if (action === 'suggest') showSuggestions(button.dataset.date, button.dataset.classId);
-  if (action === 'delete-shift') await deleteShift(button.dataset.id);
-}
-
-function openShiftDialog(prefill = {}) {
-  if (!isManager()) return;
-  populateCommonSelects();
-  const form = $('#shiftForm');
-  const existing = prefill.shiftId ? state.shifts.find((shift) => shift.id === prefill.shiftId) : null;
-  form.reset();
-  form.elements.id.value = existing?.id || '';
-  form.elements.shift_date.value = existing?.shift_date || prefill.date || dateISO(state.weekStart);
-  form.elements.class_id.value = existing?.class_id || prefill.classId || state.classes[0]?.id || '';
-  form.elements.employee_id.value = existing?.employee_id || prefill.employeeId || state.profiles.find((p) => p.active)?.id || '';
-  const selectedProfile = profileById(existing?.employee_id || prefill.employeeId);
-  form.elements.start_time.value = trimTime(existing?.start_time) || prefill.startTime || trimTime(selectedProfile?.default_start) || '07:30';
-  form.elements.end_time.value = trimTime(existing?.end_time) || prefill.endTime || trimTime(selectedProfile?.default_end) || '15:30';
-  form.elements.shift_role.value = existing?.shift_role || prefill.role || 'staff';
-  form.elements.status.value = existing?.status || 'draft';
-  form.elements.public_note.value = existing?.public_note || '';
-  $('#shiftFormWarning').classList.add('hidden');
-  $('#shiftDialog .modal-heading h3').textContent = existing ? 'עריכת שיבוץ' : 'הוספת שיבוץ';
-  $('#shiftDialog').showModal();
-}
-
-async function saveShift(event) {
-  event.preventDefault();
-  if (!isManager()) return;
-  const form = event.currentTarget;
-  const data = Object.fromEntries(new FormData(form).entries());
-  const profile = profileById(data.employee_id);
-  const date = parseLocalDate(data.shift_date);
-  const warnings = [];
-  if (profile?.fixed_day_off === date.getDay()) warnings.push('זהו היום החופשי הקבוע של העובדת.');
-  const constraint = activeConstraint(data.employee_id, data.class_id, data.shift_date);
-  if (constraint?.constraint_type === 'forbidden') return showToast('לא ניתן לשבץ: קיימת הגבלה חוסמת לכיתה זו', 'error');
-  if (constraint?.constraint_type === 'avoid') warnings.push('קיימת העדפה להימנע משיבוץ העובדת בכיתה זו.');
-  if (warnings.length && !window.confirm(`${warnings.join('\n')}\nהאם לשמור בכל זאת?`)) return;
-
-  const button = form.querySelector('button[value="default"]');
-  setBusy(button, true);
-  try {
-    const payload = {
-      shift_date: data.shift_date,
-      class_id: data.class_id,
-      employee_id: data.employee_id,
-      start_time: data.start_time,
-      end_time: data.end_time,
-      shift_role: data.shift_role,
-      status: data.status,
-      public_note: data.public_note || null,
-      created_by: state.profile.id,
-    };
-    const query = data.id ? state.client.from('hadas_shifts').update(payload).eq('id', data.id) : state.client.from('hadas_shifts').insert(payload);
-    const { error } = await query;
-    if (error) throw error;
-    $('#shiftDialog').close();
-    await loadWeekData();
-    await loadTodayData();
-    renderSchedule();
-    renderDashboard();
-    showToast('השיבוץ נשמר', 'success');
-  } catch (error) {
-    showToast(error.message.includes('חופפות') ? 'העובדת כבר משובצת בשעות חופפות' : error.message, 'error');
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-async function deleteShift(id) {
-  if (!isManager() || !window.confirm('למחוק את השיבוץ?')) return;
-  const { error } = await state.client.from('hadas_shifts').delete().eq('id', id);
-  if (error) return showToast(error.message, 'error');
-  await loadWeekData();
-  await loadTodayData();
-  renderSchedule();
-  renderDashboard();
-  showToast('השיבוץ נמחק', 'success');
-}
-
-async function publishWeek(status) {
-  if (!isManager()) return;
-  const { warnings } = validateSchedule();
-  const blocking = warnings.filter((item) => item.severity === 'error');
-  if (blocking.length && status === 'final') {
-    return showToast(`לא ניתן לפרסם שיבוץ סופי לפני טיפול ב-${blocking.length} חריגות`, 'error');
-  }
-  const start = dateISO(state.weekStart);
-  const end = dateISO(addDays(state.weekStart, 5));
-  const { error } = await state.client.from('hadas_shifts').update({ status }).gte('shift_date', start).lte('shift_date', end);
-  if (error) return showToast(error.message, 'error');
-  await loadWeekData();
-  renderSchedule();
-  showToast(status === 'final' ? 'השיבוץ פורסם כסופי' : 'השיבוץ פורסם כזמני', 'success');
-}
-
-async function acknowledgeSchedule() {
-  const weekStart = dateISO(state.weekStart);
-  const { error } = await state.client.from('hadas_schedule_acknowledgements').upsert({ employee_id: state.profile.id, week_start: weekStart }, { onConflict: 'employee_id,week_start' });
-  if (error) return showToast(error.message, 'error');
-  showToast('אישור הקריאה נשמר', 'success');
-}
-
-async function downloadScheduleImage() {
-  if (!window.html2canvas) return showToast('רכיב שמירת התמונה לא נטען', 'error');
-  const button = $('#imageBtn');
-  setBusy(button, true, 'מכין תמונה…');
-  try {
-    const canvas = await window.html2canvas($('#scheduleExport'), { scale: 2, backgroundColor: '#ffffff' });
-    const link = document.createElement('a');
-    link.download = `שיבוץ-מעון-הדס-${dateISO(state.weekStart)}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  } catch (error) {
-    showToast(error.message, 'error');
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-function changeWeek(days) {
-  setWeek(addDays(state.weekStart, days));
-}
-
-async function setWeek(date) {
-  state.weekStart = startOfWeek(date);
-  await loadWeekData();
-  renderSchedule();
-  updateRequestShiftOptions();
-}
-
-function showSuggestions(date, classId) {
-  const classShifts = state.shifts.filter((shift) => shift.shift_date === date && shift.class_id === classId);
-  const needsLead = !classShifts.some((shift) => ['teacher', 'lead'].includes(shift.shift_role));
-  const weeklyMinutes = new Map();
-  for (const shift of state.shifts) weeklyMinutes.set(shift.employee_id, (weeklyMinutes.get(shift.employee_id) || 0) + minutesBetween(shift.start_time, shift.end_time));
-
-  const candidates = state.profiles
-    .filter((profile) => profile.active)
-    .filter((profile) => profile.fixed_day_off !== parseLocalDate(date).getDay())
-    .filter((profile) => !hasApprovedAbsence(profile.id, date))
-    .filter((profile) => !activeConstraint(profile.id, classId, date, 'forbidden'))
-    .filter((profile) => !state.shifts.some((shift) => shift.employee_id === profile.id && shift.shift_date === date && overlaps(shift.start_time, shift.end_time, state.settings.opening_time, state.settings.closing_time)))
-    .map((profile) => {
-      const constraint = activeConstraint(profile.id, classId, date);
-      let score = 100;
-      if (profile.primary_class_id === classId) score += 35;
-      if (needsLead && profile.can_lead) score += 25;
-      if (constraint?.constraint_type === 'preferred') score += 20;
-      if (constraint?.constraint_type === 'avoid') score -= 30;
-      score -= (weeklyMinutes.get(profile.id) || 0) / 120;
-      return { profile, score, hours: (weeklyMinutes.get(profile.id) || 0) / 60, constraint };
-    })
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
-
-  $('#suggestionsList').innerHTML = candidates.length ? candidates.map(({ profile, hours, constraint }) => `
-    <article class="suggestion-card">
-      <div class="card-heading"><div><h3>${escapeHtml(profile.full_name)}</h3><p class="muted">${escapeHtml(profile.job_title)} · ${hours.toFixed(1)} שעות השבוע</p></div>${profile.can_lead ? '<span class="role-chip">יכולה להוביל</span>' : ''}</div>
-      <p>${profile.primary_class_id === classId ? 'משויכת בדרך כלל לכיתה זו.' : 'פנויה באותו יום.'}${constraint?.constraint_type === 'avoid' ? ' קיימת העדפה להימנע מהכיתה.' : ''}</p>
-      <button class="primary-btn" data-action="use-suggestion" data-employee-id="${profile.id}" data-date="${date}" data-class-id="${classId}" data-role="${needsLead && profile.can_lead ? 'lead' : 'replacement'}">שבצי עובדת</button>
-    </article>`).join('') : '<div class="empty-state">לא נמצאה עובדת פנויה שעומדת בתנאים.</div>';
-  $('#suggestionsDialog').showModal();
-}
-
-function handleSuggestionClick(event) {
-  const button = event.target.closest('[data-action="use-suggestion"]');
-  if (!button) return;
-  $('#suggestionsDialog').close();
-  openShiftDialog({ date: button.dataset.date, classId: button.dataset.classId, employeeId: button.dataset.employeeId, role: button.dataset.role });
-}
-
-function renderEmployees() {
-  if (!isManager()) return;
-  const rows = state.profiles.map((profile) => {
-    const classItem = classById(profile.primary_class_id);
-    return `<tr class="${profile.active ? '' : 'inactive-row'}">
-      <td><strong>${escapeHtml(profile.full_name)}</strong><br><small>${escapeHtml(profile.phone)}</small></td>
-      <td>${escapeHtml(profile.job_title)}</td>
-      <td>${escapeHtml(classItem?.name || 'ללא')}</td>
-      <td>${ROLE_LABELS[profile.role] || profile.role}</td>
-      <td>${profile.weekly_hours ?? '—'}</td>
-      <td>${profile.fixed_day_off === null || profile.fixed_day_off === undefined ? 'משתנה' : DAY_NAMES[profile.fixed_day_off]}</td>
-      <td><span class="status-chip ${profile.active ? 'ok' : 'error'}">${profile.active ? 'פעילה' : 'מושבתת'}</span></td>
-      <td><div class="row-actions">
-        <button class="mini-btn" data-action="edit-employee" data-id="${profile.id}">עריכה</button>
-        <button class="mini-btn" data-action="reset-password" data-id="${profile.id}">איפוס סיסמה</button>
-        ${profile.active ? `<button class="mini-btn" data-action="deactivate-employee" data-id="${profile.id}">השבתה</button>` : `<button class="mini-btn" data-action="activate-employee" data-id="${profile.id}">הפעלה</button>`}
-      </div></td>
-    </tr>`;
-  }).join('');
-  $('#employeesList').innerHTML = `<table class="data-table"><thead><tr><th>עובדת</th><th>תפקיד</th><th>כיתה</th><th>הרשאה</th><th>שעות שבועיות</th><th>יום חופשי</th><th>מצב</th><th>פעולות</th></tr></thead><tbody>${rows}</tbody></table>`;
-}
-
-function renderConstraintFields(employeeId = null) {
-  $('#constraintsFields').innerHTML = state.classes.map((classItem) => {
-    const constraint = state.constraints.find((item) => item.employee_id === employeeId && item.class_id === classItem.id);
-    return `<div class="constraint-row" data-class-id="${classItem.id}">
-      <label>כיתה<input value="${escapeHtml(classItem.name)}" disabled /></label>
-      <label>סוג<select class="constraint-type"><option value="">ללא</option><option value="preferred" ${constraint?.constraint_type === 'preferred' ? 'selected' : ''}>עדיפות</option><option value="avoid" ${constraint?.constraint_type === 'avoid' ? 'selected' : ''}>עדיף להימנע</option><option value="forbidden" ${constraint?.constraint_type === 'forbidden' ? 'selected' : ''}>אסור לשבץ</option></select></label>
-      <label>מתאריך<input class="constraint-from" type="date" value="${constraint?.valid_from || ''}" /></label>
-      <label>עד תאריך<input class="constraint-to" type="date" value="${constraint?.valid_to || ''}" /></label>
-      <label class="constraint-reason">סיבה<input class="constraint-reason-input" value="${escapeHtml(constraint?.reason || '')}" /></label>
-    </div>`;
-  }).join('');
-}
-
-function openEmployeeDialog(id = null) {
-  if (!isManager()) return;
-  populateCommonSelects();
-  const form = $('#employeeForm');
-  form.reset();
-  const profile = id ? profileById(id) : null;
-  form.elements.id.value = profile?.id || '';
-  form.elements.full_name.value = profile?.full_name || '';
-  form.elements.phone.value = profile?.phone || '';
-  form.elements.job_title.value = profile?.job_title || 'אשת צוות';
-  form.elements.role.value = profile?.role || 'employee';
-  form.elements.primary_class_id.value = profile?.primary_class_id || '';
-  form.elements.can_lead.value = String(Boolean(profile?.can_lead));
-  form.elements.weekly_hours.value = profile?.weekly_hours ?? '';
-  form.elements.fixed_day_off.value = profile?.fixed_day_off ?? '';
-  form.elements.default_start.value = trimTime(profile?.default_start) || '07:30';
-  form.elements.default_end.value = trimTime(profile?.default_end) || '15:30';
-  form.elements.admin_notes.value = state.privateRows.find((row) => row.employee_id === id)?.admin_notes || '';
-  renderConstraintFields(id);
-  $('#employeeDialog').showModal();
-}
-
-function collectConstraints() {
-  return $$('.constraint-row', $('#constraintsFields')).map((row) => ({
-    class_id: row.dataset.classId,
-    constraint_type: $('.constraint-type', row).value,
-    valid_from: $('.constraint-from', row).value || null,
-    valid_to: $('.constraint-to', row).value || null,
-    reason: $('.constraint-reason-input', row).value || null,
-  })).filter((item) => item.constraint_type);
-}
-
-async function saveEmployee(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const data = Object.fromEntries(new FormData(form).entries());
-  const body = {
-    id: data.id || undefined,
-    full_name: data.full_name,
-    phone: data.phone,
-    job_title: data.job_title,
-    role: data.role,
-    primary_class_id: data.primary_class_id || null,
-    can_lead: data.can_lead === 'true',
-    weekly_hours: data.weekly_hours ? Number(data.weekly_hours) : null,
-    fixed_day_off: data.fixed_day_off === '' ? null : Number(data.fixed_day_off),
-    default_start: data.default_start,
-    default_end: data.default_end,
-    admin_notes: data.admin_notes,
-    constraints: collectConstraints(),
-  };
-  const button = form.querySelector('button[value="default"]');
-  setBusy(button, true);
-  try {
-    await apiFetch('/api/employees', { method: data.id ? 'PATCH' : 'POST', body });
-    $('#employeeDialog').close();
-    await loadCoreData();
-    renderEmployees();
-    populateCommonSelects();
-    showToast(data.id ? 'פרטי העובדת עודכנו' : 'העובדת נוספה עם הסיסמה הראשונית hadas', 'success');
-  } catch (error) {
-    showToast(error.message, 'error');
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-async function handleEmployeeClick(event) {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
-  const id = button.dataset.id;
-  const action = button.dataset.action;
-  if (action === 'edit-employee') return openEmployeeDialog(id);
-  try {
-    if (action === 'reset-password') {
-      if (!window.confirm('לאפס את הסיסמה של העובדת ל-hadas?')) return;
-      await apiFetch('/api/employees', { method: 'PATCH', body: { id, reset_password: true } });
-      return showToast('הסיסמה אופסה ל-hadas', 'success');
-    }
-    if (action === 'deactivate-employee') {
-      if (!window.confirm('להשבית את העובדת? היסטוריית השיבוצים תישמר.')) return;
-      await apiFetch('/api/employees', { method: 'DELETE', body: { id } });
-    }
-    if (action === 'activate-employee') {
-      await apiFetch('/api/employees', { method: 'PATCH', body: { id, active: true } });
-    }
-    await loadCoreData();
-    renderEmployees();
-    showToast('מצב העובדת עודכן', 'success');
-  } catch (error) {
-    showToast(error.message, 'error');
-  }
-}
-
-function openRequestDialog() {
-  const form = $('#requestForm');
-  form.reset();
-  form.elements.request_date.value = dateISO(new Date());
-  updateRequestShiftOptions();
-  updateRequestFormFields();
-  $('#requestDialog').showModal();
-}
-
-function updateRequestFormFields() {
-  const type = $('#requestForm [name="request_type"]').value;
-  $$('.request-time').forEach((element) => element.classList.add('hidden'));
-  $$('.swap-field').forEach((element) => element.classList.toggle('hidden', type !== 'swap'));
-  if (type === 'late_start') $('.start-field').classList.remove('hidden');
-  if (type === 'early_finish') $('.end-field').classList.remove('hidden');
-}
-
-function updateRequestShiftOptions() {
-  const myShifts = state.shifts.filter((shift) => shift.employee_id === state.profile?.id);
-  $('#requestForm [name="shift_id"]').innerHTML = `<option value="">בחרי שיבוץ</option>${myShifts.map((shift) => `<option value="${shift.id}">${formatDate(shift.shift_date)} · ${escapeHtml(classById(shift.class_id)?.name || '')} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</option>`).join('')}`;
-  populateTargetShifts();
-}
-
-function populateTargetShifts() {
-  const targetId = $('#requestForm [name="target_employee_id"]').value;
-  const hadas_shifts = state.shifts.filter((shift) => shift.employee_id === targetId);
-  $('#requestForm [name="target_shift_id"]').innerHTML = `<option value="">בחרי שיבוץ</option>${hadas_shifts.map((shift) => `<option value="${shift.id}">${formatDate(shift.shift_date)} · ${escapeHtml(classById(shift.class_id)?.name || '')} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</option>`).join('')}`;
-}
-
-async function saveRequest(event) {
-  event.preventDefault();
-  const form = event.currentTarget;
-  const data = Object.fromEntries(new FormData(form).entries());
-  if (data.request_type === 'swap' && (!data.shift_id || !data.target_employee_id || !data.target_shift_id)) {
-    return showToast('יש לבחור את שני השיבוצים ואת העובדת השנייה', 'error');
-  }
-  const payload = {
-    requester_id: state.profile.id,
-    request_type: data.request_type,
-    request_date: data.request_date,
-    requested_start: data.requested_start || null,
-    requested_end: data.requested_end || null,
-    shift_id: data.shift_id || null,
-    target_employee_id: data.target_employee_id || null,
-    target_shift_id: data.target_shift_id || null,
-    reason: data.reason || null,
-  };
-  const button = form.querySelector('button[value="default"]');
-  setBusy(button, true, 'שולחת…');
-  try {
-    const { error } = await state.client.from('hadas_requests').insert(payload);
-    if (error) throw error;
-    $('#requestDialog').close();
-    await loadRequests();
-    renderRequests();
-    showToast('הבקשה נשלחה', 'success');
-  } catch (error) {
-    showToast(error.message, 'error');
-  } finally {
-    setBusy(button, false);
-  }
-}
-
-function renderRequests() {
-  $('#requestsList').innerHTML = state.requests.length ? state.requests.map((request) => {
-    const requester = profileById(request.requester_id);
-    const target = profileById(request.target_employee_id);
-    const canTargetAccept = request.request_type === 'swap' && request.target_employee_id === state.profile.id && !request.target_approved && request.status === 'pending';
-    const canCancel = request.requester_id === state.profile.id && request.status === 'pending';
-    return `<article class="request-card">
-      <div class="card-heading"><div><h3>${REQUEST_LABELS[request.request_type]}</h3><p class="muted">${escapeHtml(requester?.full_name || '')} · ${formatDate(request.request_date)}</p></div><span class="status-chip ${request.status === 'rejected' ? 'error' : request.status === 'applied' ? 'ok' : 'warn'}">${REQUEST_STATUS_LABELS[request.status]}</span></div>
-      <div class="meta-grid">
-        <div class="meta-item"><small>פירוט</small>${escapeHtml(request.reason || 'ללא פירוט')}</div>
-        <div class="meta-item"><small>שעות מבוקשות</small>${request.requested_start || request.requested_end ? `${trimTime(request.requested_start) || '—'}–${trimTime(request.requested_end) || '—'}` : 'לא רלוונטי'}</div>
-        <div class="meta-item"><small>החלפה עם</small>${escapeHtml(target?.full_name || 'לא רלוונטי')}${request.request_type === 'swap' ? ` · ${request.target_approved ? 'אישרה' : 'טרם אישרה'}` : ''}</div>
-      </div>
-      ${request.manager_note ? `<p><strong>הערת מנהלת:</strong> ${escapeHtml(request.manager_note)}</p>` : ''}
-      <div class="card-actions">
-        ${canTargetAccept ? `<button class="secondary-btn" data-action="target-accept" data-id="${request.id}">אני מסכימה להחלפה</button>` : ''}
-        ${canCancel ? `<button class="ghost-btn" data-action="cancel-request" data-id="${request.id}">ביטול בקשה</button>` : ''}
-        ${isManager() && request.status === 'pending' ? `<button class="primary-btn" data-action="approve-request" data-id="${request.id}">אישור</button><button class="danger-btn" data-action="reject-request" data-id="${request.id}">דחייה</button>` : ''}
-        ${isManager() && request.status === 'approved' ? `<button class="primary-btn" data-action="apply-request" data-id="${request.id}">הזרמה לשיבוץ</button>` : ''}
-      </div>
-    </article>`;
-  }).join('') : '<div class="empty-state">אין בקשות להצגה.</div>';
-}
-
-async function handleRequestClick(event) {
-  const button = event.target.closest('button[data-action]');
-  if (!button) return;
-  const id = button.dataset.id;
-  const action = button.dataset.action;
-  try {
-    if (action === 'cancel-request') {
-      await apiFetch('/api/requests', { method: 'POST', body: { id, action: 'cancel' } });
-    } else if (action === 'target-accept') {
-      await apiFetch('/api/requests', { method: 'POST', body: { id, action: 'target_accept' } });
-    } else if (action === 'approve-request' || action === 'reject-request') {
-      const status = action === 'approve-request' ? 'approved' : 'rejected';
-      const managerNote = window.prompt('הערה לעובדת (אפשר להשאיר ריק):') || '';
-      await apiFetch('/api/requests', { method: 'POST', body: { id, action: 'decide', status, manager_note: managerNote } });
-    } else if (action === 'apply-request') {
-      if (!window.confirm('להזרים את הבקשה לשיבוץ בפועל?')) return;
-      await apiFetch('/api/requests', { method: 'POST', body: { id, action: 'apply' } });
-    }
-    await Promise.all([loadRequests(), loadWeekData(), loadTodayData()]);
-    renderRequests();
-    renderSchedule();
-    renderDashboard();
-    showToast('הבקשה עודכנה', 'success');
-  } catch (error) {
-    showToast(error.message, 'error');
-  }
-}
-
-function renderAttendance() {
-  const date = $('#attendanceDate').value || dateISO(new Date());
-  const hadas_shifts = isManager()
-    ? state.attendanceDateShifts
-    : state.attendanceDateShifts.filter((shift) => shift.employee_id === state.profile.id);
-  $('#attendanceList').innerHTML = hadas_shifts.length ? hadas_shifts.map((shift) => {
-    const profile = profileById(shift.employee_id);
-    const classItem = classById(shift.class_id);
-    const row = state.attendanceDateRows.find((item) => item.shift_id === shift.id);
-    return `<article class="attendance-card" data-shift-id="${shift.id}">
-      <div class="card-heading"><div><h3>${escapeHtml(profile?.full_name || '')}</h3><p class="muted">${escapeHtml(classItem?.name || '')} · מתוכנן ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</p></div><span class="role-chip">${SHIFT_ROLE_LABELS[shift.shift_role]}</span></div>
-      ${isManager() ? `<div class="form-grid">
-        <label>מצב<select class="attendance-status">${Object.entries(ATTENDANCE_LABELS).map(([value, label]) => `<option value="${value}" ${row?.status === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-        <label>התחלה בפועל<input class="attendance-start" type="time" value="${trimTime(row?.actual_start) || trimTime(shift.start_time)}" /></label>
-        <label>סיום בפועל<input class="attendance-end" type="time" value="${trimTime(row?.actual_end) || trimTime(shift.end_time)}" /></label>
-        <label>הערה<input class="attendance-note" value="${escapeHtml(row?.note || '')}" /></label>
-      </div><button class="primary-btn" data-action="save-attendance" data-shift-id="${shift.id}">שמירה</button>` : `<div class="meta-grid"><div class="meta-item"><small>מצב</small>${ATTENDANCE_LABELS[row?.status || 'scheduled']}</div><div class="meta-item"><small>בפועל</small>${trimTime(row?.actual_start) || '—'}–${trimTime(row?.actual_end) || '—'}</div><div class="meta-item"><small>הערה</small>${escapeHtml(row?.note || 'ללא')}</div></div>`}
-    </article>`;
-  }).join('') : `<div class="empty-state">אין שיבוצים בתאריך ${formatDate(date)}.</div>`;
-}
-
-async function handleAttendanceClick(event) {
-  const button = event.target.closest('[data-action="save-attendance"]');
-  if (!button || !isManager()) return;
-  const card = button.closest('.attendance-card');
-  const shift = state.attendanceDateShifts.find((item) => item.id === button.dataset.shiftId);
-  const payload = {
-    shift_id: shift.id,
-    employee_id: shift.employee_id,
-    attendance_date: shift.shift_date,
-    status: $('.attendance-status', card).value,
-    actual_start: $('.attendance-start', card).value || null,
-    actual_end: $('.attendance-end', card).value || null,
-    note: $('.attendance-note', card).value || null,
-    updated_by: state.profile.id,
-  };
-  setBusy(button, true);
-  const { error } = await state.client.from('hadas_attendance').upsert(payload, { onConflict: 'shift_id' });
-  setBusy(button, false);
-  if (error) return showToast(error.message, 'error');
-  await loadAttendanceDate(shift.shift_date);
-  showToast('הנוכחות נשמרה', 'success');
-}
+function openSettings(){const form=$('#settingsForm');for(const name of ['opening_time','closing_time'])form.elements[name].value=trimTime(state.settings[name]);for(const name of ['required_staff','closing_required_staff','closing_window_minutes','validation_slot_minutes'])form.elements[name].value=state.settings[name];$('#settingsDialog').showModal();}
+async function saveSettings(event){event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form);for(const name of ['required_staff','closing_required_staff','closing_window_minutes','validation_slot_minutes'])data[name]=Number(data[name]);setBusy(button,true);try{await apiFetch('/api/settings',{method:'PATCH',body:data});$('#settingsDialog').close();await refreshAll();showToast('ההגדרות נשמרו','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
 
 init();

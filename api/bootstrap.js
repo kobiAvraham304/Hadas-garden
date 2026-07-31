@@ -1,122 +1,68 @@
-const { getEnv, normalizePhone, parseBody, supabaseFetch, send, handleError } = require('../lib/api-utils');
+const {
+  getEnv, db, parseBody, normalizePhone, assertDb, hashPassword,
+  send, handleError, verifyOrigin, emitEvent, audit, httpError,
+} = require('../lib/server');
 
-async function listAuthUsers() {
-  const { data } = await supabaseFetch('/auth/v1/admin/users?page=1&per_page=1000', { useSecret: true });
-  return Array.isArray(data) ? data : (data?.users || []);
-}
-
-async function createOrFindAuthUser({ phone, password, fullName }) {
+async function createAccount({ fullName, phone, role, jobTitle, primaryClassId, canLead }) {
+  const employee = assertDb(await db().from('hadas_employees').insert({
+    full_name: fullName,
+    contact_phone: phone,
+    job_title: jobTitle,
+    primary_class_id: primaryClassId || null,
+    can_lead: Boolean(canLead),
+    active: true,
+  }).select('*').single(), 'לא ניתן ליצור כרטיס עובדת');
   try {
-    const { data } = await supabaseFetch('/auth/v1/admin/users', {
-      method: 'POST',
-      useSecret: true,
-      body: {
-        phone,
-        password,
-        phone_confirm: true,
-        user_metadata: { full_name: fullName },
-      },
-    });
-    return { user: data.user || data, created: true };
+    const user = assertDb(await db().from('hadas_users').insert({
+      employee_id: employee.id,
+      phone,
+      password_hash: await hashPassword('hadas'),
+      role,
+      active: true,
+      must_change_password: true,
+    }).select('id').single(), 'לא ניתן ליצור משתמשת');
+    return { employee, user };
   } catch (error) {
-    if (![400, 409, 422].includes(Number(error.status))) throw error;
-    const users = await listAuthUsers();
-    const existing = users.find((user) => user.phone === phone);
-    if (!existing) throw error;
-    return { user: existing, created: false };
+    await db().from('hadas_employees').delete().eq('id', employee.id);
+    throw error;
   }
-}
-
-async function getClassId(slug) {
-  const { data } = await supabaseFetch(`/rest/v1/hadas_classes?slug=eq.${encodeURIComponent(slug)}&select=id&limit=1`, { useSecret: true });
-  return Array.isArray(data) && data[0] ? data[0].id : null;
-}
-
-async function insertProfile(profile) {
-  await supabaseFetch('/rest/v1/hadas_profiles', {
-    method: 'POST',
-    useSecret: true,
-    headers: { Prefer: 'return=minimal' },
-    body: profile,
-  });
 }
 
 module.exports = async function handler(req, res) {
   try {
-    if (req.method !== 'POST') return send(res, 405, { ok: false, error: 'Method not allowed' });
+    if (req.method !== 'POST') return send(res, 405, { ok:false, error:'Method not allowed' });
+    verifyOrigin(req);
     const env = getEnv();
     const body = parseBody(req);
-    if (!env.bootstrapToken || body.bootstrapToken !== env.bootstrapToken) {
-      return send(res, 403, { ok: false, error: 'קוד ההקמה שגוי' });
+    if (!env.bootstrapToken || body.bootstrapToken !== env.bootstrapToken) throw httpError(403, 'קוד ההקמה שגוי');
+
+    const users = assertDb(await db().from('hadas_users').select('role,active'), 'לא ניתן לבדוק את מצב המערכת') || [];
+    if (users.some((row) => row.active && row.role === 'admin') && users.some((row) => row.active && row.role === 'scheduler')) {
+      throw httpError(409, 'המערכת כבר הוקמה');
     }
 
-    const { data: existingProfiles } = await supabaseFetch('/rest/v1/hadas_profiles?select=id,phone,role,active', { useSecret: true });
-    const existing = Array.isArray(existingProfiles) ? existingProfiles : [];
-    const hasAdmin = existing.some((row) => row.active && row.role === 'admin');
-    const hasScheduler = existing.some((row) => row.active && row.role === 'scheduler');
-    if (hasAdmin && hasScheduler) {
-      return send(res, 409, { ok: false, error: 'המערכת כבר הוקמה' });
-    }
-
-    const requestedPassword = String(body.password || 'hadas');
-    const password = requestedPassword === 'hadas' ? 'hadas1' : requestedPassword;
-    if (password.length < 6) return send(res, 400, { ok: false, error: 'הסיסמה הראשונית חייבת לכלול לפחות 6 תווים' });
-
-    const odemClassId = await getClassId('odem');
-    const users = [
-      {
-        fullName: 'אילנית',
-        phone: normalizePhone(body.ilanitPhone),
-        role: 'admin',
-        jobTitle: 'מנהלת מעון',
-        primaryClassId: null,
-        canLead: true,
-      },
-      {
-        fullName: 'לינור אברהם',
-        phone: normalizePhone(body.linorPhone),
-        role: 'scheduler',
-        jobTitle: 'גננת ואחראית שיבוץ',
-        primaryClassId: odemClassId,
-        canLead: true,
-      },
-    ];
+    const ilanitPhone = normalizePhone(body.ilanitPhone);
+    const linorPhone = normalizePhone(body.linorPhone);
+    if (ilanitPhone === linorPhone) throw httpError(400, 'יש להזין מספר טלפון שונה לכל משתמשת');
+    const odem = assertDb(await db().from('hadas_classes').select('id').eq('slug','odem').maybeSingle(), 'כיתת אודם לא נמצאה');
 
     const created = [];
-    const skipped = [];
-    for (const item of users) {
-      const alreadyExists = existing.find((row) => row.phone === item.phone || row.role === item.role);
-      if (alreadyExists) {
-        skipped.push({ id: alreadyExists.id, fullName: item.fullName, phone: item.phone });
-        continue;
+    try {
+      created.push(await createAccount({
+        fullName:'אילנית', phone:ilanitPhone, role:'admin', jobTitle:'מנהלת מעון', primaryClassId:null, canLead:true,
+      }));
+      created.push(await createAccount({
+        fullName:'לינור אברהם', phone:linorPhone, role:'scheduler', jobTitle:'גננת ואחראית שיבוץ', primaryClassId:odem?.id || null, canLead:true,
+      }));
+    } catch (error) {
+      for (const item of created) {
+        await db().from('hadas_users').delete().eq('id', item.user.id);
+        await db().from('hadas_employees').delete().eq('id', item.employee.id);
       }
-
-      const authResult = await createOrFindAuthUser({ phone: item.phone, password, fullName: item.fullName });
-      const userId = authResult.user?.id;
-      if (!userId) throw new Error(`לא התקבל מזהה משתמש עבור ${item.fullName}`);
-      try {
-        await insertProfile({
-          id: userId,
-          phone: item.phone,
-          full_name: item.fullName,
-          role: item.role,
-          job_title: item.jobTitle,
-          primary_class_id: item.primaryClassId,
-          can_lead: item.canLead,
-          active: true,
-          must_change_password: true,
-        });
-      } catch (error) {
-        if (authResult.created) {
-          try { await supabaseFetch(`/auth/v1/admin/users/${userId}`, { method: 'DELETE', useSecret: true }); } catch {}
-        }
-        throw error;
-      }
-      created.push({ id: userId, fullName: item.fullName, phone: item.phone });
+      throw error;
     }
-
-    send(res, 201, { ok: true, created, skipped });
-  } catch (error) {
-    handleError(res, error);
-  }
+    await emitEvent('bootstrap');
+    await audit(null, 'bootstrap', 'system', 'initial', { employees: created.map((item) => item.employee.id) });
+    send(res, 201, { ok:true, message:'המערכת הוקמה. הסיסמה הראשונית היא hadas.' });
+  } catch (error) { handleError(res, error); }
 };

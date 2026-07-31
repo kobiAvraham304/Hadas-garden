@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#f6efe8" />
+  <meta name="theme-color" content="#f4ede6" />
   <title>מערכת השיבוצים | מעון הדס</title>
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
@@ -11,47 +11,34 @@
   <script src="/app.js" defer></script>
 </head>
 <body>
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status"></div>
 
   <main id="loadingScreen" class="auth-shell">
-    <section class="auth-card">
-      <div class="brand-mark">הדס</div>
-      <h1>מערכת השיבוצים</h1>
-      <p class="muted">טוען את המערכת…</p>
-    </section>
+    <section class="auth-card"><div class="brand-mark">הדס</div><h1>מערכת המעון</h1><p class="muted">טוען את המערכת…</p></section>
   </main>
 
   <main id="loginScreen" class="auth-shell hidden">
     <section class="auth-card">
       <div class="brand-mark">הדס</div>
       <h1>ברוכות הבאות</h1>
-      <p class="muted">כניסה באמצעות מספר טלפון וסיסמה אישית</p>
+      <p class="muted">כניסה לפי מספר טלפון וסיסמה אישית</p>
       <form id="loginForm" class="stack-form">
-        <label>מספר טלפון
-          <input name="phone" type="tel" placeholder="05X-XXXXXXX" autocomplete="tel" required />
-        </label>
-        <label>סיסמה
-          <input name="password" type="password" autocomplete="current-password" required />
-        </label>
+        <label>מספר טלפון<input name="phone" type="tel" inputmode="tel" autocomplete="username" placeholder="05X-XXXXXXX" required /></label>
+        <label>סיסמה<input name="password" type="password" autocomplete="current-password" required /></label>
         <button class="primary-btn" type="submit">כניסה למערכת</button>
       </form>
       <p class="small-note">בכניסה הראשונה הסיסמה היא <strong>hadas</strong>.</p>
-      <a class="text-link" href="/setup.html">הקמה ראשונית של המערכת</a>
+      <a class="text-link" href="/setup.html">הקמה ראשונית</a>
     </section>
   </main>
 
   <main id="passwordScreen" class="auth-shell hidden">
     <section class="auth-card">
-      <div class="brand-mark">הדס</div>
-      <h1>בחירת סיסמה אישית</h1>
-      <p class="muted">לפני שממשיכים יש להחליף את הסיסמה הראשונית.</p>
+      <div class="brand-mark">הדס</div><h1>בחירת סיסמה אישית</h1>
+      <p class="muted">יש לבחור סיסמה חדשה באורך 8 תווים לפחות.</p>
       <form id="passwordForm" class="stack-form">
-        <label>סיסמה חדשה
-          <input name="password" type="password" minlength="8" autocomplete="new-password" required />
-        </label>
-        <label>אימות סיסמה
-          <input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required />
-        </label>
+        <label>סיסמה חדשה<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <label>אימות סיסמה<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required /></label>
         <button class="primary-btn" type="submit">שמירת הסיסמה</button>
       </form>
     </section>
@@ -59,20 +46,8 @@
 
   <div id="appShell" class="app-shell hidden">
     <header class="topbar">
-      <div class="brand-row">
-        <div class="mini-brand">הדס</div>
-        <div>
-          <h1>מערכת השיבוצים</h1>
-          <p id="liveStatus" class="live-status"><span></span> מתעדכן בזמן אמת</p>
-        </div>
-      </div>
-      <div class="user-area">
-        <div>
-          <strong id="userName"></strong>
-          <small id="userRole"></small>
-        </div>
-        <button id="logoutBtn" class="ghost-btn">יציאה</button>
-      </div>
+      <div class="brand-row"><div class="mini-brand">הדס</div><div><h1>מערכת המעון</h1><p id="liveStatus" class="live-status"><span></span> מתעדכן בזמן אמת</p></div></div>
+      <div class="user-area"><div><strong id="userName"></strong><small id="userRole"></small></div><button id="logoutBtn" class="ghost-btn">יציאה</button></div>
     </header>
 
     <nav class="main-nav" aria-label="ניווט ראשי">
@@ -80,6 +55,10 @@
       <button data-tab="schedule" class="nav-btn">שיבוץ</button>
       <button data-tab="requests" class="nav-btn">בקשות</button>
       <button data-tab="attendance" class="nav-btn">נוכחות</button>
+      <button data-tab="announcements" class="nav-btn">הודעות</button>
+      <button data-tab="tasks" class="nav-btn">משימות</button>
+      <button data-tab="calendar" class="nav-btn">לוח שנה</button>
+      <button data-tab="documents" class="nav-btn">מסמכים</button>
       <button data-tab="employees" class="nav-btn manager-only">עובדות</button>
     </nav>
 
@@ -88,21 +67,18 @@
 
       <section id="schedulePanel" class="panel">
         <div class="section-heading">
-          <div>
-            <h2>שיבוץ שבועי</h2>
-            <p id="weekLabel" class="muted"></p>
-          </div>
+          <div><h2>שיבוץ שבועי</h2><p id="weekLabel" class="muted"></p></div>
           <div class="actions-wrap">
-            <button id="prevWeekBtn" class="ghost-btn">שבוע קודם</button>
-            <button id="todayWeekBtn" class="ghost-btn">השבוע</button>
-            <button id="nextWeekBtn" class="ghost-btn">שבוע הבא</button>
+            <button id="prevWeekBtn" class="ghost-btn">שבוע קודם</button><button id="todayWeekBtn" class="ghost-btn">השבוע</button><button id="nextWeekBtn" class="ghost-btn">שבוע הבא</button>
+            <button id="copyWeekBtn" class="secondary-btn manager-only">העתקת שבוע קודם</button>
             <button id="addShiftBtn" class="primary-btn manager-only">הוספת שיבוץ</button>
           </div>
         </div>
         <div class="toolbar">
-          <button id="publishTemporaryBtn" class="secondary-btn manager-only">פרסום כשיבוץ זמני</button>
-          <button id="publishFinalBtn" class="secondary-btn manager-only">פרסום כשיבוץ סופי</button>
-          <button id="ackScheduleBtn" class="secondary-btn employee-action">קראתי את השיבוץ</button>
+          <button id="publishTemporaryBtn" class="secondary-btn manager-only">פרסום זמני</button>
+          <button id="publishFinalBtn" class="secondary-btn manager-only">פרסום סופי</button>
+          <button id="ackScheduleBtn" class="secondary-btn employee-only">קראתי את השיבוץ</button>
+          <button id="settingsBtn" class="ghost-btn manager-only">הגדרות תקינה</button>
           <button id="printBtn" class="ghost-btn">הדפסה / PDF</button>
           <button id="imageBtn" class="ghost-btn">שמירה כתמונה</button>
         </div>
@@ -111,26 +87,37 @@
       </section>
 
       <section id="requestsPanel" class="panel">
-        <div class="section-heading">
-          <div><h2>בקשות והחלפות</h2><p class="muted">בקשות נכנסות לתוקף רק לאחר אישור והזרמה לשיבוץ.</p></div>
-          <button id="newRequestBtn" class="primary-btn">בקשה חדשה</button>
-        </div>
+        <div class="section-heading"><div><h2>בקשות והחלפות</h2><p class="muted">הבקשה נכנסת לשיבוץ רק לאחר אישור והזרמה.</p></div><button id="newRequestBtn" class="primary-btn">בקשה חדשה</button></div>
         <div id="requestsList" class="cards-list"></div>
       </section>
 
       <section id="attendancePanel" class="panel">
-        <div class="section-heading">
-          <div><h2>נוכחות בפועל</h2><p class="muted">השוואה בין השיבוץ המתוכנן לביצוע בפועל.</p></div>
-          <label class="inline-field">תאריך <input id="attendanceDate" type="date" /></label>
-        </div>
+        <div class="section-heading"><div><h2>נוכחות בפועל</h2><p class="muted">השוואה בין המתוכנן לביצוע בפועל.</p></div><label class="inline-field">תאריך<input id="attendanceDate" type="date" /></label></div>
         <div id="attendanceList" class="cards-list"></div>
       </section>
 
+      <section id="announcementsPanel" class="panel">
+        <div class="section-heading"><div><h2>הודעות לצוות</h2><p class="muted">עדכונים חשובים ואישור קריאה.</p></div><button id="newAnnouncementBtn" class="primary-btn manager-only">הודעה חדשה</button></div>
+        <div id="announcementsList" class="cards-list"></div>
+      </section>
+
+      <section id="tasksPanel" class="panel">
+        <div class="section-heading"><div><h2>משימות</h2><p class="muted">משימות לכל המעון, לכיתה או לעובדת.</p></div><button id="newTaskBtn" class="primary-btn manager-only">משימה חדשה</button></div>
+        <div id="tasksList" class="cards-list"></div>
+      </section>
+
+      <section id="calendarPanel" class="panel">
+        <div class="section-heading"><div><h2>לוח שנה</h2><p class="muted">ישיבות, הדרכות, חופשות, ימי הולדת ופעילויות.</p></div><button id="newCalendarBtn" class="primary-btn manager-only">אירוע חדש</button></div>
+        <div id="calendarList" class="timeline-list"></div>
+      </section>
+
+      <section id="documentsPanel" class="panel">
+        <div class="section-heading"><div><h2>מסמכים</h2><p class="muted">קבצים נשמרים באופן פרטי ומורדים בקישור זמני.</p></div><button id="newDocumentBtn" class="primary-btn manager-only">העלאת מסמך</button></div>
+        <div id="documentsList" class="cards-list"></div>
+      </section>
+
       <section id="employeesPanel" class="panel manager-only">
-        <div class="section-heading">
-          <div><h2>ניהול עובדות</h2><p class="muted">הוספה, עריכה, הגבלות כיתה, שעות והרשאות.</p></div>
-          <button id="newEmployeeBtn" class="primary-btn">הוספת עובדת</button>
-        </div>
+        <div class="section-heading"><div><h2>ניהול עובדות</h2><p class="muted">כרטיס עובדת, הרשאה, שעות, כיתה ואילוצים.</p></div><button id="newEmployeeBtn" class="primary-btn">הוספת עובדת</button></div>
         <div id="employeesList" class="table-card"></div>
       </section>
     </div>
@@ -138,19 +125,18 @@
 
   <dialog id="shiftDialog" class="modal">
     <form id="shiftForm" method="dialog" class="modal-card">
-      <div class="modal-heading"><h3>הוספת שיבוץ</h3><button type="button" class="icon-btn close-dialog">×</button></div>
-      <input type="hidden" name="id" />
+      <div class="modal-heading"><h3>שיבוץ</h3><button type="button" class="icon-btn close-dialog">×</button></div>
+      <input type="hidden" name="id" /><input type="hidden" name="override_day_off" value="false" />
       <div class="form-grid">
         <label>תאריך<input name="shift_date" type="date" required /></label>
         <label>כיתה<select name="class_id" required></select></label>
         <label class="full-field">עובדת<select name="employee_id" required></select></label>
         <label>שעת התחלה<input name="start_time" type="time" value="07:30" required /></label>
         <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
-        <label>תפקיד באותו היום<select name="shift_role"><option value="teacher">גננת</option><option value="lead">מובילה</option><option value="staff" selected>אשת צוות</option><option value="replacement">מחליפה</option></select></label>
-        <label>מצב שיבוץ<select name="status"><option value="draft">טיוטה</option><option value="temporary">זמני</option><option value="final">סופי</option></select></label>
-        <label class="full-field">הערה גלויה<input name="public_note" type="text" /></label>
+        <label>תפקיד<select name="shift_role"><option value="teacher">גננת</option><option value="lead">מובילה</option><option value="staff" selected>אשת צוות</option><option value="replacement">מחליפה</option></select></label>
+        <label>מצב<select name="status"><option value="draft">טיוטה</option><option value="temporary">זמני</option><option value="final">סופי</option></select></label>
+        <label class="full-field">הערה גלויה<input name="public_note" /></label>
       </div>
-      <div id="shiftFormWarning" class="notice hidden"></div>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירה</button></div>
     </form>
   </dialog>
@@ -160,22 +146,19 @@
       <div class="modal-heading"><h3>כרטיס עובדת</h3><button type="button" class="icon-btn close-dialog">×</button></div>
       <input type="hidden" name="id" />
       <div class="form-grid">
-        <label>שם מלא<input name="full_name" required /></label>
-        <label>מספר טלפון<input name="phone" type="tel" required /></label>
+        <label>שם מלא<input name="full_name" required /></label><label>מספר טלפון<input name="phone" type="tel" required /></label>
         <label>תפקיד במעון<input name="job_title" value="אשת צוות" required /></label>
         <label>הרשאה<select name="role"><option value="employee">עובדת</option><option value="scheduler">אחראית שיבוץ</option><option value="admin">מנהלת</option></select></label>
-        <label>כיתה קבועה<select name="primary_class_id"><option value="">ללא כיתה קבועה</option></select></label>
+        <label>כיתה קבועה<select name="primary_class_id"><option value="">ללא</option></select></label>
         <label>יכולה להיות מובילה<select name="can_lead"><option value="false">לא</option><option value="true">כן</option></select></label>
         <label>שעות שבועיות<input name="weekly_hours" type="number" min="0" max="60" step="0.25" /></label>
+        <label>אחוז משרה<input name="employment_percent" type="number" min="0" max="200" step="1" /></label>
         <label>יום חופשי קבוע<select name="fixed_day_off"><option value="">משתנה / ללא</option><option value="0">ראשון</option><option value="1">שני</option><option value="2">שלישי</option><option value="3">רביעי</option><option value="4">חמישי</option><option value="5">שישי</option></select></label>
         <label>שעת התחלה רגילה<input name="default_start" type="time" value="07:30" /></label>
         <label>שעת סיום רגילה<input name="default_end" type="time" value="15:30" /></label>
         <label class="full-field">הערה ניהולית<textarea name="admin_notes" rows="2"></textarea></label>
       </div>
-      <fieldset class="constraints-box">
-        <legend>הגבלות והעדפות כיתה</legend>
-        <div id="constraintsFields" class="constraints-grid"></div>
-      </fieldset>
+      <fieldset class="constraints-box"><legend>העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירה</button></div>
     </form>
   </dialog>
@@ -184,24 +167,50 @@
     <form id="requestForm" method="dialog" class="modal-card">
       <div class="modal-heading"><h3>בקשה חדשה</h3><button type="button" class="icon-btn close-dialog">×</button></div>
       <div class="form-grid">
-        <label>סוג בקשה<select name="request_type" required><option value="leave">חופשה</option><option value="day_off">יום חופשי</option><option value="late_start">התחלה מאוחרת</option><option value="early_finish">סיום מוקדם</option><option value="sick">מחלה</option><option value="swap">החלפת שיבוץ</option><option value="other">אחר</option></select></label>
+        <label>סוג<select name="request_type" required><option value="leave">חופשה</option><option value="day_off">יום חופשי</option><option value="late_start">התחלה מאוחרת</option><option value="early_finish">סיום מוקדם</option><option value="sick">מחלה</option><option value="swap">החלפת שיבוץ</option><option value="other">אחר</option></select></label>
         <label>תאריך<input name="request_date" type="date" required /></label>
-        <label class="request-time start-field hidden">שעת התחלה מבוקשת<input name="requested_start" type="time" /></label>
-        <label class="request-time end-field hidden">שעת סיום מבוקשת<input name="requested_end" type="time" /></label>
-        <label class="swap-field hidden">השיבוץ שלי<select name="shift_id"></select></label>
-        <label class="swap-field hidden">עובדת להחלפה<select name="target_employee_id"></select></label>
-        <label class="swap-field hidden full-field">השיבוץ של העובדת השנייה<select name="target_shift_id"></select></label>
-        <label class="full-field">סיבה / פירוט<textarea name="reason" rows="3"></textarea></label>
+        <label class="request-start hidden">שעת התחלה<input name="requested_start" type="time" /></label>
+        <label class="request-end hidden">שעת סיום<input name="requested_end" type="time" /></label>
+        <label class="shift-choice-field hidden">השיבוץ הרלוונטי<select name="shift_id"></select></label>
+        <label class="swap-field hidden">עובדת שנייה<select name="target_employee_id"></select></label>
+        <label class="swap-field hidden full-field">השיבוץ שלה<select name="target_shift_id"></select></label>
+        <label class="full-field">פירוט<textarea name="reason" rows="3"></textarea></label>
       </div>
-      <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שליחת בקשה</button></div>
+      <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שליחה</button></div>
     </form>
   </dialog>
 
-  <dialog id="suggestionsDialog" class="modal">
-    <section class="modal-card">
-      <div class="modal-heading"><h3>הצעות למחליפה</h3><button type="button" class="icon-btn close-dialog">×</button></div>
-      <div id="suggestionsList" class="cards-list"></div>
-    </section>
-  </dialog>
+  <dialog id="announcementDialog" class="modal"><form id="announcementForm" method="dialog" class="modal-card">
+    <div class="modal-heading"><h3>הודעה חדשה</h3><button type="button" class="icon-btn close-dialog">×</button></div>
+    <div class="form-grid"><label>כותרת<input name="title" required /></label><label>סוג<select name="announcement_type"><option value="info">מידע</option><option value="important">חשוב</option><option value="urgent">דחוף</option></select></label><label>כיתה<select name="class_id"><option value="">כל המעון</option></select></label><label>תוקף עד<input name="expires_at" type="datetime-local" /></label><label class="full-field">תוכן<textarea name="body" rows="5" required></textarea></label></div>
+    <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">פרסום</button></div>
+  </form></dialog>
+
+  <dialog id="taskDialog" class="modal"><form id="taskForm" method="dialog" class="modal-card">
+    <div class="modal-heading"><h3>משימה חדשה</h3><button type="button" class="icon-btn close-dialog">×</button></div>
+    <div class="form-grid"><label>כותרת<input name="title" required /></label><label>עדיפות<select name="priority"><option value="normal">רגילה</option><option value="important">חשובה</option><option value="urgent">דחופה</option></select></label><label>יעד<select name="target_type"><option value="all">כל העובדות</option><option value="class">כיתה</option><option value="employee">עובדת</option></select></label><label>בחירת יעד<select name="target_id"><option value="">לא נדרש</option></select></label><label>תאריך יעד<input name="due_at" type="datetime-local" /></label><label class="full-field">פירוט<textarea name="description" rows="4"></textarea></label></div>
+    <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">יצירה</button></div>
+  </form></dialog>
+
+  <dialog id="calendarDialog" class="modal"><form id="calendarForm" method="dialog" class="modal-card">
+    <div class="modal-heading"><h3>אירוע חדש</h3><button type="button" class="icon-btn close-dialog">×</button></div>
+    <div class="form-grid"><label>כותרת<input name="title" required /></label><label>סוג<select name="event_type"><option value="meeting">ישיבה</option><option value="training">הדרכה</option><option value="holiday">חופשה/חג</option><option value="birthday">יום הולדת</option><option value="activity">פעילות</option><option value="other">אחר</option></select></label><label>תאריך<input name="event_date" type="date" required /></label><label>נראות<select name="visibility"><option value="all">כל העובדות</option><option value="class">כיתה</option><option value="managers">לינור ואילנית בלבד</option></select></label><label>כיתה<select name="class_id"><option value="">ללא</option></select></label><label>התחלה<input name="start_time" type="time" /></label><label>סיום<input name="end_time" type="time" /></label><label class="full-field">פירוט<textarea name="description" rows="3"></textarea></label></div>
+    <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירה</button></div>
+  </form></dialog>
+
+  <dialog id="documentDialog" class="modal"><form id="documentForm" method="dialog" class="modal-card">
+    <div class="modal-heading"><h3>העלאת מסמך</h3><button type="button" class="icon-btn close-dialog">×</button></div>
+    <div class="form-grid"><label>כותרת<input name="title" required /></label><label>נראות<select name="visibility"><option value="all">כל העובדות</option><option value="class">כיתה</option><option value="managers">לינור ואילנית בלבד</option></select></label><label>כיתה<select name="class_id"><option value="">ללא</option></select></label><label class="full-field">קובץ עד 10MB<input name="file" type="file" accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.xlsx" required /></label><label class="full-field">תיאור<textarea name="description" rows="3"></textarea></label></div>
+    <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">העלאה</button></div>
+  </form></dialog>
+
+  <dialog id="settingsDialog" class="modal"><form id="settingsForm" method="dialog" class="modal-card">
+    <div class="modal-heading"><h3>הגדרות תקינה</h3><button type="button" class="icon-btn close-dialog">×</button></div>
+    <div class="form-grid"><label>פתיחת המעון<input name="opening_time" type="time" /></label><label>סגירת המעון<input name="closing_time" type="time" /></label><label>צוות נדרש בכיתה<input name="required_staff" type="number" min="1" max="10" /></label><label>צוות נדרש בסגירה<input name="closing_required_staff" type="number" min="1" max="10" /></label><label>חלון סגירה בדקות<input name="closing_window_minutes" type="number" min="15" max="180" step="15" /></label><label>בדיקה כל כמה דקות<select name="validation_slot_minutes"><option value="15">15</option><option value="30">30</option><option value="60">60</option></select></label></div>
+    <div class="notice">ברירת המחדל: בארבע נשות צוות לאורך היום, ובשלוש במהלך 30 הדקות האחרונות.</div>
+    <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירה</button></div>
+  </form></dialog>
+
+  <dialog id="suggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><h3>מחליפות אפשריות</h3><button type="button" class="icon-btn close-dialog">×</button></div><div id="suggestionsList" class="cards-list"></div></div></dialog>
 </body>
 </html>
