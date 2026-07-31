@@ -1,6 +1,6 @@
 const {
   requireSession, parseBody, db, assertDb, emitEvent, audit,
-  send, handleError, httpError,
+  send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
 const { validateWeek, timeToMinutes } = require('../lib/schedule');
 
@@ -83,7 +83,7 @@ module.exports = async function handler(req,res) {
     const body = parseBody(req);
 
     if (req.method === 'POST' && body.action === 'ack') {
-      const weekStart = getSunday(String(body.week_start || new Date().toISOString().slice(0,10)));
+      const weekStart = getSunday(String(body.week_start || israelDateISO()));
       assertDb(await db().from('hadas_schedule_acknowledgements').upsert({ employee_id:caller.employee.id,week_start:weekStart,acknowledged_at:new Date().toISOString() },{ onConflict:'employee_id,week_start' }), 'לא ניתן לשמור אישור קריאה');
       await emitEvent('schedule_ack');
       return send(res,200,{ ok:true });

@@ -1,6 +1,6 @@
 const {
   requireSession, parseBody, normalizePhone, db, assertDb, hashPassword,
-  revokeUserSessions, emitEvent, audit, send, handleError, httpError,
+  revokeUserSessions, emitEvent, audit, send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
 const { timeToMinutes } = require('../lib/schedule');
 
@@ -125,7 +125,7 @@ module.exports = async function handler(req,res) {
       if (body.active !== undefined) {
         userUpdate.active = nextActive;
         employeeUpdate.active = nextActive;
-        if (!nextActive) employeeUpdate.ended_at = body.ended_at || new Date().toISOString().slice(0,10);
+        if (!nextActive) employeeUpdate.ended_at = body.ended_at || israelDateISO();
         else if (body.ended_at === undefined) employeeUpdate.ended_at = null;
       }
       if (body.reset_password) {
@@ -152,7 +152,7 @@ module.exports = async function handler(req,res) {
       if (!user) throw httpError(404,'המשתמשת לא נמצאה');
       await ensureAdminRemains(user.id,user.role,false);
       assertDb(await db().from('hadas_users').update({ active:false }).eq('id',user.id), 'לא ניתן להשבית משתמשת');
-      assertDb(await db().from('hadas_employees').update({ active:false,ended_at:new Date().toISOString().slice(0,10) }).eq('id',employeeId), 'לא ניתן להשבית עובדת');
+      assertDb(await db().from('hadas_employees').update({ active:false,ended_at:israelDateISO() }).eq('id',employeeId), 'לא ניתן להשבית עובדת');
       await revokeUserSessions(user.id);
       await audit(caller.employee.id,'deactivate','employee',employeeId);
       await emitEvent('employees');

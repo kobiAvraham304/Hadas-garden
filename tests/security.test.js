@@ -4,7 +4,6 @@ const assert = require('node:assert/strict');
 process.env.SUPABASE_URL = 'https://example.supabase.co';
 process.env.SUPABASE_PUBLISHABLE_KEY = 'publishable-test';
 process.env.SUPABASE_SECRET_KEY = 'server-test-key';
-process.env.SESSION_PEPPER = 'pepper-for-tests';
 
 const {
   normalizePhone, displayPhone, hashPassword, verifyPassword, db,
@@ -46,4 +45,15 @@ test('signed storage URLs keep the Supabase /storage/v1 prefix', async () => {
   } finally {
     global.fetch = originalFetch;
   }
+});
+
+
+test('the SQL initial password hash is exactly the temporary password hadas', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const schema = fs.readFileSync(path.join(__dirname,'..','supabase','schema.sql'),'utf8');
+  const encoded = schema.match(/v_initial_hash text := '([^']+)'/)?.[1];
+  assert.ok(encoded);
+  assert.equal(await verifyPassword('hadas', encoded), true);
+  assert.equal(await verifyPassword('Hadas', encoded), false);
 });

@@ -1,5 +1,5 @@
 const {
-  requireSession, isManager, db, assertDb, displayPhone, send, handleError,
+  requireSession, isManager, db, assertDb, displayPhone, israelDateISO, send, handleError,
 } = require('../lib/server');
 const { dateRange } = require('../lib/schedule');
 
@@ -16,19 +16,19 @@ function sanitizeEmployee(employee, manager, usersByEmployee, privateByEmployee)
     job_title:employee.job_title,
     primary_class_id:employee.primary_class_id,
     can_lead:employee.can_lead,
-    weekly_hours:employee.weekly_hours,
-    employment_percent:employee.employment_percent,
-    default_start:employee.default_start,
-    default_end:employee.default_end,
-    fixed_day_off:employee.fixed_day_off,
     active:employee.active,
-    started_at:employee.started_at,
-    ended_at:employee.ended_at,
   };
   if (manager) {
     const user = usersByEmployee.get(employee.id);
     return {
       ...base,
+      weekly_hours:employee.weekly_hours,
+      employment_percent:employee.employment_percent,
+      default_start:employee.default_start,
+      default_end:employee.default_end,
+      fixed_day_off:employee.fixed_day_off,
+      started_at:employee.started_at,
+      ended_at:employee.ended_at,
       phone:user ? displayPhone(user.phone) : displayPhone(employee.contact_phone),
       role:user?.role || 'employee',
       user_active:user?.active ?? false,
@@ -44,9 +44,9 @@ module.exports = async function handler(req, res) {
     if (req.method !== 'GET') return send(res, 405, { ok:false, error:'Method not allowed' });
     const caller = await requireSession(req, { csrf:false });
     const manager = isManager(caller);
-    const weekStart = String(req.query?.week_start || new Date().toISOString().slice(0,10));
+    const weekStart = String(req.query?.week_start || israelDateISO());
     const weekEnd = plusDays(weekStart, 5);
-    const attendanceDate = String(req.query?.attendance_date || new Date().toISOString().slice(0,10));
+    const attendanceDate = String(req.query?.attendance_date || israelDateISO());
     const calendarStart = plusDays(weekStart, -31);
     const calendarEnd = plusDays(weekStart, 120);
 
@@ -67,7 +67,7 @@ module.exports = async function handler(req, res) {
       db().from('hadas_task_assignees').select('*'),
       db().from('hadas_calendar_events').select('*').gte('event_date',calendarStart).lte('event_date',calendarEnd).order('event_date'),
       db().from('hadas_documents').select('*').eq('active',true).order('created_at',{ ascending:false }).limit(200),
-      db().from('hadas_shifts').select('*').eq('shift_date',new Date().toISOString().slice(0,10)).order('start_time'),
+      db().from('hadas_shifts').select('*').eq('shift_date',israelDateISO()).order('start_time'),
     ]);
     const [classesR, employeesR, usersR, privateR, constraintsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, readsR, tasksR, assigneesR, calendarR, documentsR, todayShiftsR] = queries;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
@@ -109,6 +109,7 @@ module.exports = async function handler(req, res) {
 
     const now = Date.now();
     announcements = announcements.filter((row) => {
+      if (!row.active) return false;
       if (manager) return true;
       return Date.parse(row.published_at) <= now && (!row.expires_at || Date.parse(row.expires_at) >= now);
     });

@@ -1,46 +1,64 @@
--- מערכת השיבוצים של מעון הדס — גרסה 0.2.0
+-- מערכת השיבוצים של מעון הדס — גרסה 0.4.1
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
--- ניתן להריץ את הקובץ גם מעל סכמת 0.1.0; hadas_profiles תשונה ל-hadas_employees.
+-- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
+-- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
+-- הוא אינו נוגע בטבלאות או בנתונים של מערכת אופקים או של פרויקטים אחרים.
 
-create extension if not exists pgcrypto;
-
--- שדרוג בטוח מגרסה 0.1.0
+-- הסרה בטוחה מה-publication לפני מחיקת טבלת האותות.
 DO $$
 BEGIN
-  IF to_regclass('public.hadas_profiles') IS NOT NULL
-     AND to_regclass('public.hadas_employees') IS NULL THEN
-    ALTER TABLE public.hadas_profiles RENAME TO hadas_employees;
+  IF EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname='supabase_realtime' AND schemaname='public' AND tablename='hadas_realtime_events'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime DROP TABLE public.hadas_realtime_events;
   END IF;
 END $$;
 
-DO $$
-DECLARE r record;
-BEGIN
-  IF to_regclass('public.hadas_employees') IS NOT NULL THEN
-    FOR r IN
-      SELECT conname
-      FROM pg_constraint
-      WHERE conrelid = 'public.hadas_employees'::regclass
-        AND confrelid = 'auth.users'::regclass
-    LOOP
-      EXECUTE format('ALTER TABLE public.hadas_employees DROP CONSTRAINT %I', r.conname);
-    END LOOP;
-  END IF;
-END $$;
+-- ניקוי התקנות חלקיות או גרסאות קודמות של מערכת הדס בלבד.
+DROP TABLE IF EXISTS
+  public.hadas_announcement_reads,
+  public.hadas_task_assignees,
+  public.hadas_attendance,
+  public.hadas_schedule_acknowledgements,
+  public.hadas_requests,
+  public.hadas_shifts,
+  public.hadas_employee_class_constraints,
+  public.hadas_employee_private,
+  public.hadas_sessions,
+  public.hadas_login_security,
+  public.hadas_users,
+  public.hadas_documents,
+  public.hadas_calendar_events,
+  public.hadas_tasks,
+  public.hadas_announcements,
+  public.hadas_realtime_events,
+  public.hadas_audit_log,
+  public.hadas_app_settings,
+  public.hadas_app_meta,
+  public.hadas_employees,
+  public.hadas_profiles,
+  public.hadas_classes
+CASCADE;
 
-DO $$
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='hadas_employees' AND column_name='phone')
-     AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='hadas_employees' AND column_name='contact_phone') THEN
-    ALTER TABLE public.hadas_employees RENAME COLUMN phone TO contact_phone;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='hadas_employees' AND column_name='role') THEN
-    ALTER TABLE public.hadas_employees ALTER COLUMN role DROP NOT NULL;
-  END IF;
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='hadas_employees' AND column_name='must_change_password') THEN
-    ALTER TABLE public.hadas_employees ALTER COLUMN must_change_password DROP NOT NULL;
-  END IF;
-END $$;
+DROP FUNCTION IF EXISTS public.hadas_apply_shift_swap(uuid,uuid) CASCADE;
+DROP FUNCTION IF EXISTS public.hadas_emit_realtime_event() CASCADE;
+DROP FUNCTION IF EXISTS public.hadas_prevent_shift_overlap() CASCADE;
+DROP FUNCTION IF EXISTS public.hadas_set_updated_at() CASCADE;
+DROP FUNCTION IF EXISTS public.hadas_audit_changes() CASCADE;
+DROP FUNCTION IF EXISTS public.hadas_is_active_user() CASCADE;
+DROP FUNCTION IF EXISTS public.hadas_is_manager() CASCADE;
+
+create table if not exists public.hadas_app_meta (
+  id integer primary key default 1 check (id = 1),
+  schema_version text not null,
+  app_version text not null,
+  installed_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+insert into public.hadas_app_meta(id, schema_version, app_version)
+values (1, '0.4.1', '0.4.1')
+on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
   id uuid primary key default gen_random_uuid(),
@@ -309,6 +327,76 @@ insert into public.hadas_classes(name, slug, sort_order) values
   ('גלבוע', 'gilboa', 3)
 on conflict (slug) do update set name=excluded.name, sort_order=excluded.sort_order, active=true;
 
+
+-- שני החשבונות הראשוניים נוצרים אוטומטית בהרצת ה-SQL.
+-- אין עמוד setup, אין קוד הקמה ואין צורך ליצור משתמשים ידנית.
+DO $$
+DECLARE
+  v_employee_id uuid;
+  v_user_id uuid;
+  v_odem_id uuid;
+  v_initial_hash text := 'scrypt$16384$8$1$SGFkYXMyMDI2SW5pdGlhbA$9_BjY3gQuFn5SOEmFzZXXtxQyRLB5pzc8DGoXUZi0YY';
+BEGIN
+  SELECT id INTO v_odem_id FROM public.hadas_classes WHERE slug='odem';
+
+  -- אילנית זאדייב — מנהלת המעון
+  SELECT id INTO v_employee_id
+  FROM public.hadas_employees
+  WHERE contact_phone='+972544594513'
+  ORDER BY created_at ASC LIMIT 1;
+  IF v_employee_id IS NULL THEN
+    INSERT INTO public.hadas_employees(full_name,contact_phone,job_title,can_lead,active)
+    VALUES('אילנית זאדייב','+972544594513','מנהלת מעון',true,true)
+    RETURNING id INTO v_employee_id;
+  ELSE
+    UPDATE public.hadas_employees
+    SET full_name='אילנית זאדייב', contact_phone='+972544594513', job_title='מנהלת מעון', can_lead=true, active=true, ended_at=null
+    WHERE id=v_employee_id;
+  END IF;
+
+  SELECT id INTO v_user_id FROM public.hadas_users
+  WHERE phone='+972544594513' OR employee_id=v_employee_id
+  ORDER BY CASE WHEN phone='+972544594513' THEN 0 ELSE 1 END, created_at ASC LIMIT 1;
+  IF v_user_id IS NULL THEN
+    INSERT INTO public.hadas_users(employee_id,phone,password_hash,role,active,must_change_password)
+    VALUES(v_employee_id,'+972544594513',v_initial_hash,'admin',true,true);
+  ELSE
+    UPDATE public.hadas_users
+    SET employee_id=v_employee_id, phone='+972544594513', role='admin', active=true
+    WHERE id=v_user_id;
+  END IF;
+
+  -- לינור אברהם — גננת ואחראית שיבוץ
+  v_employee_id := NULL;
+  v_user_id := NULL;
+  SELECT id INTO v_employee_id
+  FROM public.hadas_employees
+  WHERE contact_phone='+972542521780'
+  ORDER BY created_at ASC LIMIT 1;
+  IF v_employee_id IS NULL THEN
+    INSERT INTO public.hadas_employees(full_name,contact_phone,job_title,primary_class_id,can_lead,active)
+    VALUES('לינור אברהם','+972542521780','גננת',v_odem_id,true,true)
+    RETURNING id INTO v_employee_id;
+  ELSE
+    UPDATE public.hadas_employees
+    SET full_name='לינור אברהם', contact_phone='+972542521780', job_title='גננת',
+        primary_class_id=coalesce(primary_class_id,v_odem_id), can_lead=true, active=true, ended_at=null
+    WHERE id=v_employee_id;
+  END IF;
+
+  SELECT id INTO v_user_id FROM public.hadas_users
+  WHERE phone='+972542521780' OR employee_id=v_employee_id
+  ORDER BY CASE WHEN phone='+972542521780' THEN 0 ELSE 1 END, created_at ASC LIMIT 1;
+  IF v_user_id IS NULL THEN
+    INSERT INTO public.hadas_users(employee_id,phone,password_hash,role,active,must_change_password)
+    VALUES(v_employee_id,'+972542521780',v_initial_hash,'scheduler',true,true);
+  ELSE
+    UPDATE public.hadas_users
+    SET employee_id=v_employee_id, phone='+972542521780', role='scheduler', active=true
+    WHERE id=v_user_id;
+  END IF;
+END $$;
+
 create or replace function public.hadas_set_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end;
@@ -318,7 +406,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'hadas_classes','hadas_employees','hadas_users','hadas_employee_private','hadas_shifts',
+    'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_employee_private','hadas_shifts',
     'hadas_requests','hadas_announcements','hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings'
   ] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
@@ -424,7 +512,7 @@ DO $$
 DECLARE t text; r record;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
+    'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
     'hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance',
     'hadas_requests','hadas_schedule_acknowledgements','hadas_app_settings','hadas_announcements',
     'hadas_announcement_reads','hadas_tasks','hadas_task_assignees','hadas_calendar_events',
@@ -441,8 +529,25 @@ END $$;
 grant usage on schema public to anon, authenticated, service_role;
 grant select on public.hadas_realtime_events to anon, authenticated;
 create policy hadas_realtime_public_read on public.hadas_realtime_events for select to anon, authenticated using (true);
-grant all on all tables in schema public to service_role;
-grant all on all sequences in schema public to service_role;
+
+-- הרשאות שרת רק לאובייקטים של מערכת הדס, בלי לגעת בטבלאות אחרות בפרויקט.
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT tablename FROM pg_tables
+    WHERE schemaname='public' AND left(tablename, 6) = 'hadas_'
+  LOOP
+    EXECUTE format('GRANT ALL ON TABLE public.%I TO service_role', r.tablename);
+  END LOOP;
+
+  FOR r IN
+    SELECT sequence_name FROM information_schema.sequences
+    WHERE sequence_schema='public' AND left(sequence_name, 6) = 'hadas_'
+  LOOP
+    EXECUTE format('GRANT ALL ON SEQUENCE public.%I TO service_role', r.sequence_name);
+  END LOOP;
+END $$;
 
 -- Bucket פרטי למסמכים. הורדה והעלאה רק בקישורים חתומים שנוצרים בשרת.
 insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)

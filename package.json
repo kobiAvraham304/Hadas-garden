@@ -1,12 +1,15 @@
 {
   "name": "hadas-scheduling",
-  "version": "0.2.0",
+  "version": "0.4.1",
   "private": true,
   "description": "מערכת שיבוצים וניהול צוות בזמן אמת למעון הדס",
   "license": "UNLICENSED",
   "scripts": {
     "test": "node --test tests/*.test.js",
-    "check": "node scripts/check.js"
+    "check": "node scripts/check.js",
+    "qa": "npm test && npm run check"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": "22.x"
+  }
 }
