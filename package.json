@@ -1,0 +1,7 @@
+{
+  "name": "hadas-scheduling",
+  "version": "0.1.0",
+  "private": true,
+  "description": "מערכת שיבוצים בזמן אמת למעון הדס",
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>הקמת מערכת | מעון הדס</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body class="setup-body">
+  <main class="auth-shell">
+    <section class="auth-card wide-card">
+      <div class="brand-mark">הדס</div>
+      <h1>הקמת מערכת השיבוצים</h1>
+      <p class="muted">המסך מיועד להפעלה חד־פעמית לאחר הרצת קובץ בסיס הנתונים.</p>
+      <div id="setupStatus" class="notice">בודק את מצב המערכת…</div>
+      <form id="setupForm" class="form-grid hidden">
+        <label class="full-field">קוד הקמה
+          <input name="bootstrapToken" type="password" required autocomplete="off" />
+        </label>
+        <label>טלפון אילנית
+          <input name="ilanitPhone" type="tel" placeholder="05X-XXXXXXX" required />
+        </label>
+        <label>טלפון לינור
+          <input name="linorPhone" type="tel" placeholder="05X-XXXXXXX" required />
+        </label>
+        <label class="full-field">סיסמה ראשונית
+          <input name="password" type="text" value="hadas" minlength="6" required />
+        </label>
+        <button class="primary-btn full-field" type="submit">הקמת לינור ואילנית</button>
+      </form>
+      <a class="text-link" href="/">חזרה למסך הכניסה</a>
+    </section>
+  </main>
+  <script src="/setup.js" defer></script>
+</body>
+</html>
