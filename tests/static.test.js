@@ -39,9 +39,9 @@ test('setup complexity was removed completely', () => {
   assert.doesNotMatch(content,/process\.env\.(BOOTSTRAP_TOKEN|SESSION_PEPPER|APP_URL)/);
 });
 
-test('Vercel security headers, health route and fixed Node major are present', () => {
+test('Vercel security headers and health route are present without a conflicting Node override', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.4.1'); assert.equal(pkg.engines.node,'22.x');
+  assert.equal(pkg.version,'0.4.2'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
