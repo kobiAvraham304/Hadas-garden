@@ -1,0 +1,150 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+function read(file) { return fs.readFileSync(path.join(root, file), 'utf8'); }
+function allProjectText(){
+  const files=fs.readdirSync(root,{recursive:true,withFileTypes:true})
+    .filter(e=>e.isFile()).map(e=>path.join(e.parentPath||e.path,e.name))
+    .filter(f=>!f.includes(`${path.sep}tests${path.sep}`)&&!f.endsWith('.zip'))
+    .filter(f=>/\.(js|html|sql|md|json|css|example)$/.test(f));
+  return files.map(f=>fs.readFileSync(f,'utf8')).join('\n');
+}
+
+test('all fixed ID selectors used by app.js exist in index.html', () => {
+  const html = read('index.html'); const js = read('app.js');
+  const ids = new Set([...html.matchAll(/\bid=["']([^"']+)["']/g)].map(m=>m[1]));
+  const used = new Set([...js.matchAll(/\$\(["']#([A-Za-z0-9_-]+)["']/g)].map(m=>m[1]));
+  assert.deepEqual([...used].filter(id=>!ids.has(id)), []);
+});
+
+test('project contains phone login only and no bundled secret value', () => {
+  const content=allProjectText();
+  assert.doesNotMatch(content, /@hadas\.local/i);
+  assert.doesNotMatch(content, /signInWithPassword|auth\.signIn/i);
+  assert.doesNotMatch(content, /sb_secret_[A-Za-z0-9_-]{20,}/i);
+  assert.match(read('index.html'), /מספר טלפון/);
+});
+
+test('setup complexity remains removed', () => {
+  const content=allProjectText(); const vercel=JSON.parse(read('vercel.json'));
+  assert.equal(fs.existsSync(path.join(root,'setup.html')),false);
+  assert.doesNotMatch(read('README.md'),/BOOTSTRAP_TOKEN|SESSION_PEPPER|APP_URL|\/setup/);
+  assert.ok(!vercel.rewrites.some(item=>item.source==='/setup'));
+  const vars=[...read('.env.example').matchAll(/^([A-Z0-9_]+)=/gm)].map(m=>m[1]);
+  assert.deepEqual(vars,['SUPABASE_URL','SUPABASE_PUBLISHABLE_KEY','SUPABASE_SECRET_KEY']);
+  assert.doesNotMatch(content,/process\.env\.(BOOTSTRAP_TOKEN|SESSION_PEPPER|APP_URL)/);
+});
+
+test('version, security headers and health route are consistent', () => {
+  const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
+  assert.equal(pkg.version,'0.5.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
+  const raw=read('vercel.json');
+  for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
+  for(const file of ['app.js','handlers/config.js','handlers/health.js','package.json','supabase/schema.sql']) assert.doesNotMatch(read(file),/version[^\n]*0\.4\.3/i,file);
+});
+
+test('initial accounts and schema version are present in clean installer', () => {
+  const schema=read('supabase/schema.sql');
+  assert.match(schema,/אילנית זאדייב/); assert.match(schema,/\+972544594513/); assert.match(schema,/'admin'/);
+  assert.match(schema,/לינור אברהם/); assert.match(schema,/\+972542521780/); assert.match(schema,/'scheduler'/);
+  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.5\.0'/);
+  assert.match(schema,/ENABLE ROW LEVEL SECURITY/i); assert.match(schema,/REVOKE ALL ON TABLE/i);
+  assert.match(schema,/hadas_realtime_public_read/); assert.match(schema,/ALTER PUBLICATION supabase_realtime ADD TABLE/i);
+});
+
+test('new product name is used across main interfaces', () => {
+  for(const file of ['index.html','README.md','VERSION.md','supabase/schema.sql']) assert.match(read(file),/מערכת ניהול שיבוצים מעון הדס/,file);
+  assert.doesNotMatch(read('index.html'),/מערכת השיבוצים של מעון הדס/);
+});
+
+test('documents module and navigation are removed from runtime', () => {
+  assert.equal(fs.existsSync(path.join(root,'handlers','documents.js')),false);
+  assert.doesNotMatch(read('index.html'),/data-tab="documents"|id="documentsPanel"|מסמכים/);
+  assert.doesNotMatch(read('api/index.js'),/documents/);
+  assert.doesNotMatch(read('vercel.json'),/api\/documents/);
+  assert.doesNotMatch(read('app.js'),/renderDocuments|documentsList|documentDialog/);
+  assert.doesNotMatch(read('lib/server.js'),/StorageBucket|storage\s*=/);
+});
+
+test('schedule has prepare-and-publish flow without temporary or final options', () => {
+  const app=read('app.js'); const html=read('index.html'); const shifts=read('handlers/shifts.js');
+  assert.match(html,/id="publishScheduleBtn"/);
+  assert.match(html,/פרסום השיבוץ/);
+  assert.doesNotMatch(html,/שיבוץ זמני|שיבוץ סופי/);
+  assert.match(shifts,/publish_preview/);
+  assert.match(shifts,/hadas_schedule_changes/);
+  assert.match(shifts,/status: 'draft'/);
+  assert.match(shifts,/status: 'published'/);
+  assert.match(app,/renderPublicationState/);
+  assert.match(app,/changeRowHtml/);
+});
+
+test('client includes responsive week, day and personal schedule views', () => {
+  const app=read('app.js'); const css=read('styles.css'); const html=read('index.html');
+  assert.match(app,/timeoutSignal/); assert.match(app,/state\.refreshing/);
+  for(const mode of ['week','day','mine']) assert.match(html,new RegExp(`data-mode="${mode}"`));
+  assert.match(app,/renderScheduleWeek/); assert.match(app,/renderScheduleDay/); assert.match(app,/renderScheduleMine/);
+  assert.match(app,/copy_preview/); assert.match(app,/copy_previous/);
+  assert.match(css,/@media\(max-width:760px\)/);
+  assert.match(css,/min-height:44px/);
+  assert.match(css,/prefers-reduced-motion/);
+});
+
+test('all time fields and rendered times are isolated left-to-right', () => {
+  const app=read('app.js'); const css=read('styles.css');
+  assert.match(app,/<bdi class="time-value">/);
+  assert.match(css,/input\[type="time"\][^}]*direction:ltr/);
+  assert.match(css,/\.time-value[^}]*direction:ltr/);
+  assert.match(css,/unicode-bidi:isolate/);
+});
+
+test('requests, announcements, tasks and employee management have rich controls', () => {
+  const html=read('index.html'); const app=read('app.js'); const css=read('styles.css');
+  assert.match(html,/request-type-card/);
+  assert.match(html,/employeeStatusFilter/); assert.match(html,/employeeClassFilter/); assert.match(html,/employeeTypeFilter/);
+  assert.match(app,/announcement_employee_ids/); assert.match(app,/task_employee_ids/);
+  assert.match(html,/content-creator-only/);
+  assert.match(app,/employeePickerHtml/);
+  assert.match(css,/\.request-card/); assert.match(css,/\.employee-card-grid/);
+});
+
+test('calendar is a 42-day monthly grid with navigation and event details', () => {
+  const html=read('index.html'); const app=read('app.js'); const css=read('styles.css');
+  for(const id of ['prevMonthBtn','todayMonthBtn','nextMonthBtn','calendarMonthLabel','calendarGrid','calendarEventDialog']) assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(app,/Array\.from\(\{ length: 42 \}/);
+  assert.match(app,/openCalendarEvent/);
+  assert.match(css,/\.calendar-grid/);
+});
+
+test('dashboard does not show a Vercel deployment notice', () => {
+  const dashboard=read('index.html').match(/<section id="dashboardPanel"[\s\S]*?<\/section>/)?.[0]||'';
+  assert.doesNotMatch(dashboard,/Vercel|ורסל/i);
+});
+
+test('non-manager employee payload excludes private employment fields', () => {
+  const dataApi=read('handlers/data.js'); const baseBlock=dataApi.match(/const base = \{([\s\S]*?)\n  \};/)?.[1]||'';
+  assert.doesNotMatch(baseBlock,/weekly_hours|employment_percent|fixed_day_off|started_at|ended_at|admin_notes|phone/);
+  assert.match(dataApi,/if \(!manager\) return base/);
+});
+
+test('health page is CSP-compatible and references 0.5 migration', () => {
+  const html=read('health.html'); const js=read('health.js');
+  assert.match(html,/src="\/health\.js"/); assert.doesNotMatch(html,/<script>[^<]/);
+  assert.match(js,/update-v0\.5\.0\.sql/);
+});
+
+test('runtime avoids unsafe dynamic JavaScript and inline DOM handlers', () => {
+  assert.doesNotMatch(read('app.js'),/\beval\s*\(|new Function|document\.write/);
+  assert.doesNotMatch(read('index.html'),/\son[a-z]+\s*=/i);
+});
+
+test('Vercel Hobby function count stays safely below the 12-function limit', () => {
+  const apiFiles=fs.readdirSync(path.join(root,'api')).filter(file=>file.endsWith('.js'));
+  const vercel=JSON.parse(read('vercel.json'));
+  assert.deepEqual(apiFiles,['index.js']);
+  assert.deepEqual(Object.keys(vercel.functions),['api/index.js']);
+  assert.ok(apiFiles.length <= 12);
+});

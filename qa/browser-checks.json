@@ -1,0 +1,38 @@
+{
+  "title": "מערכת ניהול שיבוצים מעון הדס",
+  "visiblePanel": "dashboardPanel",
+  "bodyOverflowX": false,
+  "mainButtonsCount": 155,
+  "scheduleOverflowX": false,
+  "requestsOverflowX": false,
+  "announcementsOverflowX": false,
+  "tasksOverflowX": false,
+  "calendarOverflowX": false,
+  "employeesOverflowX": false,
+  "timeDirection": "ltr",
+  "timeTextAlign": "center",
+  "mobileBodyOverflowX": false,
+  "mobileNavPosition": "fixed",
+  "mobileScheduleOverflowX": false,
+  "mobileScheduleButtonOverlaps": [],
+  "mobileRequestsOverflowX": false,
+  "mobileRequestsButtonOverlaps": [],
+  "mobileCalendarOverflowX": false,
+  "mobileCalendarButtonOverlaps": [],
+  "mobileEmployeesOverflowX": false,
+  "mobileEmployeesButtonOverlaps": [],
+  "calendarEventDialogOpen": true,
+  "mobileSmallButtons": [
+    {
+      "text": "◉ ישיבת צוות",
+      "w": 44,
+      "h": 36
+    },
+    {
+      "text": "✦ הדרכת קלינאית",
+      "w": 44,
+      "h": 36
+    }
+  ],
+  "runtimeExceptionCount": 0
+}
