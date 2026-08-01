@@ -1,0 +1,164 @@
+[
+  {
+    "name": "desktop1440",
+    "schedule": {
+      "vw": 1440,
+      "docW": 1440,
+      "bodyW": 1440,
+      "dialog": [],
+      "mobileWeek": "none",
+      "desktopWeek": "block",
+      "days": 6,
+      "pageErrors": []
+    },
+    "request": {
+      "vw": 1440,
+      "docW": 1440,
+      "bodyW": 1440,
+      "dialog": [
+        {
+          "id": "requestDialog",
+          "x": 330,
+          "right": 1110,
+          "w": 780,
+          "top": 153.515625,
+          "bottom": 846.484375
+        }
+      ],
+      "mobileWeek": "none",
+      "desktopWeek": "block",
+      "days": 6,
+      "pageErrors": []
+    },
+    "settings": {
+      "vw": 1440,
+      "docW": 1440,
+      "bodyW": 1440,
+      "dialog": [
+        {
+          "id": "settingsDialog",
+          "x": 330,
+          "right": 1110,
+          "w": 780,
+          "top": 66.546875,
+          "bottom": 933.453125
+        }
+      ],
+      "mobileWeek": "none",
+      "desktopWeek": "block",
+      "days": 6,
+      "pageErrors": []
+    },
+    "weekSwitchMs": 138.6,
+    "calendarSelected": "2026-08-01",
+    "errors": []
+  },
+  {
+    "name": "mobile390",
+    "schedule": {
+      "vw": 390,
+      "docW": 390,
+      "bodyW": 390,
+      "dialog": [],
+      "mobileWeek": "grid",
+      "desktopWeek": "none",
+      "days": 6,
+      "pageErrors": []
+    },
+    "request": {
+      "vw": 390,
+      "docW": 390,
+      "bodyW": 390,
+      "dialog": [
+        {
+          "id": "requestDialog",
+          "x": 8,
+          "right": 382,
+          "w": 374,
+          "top": 8,
+          "bottom": 836
+        }
+      ],
+      "mobileWeek": "grid",
+      "desktopWeek": "none",
+      "days": 6,
+      "pageErrors": []
+    },
+    "settings": {
+      "vw": 390,
+      "docW": 390,
+      "bodyW": 390,
+      "dialog": [
+        {
+          "id": "settingsDialog",
+          "x": 8,
+          "right": 382,
+          "w": 374,
+          "top": 8,
+          "bottom": 836
+        }
+      ],
+      "mobileWeek": "grid",
+      "desktopWeek": "none",
+      "days": 6,
+      "pageErrors": []
+    },
+    "weekSwitchMs": 145.1,
+    "calendarSelected": "2026-08-01",
+    "errors": []
+  },
+  {
+    "name": "mobile360",
+    "schedule": {
+      "vw": 360,
+      "docW": 360,
+      "bodyW": 360,
+      "dialog": [],
+      "mobileWeek": "grid",
+      "desktopWeek": "none",
+      "days": 6,
+      "pageErrors": []
+    },
+    "request": {
+      "vw": 360,
+      "docW": 360,
+      "bodyW": 360,
+      "dialog": [
+        {
+          "id": "requestDialog",
+          "x": 8,
+          "right": 352,
+          "w": 344,
+          "top": 8,
+          "bottom": 792
+        }
+      ],
+      "mobileWeek": "grid",
+      "desktopWeek": "none",
+      "days": 6,
+      "pageErrors": []
+    },
+    "settings": {
+      "vw": 360,
+      "docW": 360,
+      "bodyW": 360,
+      "dialog": [
+        {
+          "id": "settingsDialog",
+          "x": 8,
+          "right": 352,
+          "w": 344,
+          "top": 8,
+          "bottom": 792
+        }
+      ],
+      "mobileWeek": "grid",
+      "desktopWeek": "none",
+      "days": 6,
+      "pageErrors": []
+    },
+    "weekSwitchMs": 169.2,
+    "calendarSelected": "2026-08-01",
+    "errors": []
+  }
+]
