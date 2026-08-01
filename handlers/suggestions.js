@@ -47,11 +47,13 @@ module.exports = async function handler(req,res) {
       let score = 0;
       const reasons = [];
       if (!dayShifts.length) { score += 40; reasons.push('אינה משובץ באותו יום'); }
-      else { score += 5; reasons.push('פנויה בשעות החסרות'); }
+      else { score += 5; reasons.push('פנוי/ה בשעות החסרות'); }
       if (employee.primary_class_id === classId) { score += 28; reasons.push('זו הכיתה הקבועה שלו'); }
-      else if (employee.assignment_mode === 'rotation') { score += 12; reasons.push('מוגדר ברוטציה בין כיתות'); }
-      if (constraint?.constraint_type === 'preferred') { score += 18; reasons.push('מוגדרת בעדיפות לכיתה'); }
+      else if (employee.assignment_mode === 'substitute') { score += 26; reasons.push('מוגדר/ת כמשלימ/ת מקום'); }
+      else if (employee.assignment_mode === 'rotation') { score += 12; reasons.push('מוגדר/ת ברוטציה בין כיתות'); }
+      if (constraint?.constraint_type === 'preferred') { score += 18; reasons.push('קיימת עדיפות לכיתה'); }
       if (constraint?.constraint_type === 'avoid') { score -= 25; reasons.push('עדיף להימנע משיבוץ בכיתה'); }
+      if (pattern?.day_type === 'as_needed') { score += 18; reasons.push('מוגדר/ת לפי צורך ביום זה'); }
       if (pattern?.day_type === 'work') {
         const sameHours = String(pattern.start_time).slice(0,5) <= start && String(pattern.end_time).slice(0,5) >= end;
         if (sameHours) { score += 10; reasons.push('השעות תואמות ליום העבודה הקבוע'); }

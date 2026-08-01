@@ -1,8 +1,8 @@
 const {
-  requireSession, parseBody, db, assertDb, emitEvent, audit, isManager, canViewFullSchedule, notifyEmployees,
+  requireSession, parseBody, db, assertDb, emitEvent, audit, isManager, scheduleScope, canViewFullSchedule, notifyEmployees,
   send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
-const { validateWeek, timeToMinutes } = require('../lib/schedule');
+const { validateWeek, timeToMinutes, closingTimeForDate } = require('../lib/schedule');
 
 function addDays(dateString, days) {
   const d = new Date(`${dateString}T12:00:00Z`);
@@ -51,8 +51,9 @@ async function validateShift(payload, id, overrideDayOff = false) {
   if (!employee?.active) throw httpError(409, 'העובד אינו פעיל');
   if (employee.is_schedulable === false) throw httpError(409, 'העובד אינו מוגדר כחלק ממערך השיבוצים');
   if (!classItem?.active) throw httpError(409, 'הכיתה אינה פעילה');
-  if (timeToMinutes(payload.start_time) < timeToMinutes(settings.opening_time) || timeToMinutes(payload.end_time) > timeToMinutes(settings.closing_time)) {
-    throw httpError(409, `השיבוץ חייב להיות בין ${String(settings.opening_time).slice(0, 5)} ל-${String(settings.closing_time).slice(0, 5)}`);
+  const dayClosing = closingTimeForDate(settings, payload.shift_date);
+  if (timeToMinutes(payload.start_time) < timeToMinutes(settings.opening_time) || timeToMinutes(payload.end_time) > timeToMinutes(dayClosing)) {
+    throw httpError(409, `השיבוץ חייב להיות בין ${String(settings.opening_time).slice(0, 5)} ל-${dayClosing}${new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay() === 5 ? ' ביום שישי' : ''}`);
   }
   const constraintRows = assertDb(await db().from('hadas_employee_class_constraints').select('id,reason,valid_from,valid_to').eq('employee_id', payload.employee_id).eq('class_id', payload.class_id).eq('constraint_type', 'forbidden'), 'בדיקת אילוצים נכשלה') || [];
   const forbidden = constraintRows.find((item) => (!item.valid_from || item.valid_from <= payload.shift_date) && (!item.valid_to || item.valid_to >= payload.shift_date));
@@ -175,14 +176,19 @@ module.exports = async function handler(req, res) {
       const employees = assertDb(employeesR, 'לא ניתן לטעון ימי חופש') || [];
       const weeklyPatterns = assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [];
       const settings = assertDb(settingsR, 'לא ניתן לטעון הגדרות תקינה') || {};
-      const fullScheduleViewer = canViewFullSchedule(caller);
+      const scope = scheduleScope(caller);
+      const fullScheduleViewer = scope === 'full';
       if (!isManager(caller)) {
         shifts = restoreLastPublished(shifts, scheduleChanges);
-        if (!fullScheduleViewer) shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
+        if (scope === 'class') shifts = shifts.filter((row) => row.class_id === caller.employee.primary_class_id);
+        else if (!fullScheduleViewer) shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
         acknowledgements = acknowledgements.filter((row) => row.employee_id === caller.employee.id);
       }
       let scheduleAbsences = buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart);
-      if (!fullScheduleViewer) scheduleAbsences = scheduleAbsences.filter((row) => row.employee_id === caller.employee.id);
+      if (scope === 'class') {
+        const classEmployeeIds = new Set(employees.filter((row) => row.primary_class_id === caller.employee.primary_class_id).map((row) => row.id));
+        scheduleAbsences = scheduleAbsences.filter((row) => classEmployeeIds.has(row.employee_id));
+      } else if (!fullScheduleViewer) scheduleAbsences = scheduleAbsences.filter((row) => row.employee_id === caller.employee.id);
       return send(res, 200, {
         ok: true,
         weekStart,

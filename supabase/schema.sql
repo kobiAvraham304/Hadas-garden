@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.10.0 (סכמת נתונים 0.10.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.11.0 (סכמת נתונים 0.11.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -22,6 +22,7 @@ DROP TABLE IF EXISTS
   public.hadas_announcement_reads,
   public.hadas_task_assignees,
   public.hadas_attendance,
+  public.hadas_daily_operations,
   public.hadas_schedule_acknowledgements,
   public.hadas_schedule_changes,
   public.hadas_schedule_publications,
@@ -63,7 +64,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.10.0', '0.10.0')
+values (1, '0.11.0', '0.11.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -80,13 +81,13 @@ create table if not exists public.hadas_employees (
   id uuid primary key default gen_random_uuid(),
   full_name text not null,
   contact_phone text,
-  job_title text not null default 'אשת צוות',
+  job_title text not null default 'סייעת/ סייע',
   primary_class_id uuid references public.hadas_classes(id) on delete set null,
   can_lead boolean not null default false,
   weekly_hours numeric(5,2),
   max_weekly_hours numeric(5,2) check (max_weekly_hours is null or (max_weekly_hours >= 0 and max_weekly_hours <= 80)),
   employment_percent numeric(5,2),
-  assignment_mode text not null default 'fixed' check (assignment_mode in ('fixed','rotation','no_schedule')),
+  assignment_mode text not null default 'fixed' check (assignment_mode in ('fixed','rotation','substitute','no_schedule')),
   is_schedulable boolean not null default true,
   default_start time not null default '07:30',
   default_end time not null default '15:30',
@@ -146,14 +147,14 @@ create table if not exists public.hadas_login_security (
 create table if not exists public.hadas_employee_weekly_patterns (
   employee_id uuid not null references public.hadas_employees(id) on delete cascade,
   weekday smallint not null check (weekday between 0 and 6),
-  day_type text not null check (day_type in ('work','day_off')),
+  day_type text not null check (day_type in ('work','day_off','as_needed')),
   start_time time,
   end_time time,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (employee_id, weekday),
   check (
-    (day_type='day_off' and start_time is null and end_time is null)
+    (day_type in ('day_off','as_needed') and start_time is null and end_time is null)
     or
     (day_type='work' and start_time is not null and end_time is not null and end_time > start_time)
   )
@@ -235,6 +236,32 @@ create table if not exists public.hadas_attendance (
   check (actual_end is null or actual_start is null or actual_end > actual_start)
 );
 
+create table if not exists public.hadas_daily_operations (
+  id uuid primary key default gen_random_uuid(),
+  operation_date date not null,
+  shift_id uuid references public.hadas_shifts(id) on delete set null,
+  employee_id uuid not null references public.hadas_employees(id) on delete restrict,
+  class_id uuid not null references public.hadas_classes(id) on delete restrict,
+  operation_type text not null check (operation_type in ('sick','absent','late','early_release','other')),
+  start_time time,
+  end_time time,
+  note text,
+  replacement_employee_id uuid references public.hadas_employees(id) on delete set null,
+  replacement_from_class_id uuid references public.hadas_classes(id) on delete set null,
+  replacement_type text check (replacement_type is null or replacement_type in ('replacement','transfer')),
+  replacement_start time,
+  replacement_end time,
+  status text not null default 'open' check (status in ('open','resolved')),
+  created_by uuid references public.hadas_employees(id) on delete set null,
+  resolved_by uuid references public.hadas_employees(id) on delete set null,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists hadas_daily_operations_date_idx on public.hadas_daily_operations(operation_date,class_id,status);
+create unique index if not exists hadas_daily_operations_shift_unique on public.hadas_daily_operations(shift_id,operation_date) where shift_id is not null;
+create index if not exists hadas_daily_operations_employee_idx on public.hadas_daily_operations(employee_id,operation_date);
+
 create table if not exists public.hadas_requests (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.hadas_employees(id) on delete cascade,
@@ -250,6 +277,7 @@ create table if not exists public.hadas_requests (
   reason text,
   attachment_path text,
   attachment_name text,
+  allow_schedule_on_day_off boolean not null default false,
   attachment_type text,
   attachment_size integer,
   status text not null default 'pending' check (status in ('pending','approved','rejected','applied','cancelled')),
@@ -289,14 +317,18 @@ create table if not exists public.hadas_app_settings (
   id integer primary key default 1 check (id = 1),
   opening_time time not null default '07:30',
   closing_time time not null default '15:30',
+  friday_closing_time time not null default '12:00',
   required_staff integer not null default 4 check (required_staff > 0),
   closing_required_staff integer not null default 3 check (closing_required_staff > 0),
   closing_window_minutes integer not null default 30 check (closing_window_minutes between 15 and 180),
   validation_slot_minutes integer not null default 30 check (validation_slot_minutes in (15,30,60)),
+  require_leader boolean not null default true,
   updated_at timestamptz not null default now()
 );
 alter table public.hadas_app_settings add column if not exists closing_window_minutes integer not null default 30;
 alter table public.hadas_app_settings add column if not exists validation_slot_minutes integer not null default 30;
+alter table public.hadas_app_settings add column if not exists friday_closing_time time not null default '12:00';
+alter table public.hadas_app_settings add column if not exists require_leader boolean not null default true;
 insert into public.hadas_app_settings(id) values (1) on conflict (id) do nothing;
 
 create table if not exists public.hadas_announcements (
@@ -394,6 +426,10 @@ insert into public.hadas_classes(name, slug, sort_order) values
 on conflict (slug) do update set name=excluded.name, sort_order=excluded.sort_order, active=true;
 
 
+-- התאמת תפקידים וסוגי שיוך לגרסה 0.11.0.
+update public.hadas_employees set job_title='סייעת/ סייע' where job_title in ('סייעת','סייע','אשת צוות');
+update public.hadas_employees set assignment_mode='no_schedule',is_schedulable=false,primary_class_id=null,can_lead=false where job_title in ('מנהלת מעון','מזכירה','אחות');
+
 -- שני החשבונות הראשוניים נוצרים אוטומטית בהרצת ה-SQL.
 -- אין עמוד setup, אין קוד הקמה ואין צורך ליצור משתמשים ידנית.
 DO $$
@@ -411,12 +447,12 @@ BEGIN
   WHERE contact_phone='+972544594513'
   ORDER BY created_at ASC LIMIT 1;
   IF v_employee_id IS NULL THEN
-    INSERT INTO public.hadas_employees(full_name,contact_phone,job_title,can_lead,active)
-    VALUES('אילנית זאדייב','+972544594513','מנהלת מעון',true,true)
+    INSERT INTO public.hadas_employees(full_name,contact_phone,job_title,can_lead,active,assignment_mode,is_schedulable,primary_class_id)
+    VALUES('אילנית זאדייב','+972544594513','מנהלת מעון',false,true,'no_schedule',false,null)
     RETURNING id INTO v_employee_id;
   ELSE
     UPDATE public.hadas_employees
-    SET full_name='אילנית זאדייב', contact_phone='+972544594513', job_title='מנהלת מעון', can_lead=true, active=true, ended_at=null
+    SET full_name='אילנית זאדייב', contact_phone='+972544594513', job_title='מנהלת מעון', can_lead=false, assignment_mode='no_schedule', is_schedulable=false, primary_class_id=null, active=true, ended_at=null
     WHERE id=v_employee_id;
   END IF;
 
@@ -688,7 +724,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_requests','hadas_notifications',
+    'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_daily_operations','hadas_requests','hadas_notifications',
     'hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_announcements','hadas_announcement_recipients','hadas_announcement_reads',
     'hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings'
   ] LOOP
@@ -703,7 +739,7 @@ DECLARE t text; r record;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
-    'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance',
+    'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance','hadas_daily_operations',
     'hadas_requests','hadas_notifications','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings','hadas_announcements',
     'hadas_announcement_recipients','hadas_announcement_reads','hadas_tasks','hadas_task_assignees','hadas_calendar_events',
     'hadas_audit_log','hadas_realtime_events'

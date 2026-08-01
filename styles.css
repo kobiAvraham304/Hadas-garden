@@ -520,7 +520,7 @@ html,body{overflow-x:clip}
   .compact-constraint{grid-template-columns:1fr}.employee-pattern-preview{font-size:.77rem}
 }
 
-/* 0.10.0 — מרכז עדכונים, בקשות טווח ואישור מחלה */
+/* 0.11.0 — מרכז עדכונים, בקשות טווח ואישור מחלה */
 .notification-button{position:relative}
 .notification-button .nav-badge{position:absolute;inset:-6px auto auto -6px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--coral);color:#fff;font-size:11px;font-weight:900;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 4px 12px rgba(35,39,82,.2)}
 .notifications-toolbar{display:flex;justify-content:flex-start;margin:-4px 0 10px}
@@ -551,7 +551,7 @@ html,body{overflow-x:clip}
   .notifications-list{max-height:62vh}
 }
 
-/* 0.10.0 — personal updates and inclusive request flow */
+/* 0.11.0 — personal updates and inclusive request flow */
 .summary-card-button{appearance:none;-webkit-appearance:none;width:100%;font:inherit;text-align:right;cursor:pointer;border:1px solid var(--border);color:inherit}
 .summary-card-button:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
 .summary-card-button:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 35%,transparent);outline-offset:3px}
@@ -563,4 +563,61 @@ html,body{overflow-x:clip}
   .notifications-modal .modal-card{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
   .notification-card{grid-template-columns:42px minmax(0,1fr);gap:10px}
   .notification-card>button{grid-column:1/-1;width:100%}
+}
+
+/* ===== גרסה 0.11.0 — תפעול יומי וכרטיס עובד מתקדם ===== */
+.employee-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:18px 0 22px}
+.employee-summary-button{appearance:none;border:1px solid rgba(92,88,180,.14);background:rgba(255,255,255,.9);min-height:106px;border-radius:24px;padding:15px;display:grid;gap:4px;justify-items:start;text-align:right;box-shadow:0 10px 28px rgba(57,52,104,.07);cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease}
+.employee-summary-button:hover,.employee-summary-button:focus-visible{transform:translateY(-2px);box-shadow:0 15px 34px rgba(57,52,104,.12);border-color:rgba(100,91,220,.42)}
+.employee-summary-button.active{background:linear-gradient(145deg,#f0eeff,#fff);border-color:#8277e8;box-shadow:0 15px 34px rgba(100,91,220,.16)}
+.employee-summary-button>span{font-size:22px}.employee-summary-button strong{font-size:28px}.employee-summary-button small{color:var(--muted);font-weight:800}
+.weekly-pattern-row.is-as-needed{border-color:rgba(101,182,164,.42);background:linear-gradient(145deg,rgba(230,250,244,.82),#fff)}
+.weekly-pattern-row.is-as-needed .weekly-day-off-note{display:inline-flex;color:#267d69;background:#dcf6ee}
+.day-off-choice-summary{margin:12px 0;padding:12px 15px;border-radius:16px;background:#f3f1ff;color:#504a85;border:1px solid #dfdcfb}
+.assignment-help,#assignmentModeHelp{display:block;margin-top:7px;color:var(--muted);line-height:1.4}
+
+.daily-heading{align-items:flex-end}.daily-summary{display:grid;grid-template-columns:repeat(2,minmax(160px,220px)) 1fr;gap:14px;margin:18px 0 22px}
+.daily-stat,.daily-date-summary{border:1px solid rgba(90,84,150,.12);border-radius:24px;background:rgba(255,255,255,.92);padding:18px 20px;box-shadow:0 12px 34px rgba(54,50,104,.07);text-align:right}
+.daily-stat{appearance:none;display:grid;gap:4px;cursor:default}.daily-stat span{font-weight:900;color:var(--muted)}.daily-stat strong{font-size:34px;line-height:1}.daily-stat small,.daily-date-summary small{color:var(--muted)}
+.daily-stat.is-open{border-top:4px solid #f08b7f}.daily-stat.is-resolved{border-top:4px solid #63b9a6}.daily-date-summary{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;background:linear-gradient(135deg,#f4f1ff,#fff)}
+.daily-date-summary strong{font-size:20px}.daily-classes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.daily-class-card{position:relative;overflow:hidden;border:1px solid rgba(76,72,131,.12);border-radius:28px;background:rgba(255,255,255,.93);padding:20px;box-shadow:0 18px 45px rgba(54,50,104,.08)}
+.daily-class-card:before{content:"";position:absolute;inset:0 0 auto;height:5px;background:var(--class-accent,#8177e8)}
+.daily-class-card header{display:flex;align-items:center;justify-content:space-between;gap:12px}.daily-class-card header>div{display:flex;align-items:center;gap:10px}.daily-class-card h3{margin:0;font-size:22px}.daily-class-meta{margin:8px 0 16px;color:var(--muted);font-weight:700}
+.daily-worker-list{display:grid;gap:12px}.daily-worker-card{display:grid;gap:12px;padding:14px;border:1px solid #e9e8f3;border-radius:20px;background:#fff;transition:.18s ease}.daily-worker-card.has-operation{border-color:#f2b8ae;background:#fffaf8}.daily-worker-card.is-resolved{border-color:#bfe5da;background:#f8fffc}
+.daily-worker-main{display:flex;align-items:center;gap:10px}.employee-avatar.small{width:40px;height:40px;font-size:14px}.daily-worker-main>div{display:grid;gap:3px;min-width:0}.daily-worker-main strong{overflow:hidden;text-overflow:ellipsis}.daily-worker-main small{color:var(--muted)}
+.daily-operation-badge{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 11px;border-radius:13px;background:#fff0ed;color:#9a493e;font-weight:900}.daily-resolution{display:grid;gap:3px;padding:10px 12px;border-radius:14px;background:#eaf8f3;color:#286f60}.daily-resolution small{color:#568b80}
+.daily-reason-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:15px 0 20px}.daily-reason-grid label{position:relative}.daily-reason-grid input{position:absolute;opacity:0}.daily-reason-grid label>span,.daily-reason-grid label>strong{pointer-events:none}.daily-reason-grid label{min-height:94px;border:1px solid #e4e2f1;border-radius:18px;background:#fff;display:grid;place-items:center;align-content:center;gap:5px;cursor:pointer}.daily-reason-grid label:has(input:checked){border-color:#7b71e3;background:#f0eeff;box-shadow:0 9px 24px rgba(91,81,190,.12)}.daily-reason-grid label>span{font-size:25px;color:#6f65d8}
+.daily-suggestion-card{border:1px solid #e5e3f1;border-radius:22px;background:#fff;padding:18px;display:grid;gap:14px}.daily-suggestion-card.transfer{border-color:#c7dff3;background:#f8fcff}.daily-suggestion-card.replacement{border-color:#c9e7dd;background:#fbfffd}
+.standards-timeline{grid-template-columns:1fr auto 1fr 1fr}.timeline-rule.friday{background:#fff7e7;border-color:#f1d39b}.standards-rule-strip article:nth-child(2) span{background:#fff1db;color:#9a6b18}
+
+@media(max-width:1050px){.employee-summary{grid-template-columns:repeat(3,minmax(0,1fr))}.daily-classes{grid-template-columns:repeat(2,minmax(0,1fr))}.daily-summary{grid-template-columns:repeat(2,1fr)}.daily-date-summary{grid-column:1/-1}.daily-reason-grid{grid-template-columns:repeat(3,1fr)}.standards-timeline{grid-template-columns:1fr}}
+@media(max-width:760px){
+ .employee-summary{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin-inline:-4px;padding:4px 4px 10px}.employee-summary-button{min-width:145px;min-height:96px;scroll-snap-align:start;border-radius:20px}.employee-summary-button strong{font-size:25px}
+ .employee-filter .employee-type-block{grid-column:1/-1}.employee-type-block .filter-chips{display:flex;overflow-x:auto;flex-wrap:nowrap;padding-bottom:5px;scrollbar-width:none}.employee-type-block .filter-chip{white-space:nowrap;min-height:44px}
+ .daily-heading{align-items:stretch}.daily-heading .date-control{width:100%}.daily-heading input{width:100%}.daily-summary{grid-template-columns:1fr 1fr;gap:10px}.daily-stat,.daily-date-summary{padding:14px;border-radius:20px}.daily-stat strong{font-size:28px}.daily-date-summary{grid-column:1/-1}.daily-date-summary strong{font-size:17px}
+ .daily-classes{grid-template-columns:1fr;gap:14px}.daily-class-card{border-radius:24px;padding:16px}.daily-class-card h3{font-size:20px}.daily-worker-card{border-radius:18px}.daily-worker-card .primary-btn,.daily-worker-card .secondary-btn,.daily-worker-card .ghost-btn{width:100%;min-height:46px}
+ .daily-reason-grid{grid-template-columns:repeat(2,1fr);gap:8px}.daily-reason-grid label{min-height:84px}.daily-suggestion-card{padding:15px;border-radius:20px}.daily-suggestion-card .card-heading{align-items:flex-start}.daily-suggestion-card .score-chip{white-space:normal;text-align:center}
+ .standards-timeline{display:grid;grid-template-columns:1fr}.timeline-arrow{transform:rotate(90deg)}.standards-preview-title{align-items:flex-start;gap:7px}.standards-preview-title strong{font-size:14px;line-height:1.45}
+ #employeeDialog .form-section:has(#constraintsFields.hidden){display:none}
+}
+@media(max-width:390px){.daily-summary{grid-template-columns:1fr}.daily-date-summary{grid-column:auto}.daily-reason-grid{grid-template-columns:1fr 1fr}.employee-summary-button{min-width:132px}.daily-worker-main small{font-size:12px}.daily-operation-badge{align-items:flex-start;flex-direction:column}.standards-rule-strip{grid-template-columns:1fr}}
+
+/* 0.11.0 touch-target and mobile polish */
+.compact-chips .filter-chip{min-height:40px}
+.shift-actions .delete-shift{min-width:36px;min-height:36px;width:36px;height:36px}
+.shift-actions .replace-shift,.shift-actions .mini-btn{min-height:36px}
+@media(max-width:760px){
+  .filter-chip,.compact-chips .filter-chip{min-height:44px}
+  #schedulePanel .week-navigator{grid-template-columns:44px 1fr 44px}
+  #schedulePanel .week-navigator .icon-round-btn,#schedulePanel .week-navigator .ghost-btn{width:44px;min-height:44px}
+  .mobile-week-class .shift-actions button,.mobile-week-class .shift-actions .delete-shift{min-height:44px;height:44px}
+  .mobile-week-class .shift-actions .delete-shift{width:44px;min-width:44px}
+  .mobile-week-class .shift-actions .replace-shift{font-size:.72rem;line-height:1.2}
+  .segmented button{min-height:44px}
+}
+@media(max-width:760px){
+  .day-class-card .shift-actions button,.day-class-card .shift-actions .delete-shift{min-height:44px;height:44px}
+  .day-class-card .shift-actions .delete-shift{width:44px;min-width:44px}
+  .day-class-card .shift-actions .replace-shift{font-size:.72rem;line-height:1.2}
 }

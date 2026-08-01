@@ -83,6 +83,10 @@
       "destination": "/api/index?route=data"
     },
     {
+      "source": "/api/daily-operations",
+      "destination": "/api/index?route=daily-operations"
+    },
+    {
       "source": "/api/employees",
       "destination": "/api/index?route=employees"
     },

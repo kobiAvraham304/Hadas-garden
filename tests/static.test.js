@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.10.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.11.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
@@ -50,7 +50,7 @@ test('initial accounts and schema version are present in clean installer', () =>
   const schema=read('supabase/schema.sql');
   assert.match(schema,/אילנית זאדייב/); assert.match(schema,/\+972544594513/); assert.match(schema,/'admin'/);
   assert.match(schema,/לינור אברהם/); assert.match(schema,/\+972542521780/); assert.match(schema,/'scheduler'/);
-  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.10\.0'/);
+  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.11\.0'/);
   assert.match(schema,/ENABLE ROW LEVEL SECURITY/i); assert.match(schema,/REVOKE ALL ON TABLE/i);
   assert.match(schema,/hadas_realtime_public_read/); assert.match(schema,/ALTER PUBLICATION supabase_realtime ADD TABLE/i);
 });
@@ -130,10 +130,10 @@ test('non-manager employee payload excludes private employment fields', () => {
   assert.match(dataApi,/if \(!manager\) return base/);
 });
 
-test('health page is CSP-compatible and references 0.10 migration', () => {
+test('health page is CSP-compatible and references 0.11 migration', () => {
   const html=read('health.html'); const js=read('health.js');
   assert.match(html,/src="\/health\.js"/); assert.doesNotMatch(html,/<script>[^<]/);
-  assert.match(js,/update-v0\.10\.0\.sql/);
+  assert.match(js,/update-v0\.11\.0\.sql/);
 });
 
 test('runtime avoids unsafe dynamic JavaScript and inline DOM handlers', () => {
@@ -281,7 +281,7 @@ test('generic employee language is masculine or inclusive across the runtime', (
 
 test('0.9 employee management supports exact roles, multiple fixed days and per-day hours', () => {
   const html=read('index.html'); const app=read('app.js'); const employeesApi=read('handlers/employees.js'); const schema=read('supabase/schema.sql');
-  for(const title of ['סייעת','סייעת מובילה','סייע','גננת','מנהלת מעון','מזכירה','אחות']) assert.match(html,new RegExp(`value="${title}"`));
+  for(const title of ['סייעת/ סייע','סייעת מובילה','גננת','מנהלת מעון','מזכירה','אחות']) assert.match(html,new RegExp(`value="${title}"`));
   assert.doesNotMatch(html,/name="can_lead"/);
   assert.match(html,/id="weeklyPatternFields"/);
   assert.match(html,/name="max_weekly_hours"/);

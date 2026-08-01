@@ -13,6 +13,7 @@ const routes = Object.freeze({
   'calendar': require('../handlers/calendar'),
   'config': require('../handlers/config'),
   'data': require('../handlers/data'),
+  'daily-operations': require('../handlers/daily-operations'),
   'employees': require('../handlers/employees'),
   'health': require('../handlers/health'),
   'notifications': require('../handlers/notifications'),

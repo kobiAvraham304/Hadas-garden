@@ -67,6 +67,7 @@
       <button data-tab="schedule" class="nav-btn mobile-primary"><span class="nav-icon">▦</span><span>שיבוצים</span></button>
       <button data-tab="requests" class="nav-btn mobile-primary"><span class="nav-icon">↔</span><span>בקשות</span></button>
       <button data-tab="announcements" class="nav-btn mobile-primary"><span class="nav-icon">◉</span><span>הודעות</span><span id="announcementBadge" class="nav-badge hidden"></span></button>
+      <button data-tab="daily" class="nav-btn manager-only mobile-secondary"><span class="nav-icon">⚡</span><span>תפעול יומי</span></button>
       <button data-tab="attendance" class="nav-btn mobile-secondary"><span class="nav-icon">✓</span><span>נוכחות</span></button>
       <button data-tab="tasks" class="nav-btn mobile-secondary"><span class="nav-icon">☑</span><span>משימות</span><span id="taskBadge" class="nav-badge hidden"></span></button>
       <button data-tab="calendar" class="nav-btn mobile-secondary"><span class="nav-icon">◫</span><span>לוח שנה</span></button>
@@ -128,6 +129,12 @@
         <div id="requestsList" class="request-board"></div>
       </section>
 
+      <section id="dailyPanel" class="panel manager-only">
+        <div class="section-heading daily-heading"><div><p class="eyebrow">ניהול היום בזמן אמת</p><h2>תפעול יומי</h2><p class="muted">דיווח היעדרות, איחור או שחרור מוקדם וקבלת הצעות להחלפה או מעבר חירום בין כיתות.</p></div><label class="date-control">תאריך<input id="dailyDate" type="date" /></label></div>
+        <div id="dailySummary" class="daily-summary"></div>
+        <div id="dailyClasses" class="daily-classes"></div>
+      </section>
+
       <section id="attendancePanel" class="panel">
         <div class="section-heading"><div><p class="eyebrow">מה תוכנן ומה בוצע</p><h2>נוכחות בפועל</h2><p class="muted">עדכון שעות ונוכחות לפי השיבוץ.</p></div><label class="date-control">תאריך<input id="attendanceDate" type="date" /></label></div>
         <div id="attendanceList" class="cards-list"></div>
@@ -158,13 +165,13 @@
       </section>
 
       <section id="employeesPanel" class="panel manager-only">
-        <div class="section-heading"><div><p class="eyebrow">כוח אדם והרשאות</p><h2>ניהול עובדים</h2><p class="muted">גננות, סייעות וצוות פרא־רפואי במקום אחד.</p></div><button id="newEmployeeBtn" class="primary-btn"><span>＋</span> הוספת עובד</button></div>
+        <div class="section-heading"><div><p class="eyebrow">כוח אדם והרשאות</p><h2>ניהול עובדים</h2><p class="muted">כל עובדי המעון, השיוך לכיתות, הימים הקבועים וההרשאות במקום אחד.</p></div><button id="newEmployeeBtn" class="primary-btn"><span>＋</span> הוספת עובד</button></div>
         <div id="employeeSummary" class="employee-summary"></div>
         <div class="filter-toolbar polished-filter employee-filter">
           <label class="search-field enhanced-search"><span>חיפוש עובד</span><span class="search-input-wrap"><span aria-hidden="true">⌕</span><input id="employeeSearch" type="search" placeholder="שם, טלפון או תפקיד" /></span></label>
           <div class="filter-block"><span class="filter-label">מצב</span><div id="employeeStatusChips" class="filter-chips compact-chips"><button type="button" class="filter-chip active" data-value="active">פעילים</button><button type="button" class="filter-chip" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="inactive">לא פעילים</button></div><select id="employeeStatusFilter" class="sr-only" tabindex="-1" aria-hidden="true"><option value="active">פעילים</option><option value="all">הכול</option><option value="inactive">לא פעילים</option></select></div>
           <label class="select-filter"><span>כיתה</span><select id="employeeClassFilter"><option value="all">כל הכיתות</option></select></label>
-          <div class="filter-block employee-type-block"><span class="filter-label">תחום</span><div id="employeeTypeChips" class="filter-chips compact-chips"><button type="button" class="filter-chip active" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="teacher">גננות</button><button type="button" class="filter-chip" data-value="assistant">סייעות</button><button type="button" class="filter-chip" data-value="therapy">פרא־רפואי</button><button type="button" class="filter-chip" data-value="management">ניהול</button><button type="button" class="filter-chip" data-value="other">אחר</button></div><select id="employeeTypeFilter" class="sr-only" tabindex="-1" aria-hidden="true"><option value="all">כל התפקידים</option><option value="teacher">גננות</option><option value="assistant">סייעות</option><option value="therapy">פרא־רפואי</option><option value="management">ניהול</option><option value="other">אחר</option></select></div>
+          <div class="filter-block employee-type-block"><span class="filter-label">קבוצה</span><div id="employeeTypeChips" class="filter-chips compact-chips"><button type="button" class="filter-chip active" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="assistant">סייעות</button><button type="button" class="filter-chip" data-value="lead">סייעות מובילות</button><button type="button" class="filter-chip" data-value="teacher">גננות</button><button type="button" class="filter-chip" data-value="flexible">רוטציה / השלמה</button></div><select id="employeeTypeFilter" class="sr-only" tabindex="-1" aria-hidden="true"><option value="all">כל העובדים</option><option value="assistant">סייעות</option><option value="lead">סייעות מובילות</option><option value="teacher">גננות</option><option value="flexible">רוטציה / השלמה</option></select></div>
         </div>
         <div id="employeesList" class="employee-card-grid"></div>
       </section>
@@ -175,8 +182,9 @@
     <button id="mobileMoreBackdrop" class="mobile-more-backdrop" type="button" aria-label="סגירת תפריט"></button>
     <section class="mobile-more-card" role="dialog" aria-modal="true" aria-label="אפשרויות נוספות">
       <div class="mobile-more-handle"></div>
-      <div class="mobile-more-heading"><div><p class="eyebrow">אפשרויות נוספות</p><h3>לאן תרצי לעבור?</h3></div><button id="mobileMoreClose" type="button" class="icon-btn" aria-label="סגירה">×</button></div>
+      <div class="mobile-more-heading"><div><p class="eyebrow">אפשרויות נוספות</p><h3>לאן עוברים?</h3></div><button id="mobileMoreClose" type="button" class="icon-btn" aria-label="סגירה">×</button></div>
       <div class="mobile-more-grid">
+        <button type="button" data-more-tab="daily" class="manager-only"><span>⚡</span><strong>תפעול יומי</strong><small>היעדרויות והחלפות חירום</small></button>
         <button type="button" data-more-tab="attendance"><span>✓</span><strong>נוכחות</strong><small>עדכון שעות בפועל</small></button>
         <button type="button" data-more-tab="tasks"><span>☑</span><strong>משימות</strong><small>מעקב ביצוע</small></button>
         <button type="button" data-more-tab="calendar"><span>◫</span><strong>לוח שנה</strong><small>אירועים וישיבות</small></button>
@@ -227,12 +235,13 @@
     <form id="employeeForm" method="dialog" class="modal-card large-modal">
       <div class="modal-heading"><div><p class="eyebrow">כרטיס צוות</p><h3>פרטי עובד</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
       <input type="hidden" name="id" />
+      <div class="notice privacy-notice">🔒 המידע בכרטיס העובד חסוי ונגיש רק למנהלת המעון ולאחראית השיבוץ.</div>
       <section class="form-section"><h4>פרטים בסיסיים</h4><div class="form-grid">
         <label>שם מלא<input name="full_name" required /></label><label>מספר טלפון<input name="phone" type="tel" required /></label>
-        <label>תפקיד במעון<select name="job_title" required><option value="סייעת">סייעת</option><option value="סייעת מובילה">סייעת מובילה</option><option value="סייע">סייע</option><option value="גננת">גננת</option><option value="מנהלת מעון">מנהלת מעון</option><option value="מזכירה">מזכירה</option><option value="אחות">אחות</option></select></label>
+        <label>תפקיד במעון<select name="job_title" required><option value="סייעת/ סייע">סייעת/ סייע</option><option value="סייעת מובילה">סייעת מובילה</option><option value="גננת">גננת</option><option value="מנהלת מעון">מנהלת מעון</option><option value="מזכירה">מזכירה</option><option value="אחות">אחות</option></select></label>
         <label>הרשאה במערכת<select name="role"><option value="employee">עובד</option><option value="scheduler">אחראית שיבוץ</option><option value="admin">מנהלת</option></select></label>
-        <label>אופן שיוך לכיתות<select name="assignment_mode"><option value="fixed">כיתה קבועה</option><option value="rotation">רוטציה בין כיתות</option><option value="no_schedule">ללא שיבוץ</option></select></label>
-        <label id="primaryClassField">כיתה קבועה<select name="primary_class_id"><option value="">בחירת כיתה</option></select></label>
+        <label id="assignmentModeField">אופן שיוך לכיתות<select name="assignment_mode"><option value="fixed">כיתה קבועה</option><option value="rotation">רוטציה בין כיתות</option><option value="substitute">משלימ/ת מקום</option></select><small id="assignmentModeHelp">בחרו כיצד העובד משויך לכיתות.</small></label>
+        <label id="primaryClassField">בחירת כיתה קבועה<select name="primary_class_id"><option value="">בחירת כיתה</option></select></label>
       </div></section>
       <section class="form-section"><h4>משרה ושעות</h4><div class="form-grid">
         <label>שעות שבועיות מתוכננות<input name="weekly_hours" type="number" min="0" max="60" step="0.25" /></label>
@@ -262,6 +271,8 @@
       <div class="form-grid request-details">
         <label class="request-date-start">תאריך<input name="request_date" type="date" required /></label>
         <label class="request-range-end hidden">עד תאריך<input name="request_end_date" type="date" /></label>
+        <div id="leaveManualReminder" class="notice warn full-field hidden"><strong>תזכורת:</strong> בחופשה של יותר מיומיים רצופים יש למלא גם טופס בקשת חופשה ידני.</div>
+        <fieldset id="leaveDayOffField" class="inline-choice full-field hidden"><legend>במידת הצורך, האם ניתן לשבץ אותך ביום החופשי הקבוע באותו שבוע?</legend><label><input type="radio" name="allow_schedule_on_day_off" value="false" checked /> לא</label><label><input type="radio" name="allow_schedule_on_day_off" value="true" /> כן</label></fieldset>
         <label class="request-start hidden">שעת התחלה מבוקשת<input name="requested_start" type="time" /></label>
         <label class="request-end hidden">שעת סיום מבוקשת<input name="requested_end" type="time" /></label>
         <label class="shift-choice-field hidden">השיבוץ הרלוונטי<select name="shift_id"></select></label>
@@ -311,12 +322,22 @@
     <div class="modal-heading"><div><p class="eyebrow">חוקי שיבוץ ובקרת כוח אדם</p><h3>הגדרות תקינה</h3><p class="muted">המערכת בודקת כל כיתה לאורך היום ומתריעה לפני פרסום.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
     <div class="standards-rule-strip"><article><span>4</span><div><strong>צוות רגיל</strong><small>כולל גננת/גנן או מוביל/ה</small></div></article><article><span>3</span><div><strong>בסוף היום</strong><small>לפחות שלושה אנשי צוות</small></div></article><article><span>✓</span><div><strong>אחראי/ת בכיתה</strong><small>גננת/גנן או מוביל/ה בכל מקטע</small></div></article></div>
     <div class="standards-toolbar"><div class="standards-presets" role="group" aria-label="תקנים מהירים"><button id="settingsPresetBtn" type="button" class="secondary-btn">תקן הדס 4/3</button><button id="settingsPresetFullBtn" type="button" class="ghost-btn">4 לאורך היום</button><button id="settingsPresetLeanBtn" type="button" class="ghost-btn">3 לאורך היום</button></div><span>התצוגה המקדימה מציגה מיד כיצד התקן משפיע על השבוע.</span></div>
-    <div class="form-grid standards-grid"><label>שעת פתיחת המעון<input name="opening_time" type="time" /></label><label>שעת סגירת המעון<input name="closing_time" type="time" /></label><label>מספר אנשי צוות נדרש בכיתה<input name="required_staff" type="number" min="1" max="10" /></label><label>מספר אנשי צוות נדרש בסגירה<input name="closing_required_staff" type="number" min="1" max="10" /></label><label>כמה זמן לפני הסגירה חל תקן הסגירה<input name="closing_window_minutes" type="number" min="15" max="180" step="15" /><small>לדוגמה: 30 דקות פירושו שמ־15:00 נדרשים 3 עובדים.</small></label><label>דיוק בדיקת התקינה<select name="validation_slot_minutes"><option value="15">כל 15 דקות — מדויק</option><option value="30">כל 30 דקות — מומלץ</option><option value="60">כל שעה — בסיסי</option></select></label></div>
+    <div class="standards-section-title"><span>1</span><div><strong>שעות פעילות</strong><small>התקינה נבדקת רק בתוך שעות פעילות המעון.</small></div></div><div class="form-grid standards-grid"><label>שעת פתיחה בכל הימים<input name="opening_time" type="time" /></label><label>שעת סגירה א׳–ה׳<input name="closing_time" type="time" /></label><label>שעת סגירה ביום שישי<input name="friday_closing_time" type="time" max="12:00" /></label></div><div class="standards-section-title"><span>2</span><div><strong>כוח אדם בכל כיתה</strong><small>הגדירו את התקן הרגיל ואת התקן בחלון הסגירה.</small></div></div><div class="form-grid standards-grid"><label>מספר אנשי צוות נדרש בכיתה<input name="required_staff" type="number" min="1" max="10" /></label><label>מספר אנשי צוות נדרש בסגירה<input name="closing_required_staff" type="number" min="1" max="10" /></label><label>כמה זמן לפני הסגירה חל תקן הסגירה<input name="closing_window_minutes" type="number" min="15" max="180" step="15" /><small>המערכת מחשבת את החלון לפי שעת הסגירה של אותו יום.</small></label><label>דיוק בדיקת התקינה<select name="validation_slot_minutes"><option value="15">כל 15 דקות — מדויק</option><option value="30">כל 30 דקות — מומלץ</option><option value="60">כל שעה — בסיסי</option></select></label><label class="toggle-field full-field"><input name="require_leader" type="checkbox" checked /><span><strong>חובה גננת/גנן או מוביל/ה בכל כיתה</strong><small>ביטול הסימון יפסיק התראות על היעדר מוביל/ה.</small></span></label></div>
     <div id="settingsPreview" class="standards-preview"></div>
     <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת הגדרות התקינה</button></div>
   </form></dialog>
 
-  <dialog id="suggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">סיוע אוטומטי</p><h3>מחליפים אפשריים</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="suggestionsList" class="cards-list"></div></div></dialog>
+  <dialog id="dailyReportDialog" class="modal"><form id="dailyReportForm" method="dialog" class="modal-card">
+    <div class="modal-heading"><div><p class="eyebrow">תפעול יומי</p><h3>דיווח שינוי</h3><p id="dailyReportEmployee" class="muted"></p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+    <input type="hidden" name="shift_id" />
+    <div class="daily-reason-grid"><label><input type="radio" name="operation_type" value="sick" checked /><span>✚</span><strong>מחלה</strong></label><label><input type="radio" name="operation_type" value="absent" /><span>×</span><strong>היעדרות</strong></label><label><input type="radio" name="operation_type" value="late" /><span>◷</span><strong>איחור</strong></label><label><input type="radio" name="operation_type" value="early_release" /><span>◴</span><strong>שחרור מוקדם</strong></label><label><input type="radio" name="operation_type" value="other" /><span>•</span><strong>אחר</strong></label></div>
+    <div class="form-grid"><label id="dailyStartField" class="hidden">שעת הגעה / התחלה<input name="start_time" type="time" /></label><label id="dailyEndField" class="hidden">שעת שחרור / סיום<input name="end_time" type="time" /></label><label class="full-field">פירוט<textarea name="note" rows="3" placeholder="מידע קצר שיעזור בתפעול היום"></textarea></label></div>
+    <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת דיווח</button></div>
+  </form></dialog>
+
+  <dialog id="dailySuggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">כיסוי מיידי</p><h3>אפשרויות החלפה והעברה</h3><p class="muted">המערכת מציגה רק אפשרויות שאינן מפרות אילוצי כיתה או תקינת מקור.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="dailySuggestionsList" class="cards-list"></div></div></dialog>
+
+<dialog id="suggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">סיוע אוטומטי</p><h3>מחליפים אפשריים</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="suggestionsList" class="cards-list"></div></div></dialog>
 <div id="printExportRoot" class="print-export-root" aria-hidden="true"></div>
 </body>
 </html>

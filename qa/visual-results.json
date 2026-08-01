@@ -1,0 +1,418 @@
+[
+  {
+    "label": "desktop-dashboard",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "desktop-daily",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "desktop-employees",
+    "viewportOverflow": 0,
+    "tooSmall": [
+      {
+        "text": "פעילים",
+        "w": 67,
+        "h": 40
+      },
+      {
+        "text": "הכול",
+        "w": 54,
+        "h": 40
+      },
+      {
+        "text": "לא פעילים",
+        "w": 87,
+        "h": 40
+      },
+      {
+        "text": "הכול",
+        "w": 54,
+        "h": 40
+      },
+      {
+        "text": "סייעות",
+        "w": 65,
+        "h": 40
+      },
+      {
+        "text": "סייעות מובילות",
+        "w": 115,
+        "h": 40
+      },
+      {
+        "text": "גננות",
+        "w": 57,
+        "h": 40
+      },
+      {
+        "text": "רוטציה / השלמה",
+        "w": 123,
+        "h": 40
+      }
+    ],
+    "escaped": []
+  },
+  {
+    "label": "desktop-schedule",
+    "viewportOverflow": 0,
+    "tooSmall": [
+      {
+        "text": "שבוע מלא",
+        "w": 100,
+        "h": 39
+      },
+      {
+        "text": "לפי יום",
+        "w": 76,
+        "h": 39
+      },
+      {
+        "text": "השיבוץ שלי",
+        "w": 109,
+        "h": 39
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "＋ הוספה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "הצעת מחליף/ה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "＋ הוספה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "הצעת מחליף/ה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "＋ הוספה",
+        "w": 189,
+        "h": 34
+      }
+    ],
+    "escaped": []
+  },
+  {
+    "label": "desktop-settings-dialog",
+    "viewportOverflow": 0,
+    "tooSmall": [
+      {
+        "text": "שבוע מלא",
+        "w": 100,
+        "h": 39
+      },
+      {
+        "text": "לפי יום",
+        "w": 76,
+        "h": 39
+      },
+      {
+        "text": "השיבוץ שלי",
+        "w": 109,
+        "h": 39
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "＋ הוספה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "הצעת מחליף/ה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "＋ הוספה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "הצעת מחליף/ה",
+        "w": 189,
+        "h": 34
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "עריכה",
+        "w": 53,
+        "h": 36
+      },
+      {
+        "text": "×",
+        "w": 36,
+        "h": 36
+      },
+      {
+        "text": "＋ הוספה",
+        "w": 189,
+        "h": 34
+      }
+    ],
+    "escaped": []
+  },
+  {
+    "label": "desktop-employee-dialog",
+    "viewportOverflow": 0,
+    "tooSmall": [
+      {
+        "text": "פעילים",
+        "w": 67,
+        "h": 40
+      },
+      {
+        "text": "הכול",
+        "w": 54,
+        "h": 40
+      },
+      {
+        "text": "לא פעילים",
+        "w": 87,
+        "h": 40
+      },
+      {
+        "text": "הכול",
+        "w": 54,
+        "h": 40
+      },
+      {
+        "text": "סייעות",
+        "w": 65,
+        "h": 40
+      },
+      {
+        "text": "סייעות מובילות",
+        "w": 115,
+        "h": 40
+      },
+      {
+        "text": "גננות",
+        "w": 57,
+        "h": 40
+      },
+      {
+        "text": "רוטציה / השלמה",
+        "w": 123,
+        "h": 40
+      }
+    ],
+    "escaped": []
+  },
+  {
+    "label": "desktop-friday-end",
+    "value": "12:00"
+  },
+  {
+    "label": "desktop-page-errors",
+    "errors": []
+  },
+  {
+    "label": "mobile390-dashboard",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile390-daily",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile390-employees",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile390-schedule",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile390-settings-dialog",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile390-employee-dialog",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile390-friday-end",
+    "value": "12:00"
+  },
+  {
+    "label": "mobile390-page-errors",
+    "errors": []
+  },
+  {
+    "label": "mobile360-dashboard",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile360-daily",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile360-employees",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile360-schedule",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile360-settings-dialog",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile360-employee-dialog",
+    "viewportOverflow": 0,
+    "tooSmall": [],
+    "escaped": []
+  },
+  {
+    "label": "mobile360-friday-end",
+    "value": "12:00"
+  },
+  {
+    "label": "mobile360-page-errors",
+    "errors": []
+  }
+]

@@ -11,6 +11,7 @@ const CERTIFICATE_TYPES = new Set(['application/pdf','image/jpeg','image/png','i
 const CERTIFICATE_BUCKET = 'hadas-sick-certificates';
 
 function validDate(value) { return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')); }
+function inclusiveDays(start,end){ const a=new Date(`${start}T12:00:00Z`),b=new Date(`${end||start}T12:00:00Z`); return Math.floor((b-a)/86400000)+1; }
 function requestRangeLabel(request) {
   return request.request_end_date && request.request_end_date !== request.request_date
     ? `${request.request_date}–${request.request_end_date}` : request.request_date;
@@ -105,6 +106,7 @@ module.exports = async function handler(req,res) {
         target_employee_id:body.target_employee_id || null,
         target_shift_id:null,
         reason:String(body.reason || '').trim() || null,
+        allow_schedule_on_day_off:type === 'leave' ? (body.allow_schedule_on_day_off === true || String(body.allow_schedule_on_day_off) === 'true') : false,
         status:'pending',
       };
       let own = null;
@@ -140,7 +142,8 @@ module.exports = async function handler(req,res) {
           entityType:'request',entityId:request.id,actionRequired:true,
         });
       } else {
-        await notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id);
+        const manualNote = type === 'leave' && inclusiveDays(payload.request_date,payload.request_end_date) > 2 ? ' נדרשת גם השלמת טופס חופשה ידני.' : '';
+        await notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id);
       }
       await audit(caller.employee.id,'create','request',request.id,{ type });
       await emitEvent('requests');

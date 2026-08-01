@@ -1,5 +1,5 @@
 const {
-  requireSession, isManager, canViewFullSchedule, canCreateContent, db, assertDb, displayPhone, israelDateISO, send, handleError,
+  requireSession, isManager, scheduleScope, canViewFullSchedule, canCreateContent, db, assertDb, displayPhone, israelDateISO, send, handleError,
 } = require('../lib/server');
 const { dateRange } = require('../lib/schedule');
 
@@ -70,11 +70,14 @@ module.exports = async function handler(req, res) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, error: 'Method not allowed' });
     const caller = await requireSession(req, { csrf: false });
     const manager = isManager(caller);
-    const fullScheduleViewer = canViewFullSchedule(caller);
+    const scope = scheduleScope(caller);
+    const fullScheduleViewer = scope === 'full';
+    const classScheduleViewer = scope === 'class';
     const contentCreator = canCreateContent(caller);
     const weekStart = getSunday(String(req.query?.week_start || israelDateISO()));
     const weekEnd = plusDays(weekStart, 5);
     const attendanceDate = String(req.query?.attendance_date || israelDateISO());
+    const dailyDate = String(req.query?.daily_date || israelDateISO());
     const month = String(req.query?.calendar_month || israelDateISO().slice(0, 7));
     const calRange = calendarRange(month);
     const today = israelDateISO();
@@ -102,10 +105,12 @@ module.exports = async function handler(req, res) {
       db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle(),
       db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
       todayWeekStart === weekStart ? Promise.resolve({ data: [], error: null }) : db().from('hadas_schedule_changes').select('*').eq('week_start', todayWeekStart).is('published_revision', 'null').order('created_at'),
+      manager ? db().from('hadas_daily_operations').select('*').eq('operation_date', dailyDate).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+      manager ? db().from('hadas_shifts').select('*').eq('shift_date', dailyDate).order('start_time') : Promise.resolve({ data: [], error: null }),
       db().from('hadas_notifications').select('*').eq('employee_id', caller.employee.id).order('created_at', { ascending: false }).limit(150),
     ]);
 
-    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, notificationsR] = results;
+    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, dailyShiftsR, notificationsR] = results;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
     const employeeRows = assertDb(employeesR, 'לא ניתן לטעון עובדים') || [];
     const userRows = assertDb(usersR, 'לא ניתן לטעון הרשאות') || [];
@@ -127,6 +132,8 @@ module.exports = async function handler(req, res) {
     const publication = assertDb(publicationR, 'לא ניתן לטעון מצב פרסום') || null;
     const scheduleChanges = assertDb(changesR, 'לא ניתן לטעון שינויים') || [];
     const todayChanges = todayWeekStart === weekStart ? scheduleChanges : (assertDb(todayChangesR, 'לא ניתן לטעון שינויים') || []);
+    const dailyOperations = assertDb(dailyOperationsR, 'לא ניתן לטעון תפעול יומי') || [];
+    const dailyShifts = assertDb(dailyShiftsR, 'לא ניתן לטעון את שיבוץ התפעול היומי') || [];
     const notifications = assertDb(notificationsR, 'לא ניתן לטעון עדכונים') || [];
 
     const usersByEmployee = new Map(userRows.map((row) => [row.employee_id, row]));
@@ -175,7 +182,10 @@ module.exports = async function handler(req, res) {
     if (!manager) {
       shifts = restoreLastPublished(shifts, scheduleChanges);
       todayShifts = restoreLastPublished(todayShifts, todayChanges);
-      if (!fullScheduleViewer) {
+      if (classScheduleViewer) {
+        shifts = shifts.filter((row) => row.class_id === caller.employee.primary_class_id);
+        todayShifts = todayShifts.filter((row) => row.class_id === caller.employee.primary_class_id);
+      } else if (!fullScheduleViewer) {
         shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
         todayShifts = todayShifts.filter((row) => row.employee_id === caller.employee.id);
       }
@@ -196,7 +206,10 @@ module.exports = async function handler(req, res) {
       calendar = calendar.filter((row) => row.created_by === caller.employee.id || row.visibility === 'all' || (row.visibility === 'class' && row.class_id === caller.employee.primary_class_id));
     }
 
-    if (!fullScheduleViewer) {
+    if (classScheduleViewer) {
+      const visibleIds = new Set(employeeRows.filter((row) => row.primary_class_id === caller.employee.primary_class_id).map((row) => row.id));
+      for (const [key, value] of [...absenceMap.entries()]) if (!visibleIds.has(value.employee_id)) absenceMap.delete(key);
+    } else if (!fullScheduleViewer) {
       for (const [key, value] of [...absenceMap.entries()]) if (value.employee_id !== caller.employee.id) absenceMap.delete(key);
     }
     const visibleScheduleAbsences = [...absenceMap.values()].sort((a, b) => `${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`));
@@ -225,6 +238,8 @@ module.exports = async function handler(req, res) {
         phone: displayPhone(caller.user.phone),
         must_change_password: caller.user.must_change_password,
         can_create_content: contentCreator,
+        schedule_scope: scope,
+        can_view_class_schedule: classScheduleViewer,
         can_view_full_schedule: fullScheduleViewer,
       },
       classes,
@@ -245,6 +260,9 @@ module.exports = async function handler(req, res) {
       publication,
       scheduleChanges: manager ? scheduleChanges : [],
       scheduleAbsences: visibleScheduleAbsences,
+      dailyOperations: manager ? dailyOperations : [],
+      dailyShifts: manager ? dailyShifts : [],
+      dailyDate,
       notifications,
       weekDates: dateRange(weekStart, 6),
     });

@@ -4,7 +4,7 @@ const { overlaps, calculateWeeklyMinutes, validateWeek } = require('../lib/sched
 
 const settings = {
   opening_time: '07:30', closing_time: '15:30', required_staff: 4,
-  closing_required_staff: 3, closing_window_minutes: 30, validation_slot_minutes: 30,
+  closing_required_staff: 3, closing_window_minutes: 30, validation_slot_minutes: 30, friday_closing_time:'12:00', require_leader:true,
 };
 const classItem = { id: 'class-1', name: 'אודם', active: true };
 const employees = Array.from({ length: 5 }, (_, index) => ({
@@ -14,12 +14,15 @@ const employees = Array.from({ length: 5 }, (_, index) => ({
 
 function fullWeekShifts() {
   const dates = ['2026-08-02','2026-08-03','2026-08-04','2026-08-05','2026-08-06','2026-08-07'];
-  return dates.flatMap((date) => [
-    { id:`${date}-1`, shift_date:date, class_id:'class-1', employee_id:'e1', start_time:'07:30', end_time:'15:30', shift_role:'teacher' },
-    { id:`${date}-2`, shift_date:date, class_id:'class-1', employee_id:'e2', start_time:'07:30', end_time:'15:30', shift_role:'staff' },
-    { id:`${date}-3`, shift_date:date, class_id:'class-1', employee_id:'e3', start_time:'07:30', end_time:'15:30', shift_role:'staff' },
-    { id:`${date}-4`, shift_date:date, class_id:'class-1', employee_id:'e4', start_time:'07:30', end_time:'15:00', shift_role:'staff' },
-  ]);
+  return dates.flatMap((date) => {
+    const friday=date.endsWith('-07'); const close=friday?'12:00':'15:30'; const early=friday?'11:30':'15:00';
+    return [
+      { id:`${date}-1`, shift_date:date, class_id:'class-1', employee_id:'e1', start_time:'07:30', end_time:close, shift_role:'teacher' },
+      { id:`${date}-2`, shift_date:date, class_id:'class-1', employee_id:'e2', start_time:'07:30', end_time:close, shift_role:'staff' },
+      { id:`${date}-3`, shift_date:date, class_id:'class-1', employee_id:'e3', start_time:'07:30', end_time:close, shift_role:'staff' },
+      { id:`${date}-4`, shift_date:date, class_id:'class-1', employee_id:'e4', start_time:'07:30', end_time:early, shift_role:'staff' },
+    ];
+  });
 }
 
 test('time overlap and weekly-minute helpers work for partial shifts', () => {
@@ -63,7 +66,8 @@ test('coverage validation is compact and never floods one error per time slot', 
   assert.equal(result.errors.length, 36); // 6 days × 3 classes × 2 grouped issue types
   assert.equal(result.errors.filter((item) => item.code === 'understaffed').length, 18);
   assert.equal(result.errors.filter((item) => item.code === 'missing_leader').length, 18);
-  assert.ok(result.errors.every((item) => /07:30–15:30/.test(item.message)));
+  assert.equal(result.errors.filter((item)=>item.date==='2026-08-07').every((item)=>/07:30–12:00/.test(item.message)),true);
+  assert.equal(result.errors.filter((item)=>item.date!=='2026-08-07').every((item)=>/07:30–15:30/.test(item.message)),true);
 });
 
 test('maximum weekly hours is a blocking error and fixed weekly patterns are checked', () => {

@@ -1,0 +1,25 @@
+{
+  "daily_suggestion_button": true,
+  "daily_suggestions_count": 2,
+  "daily_dialog_inside_viewport": true,
+  "daily_report_button": true,
+  "daily_report_inside_viewport": true,
+  "employee_filter_before": 8,
+  "employee_filter_lead_after": 1,
+  "calendar_click_date": "2026-07-26",
+  "calendar_form_date": "2026-07-26",
+  "settings_controls": {
+    "opening_time": true,
+    "closing_time": true,
+    "friday_closing_time": true,
+    "required_staff": true,
+    "closing_required_staff": true,
+    "closing_window_minutes": true,
+    "validation_slot_minutes": true,
+    "require_leader": true
+  },
+  "settings_save_visible_after_scroll": true,
+  "schedule_action_min_height": 43.993408203125,
+  "horizontal_overflow": 0,
+  "page_errors": []
+}

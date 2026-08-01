@@ -5,10 +5,10 @@ const {
 const { timeToMinutes } = require('../lib/schedule');
 
 const ALLOWED_ROLES = new Set(['admin','scheduler','employee']);
-const JOB_TITLES = new Set(['סייעת','סייעת מובילה','סייע','גננת','מנהלת מעון','מזכירה','אחות']);
-const LEAD_TITLES = new Set(['סייעת מובילה','גננת','מנהלת מעון']);
-const NON_SCHEDULABLE_TITLES = new Set(['מזכירה','אחות']);
-const ASSIGNMENT_MODES = new Set(['fixed','rotation','no_schedule']);
+const JOB_TITLES = new Set(['סייעת/ סייע','סייעת מובילה','גננת','מנהלת מעון','מזכירה','אחות']);
+const LEAD_TITLES = new Set(['סייעת מובילה','גננת']);
+const NON_SCHEDULABLE_TITLES = new Set(['מזכירה','אחות','מנהלת מעון']);
+const ASSIGNMENT_MODES = new Set(['fixed','rotation','substitute','no_schedule']);
 
 function employeePayload(body) {
   const payload = {};
@@ -57,7 +57,7 @@ function employeePayload(body) {
   } else if (payload.assignment_mode === 'no_schedule') {
     payload.primary_class_id = null;
     payload.is_schedulable = false;
-  } else if (payload.assignment_mode === 'rotation') {
+  } else if (['rotation','substitute'].includes(payload.assignment_mode)) {
     payload.primary_class_id = null;
     payload.is_schedulable = true;
   } else if (payload.assignment_mode === 'fixed') {
@@ -67,7 +67,7 @@ function employeePayload(body) {
   return payload;
 }
 
-function normalizeWeeklyPatterns(patterns) {
+function normalizeWeeklyPatterns(patterns, assignmentMode) {
   if (!Array.isArray(patterns)) return null;
   const rows = [];
   const seen = new Set();
@@ -78,7 +78,12 @@ function normalizeWeeklyPatterns(patterns) {
     if (seen.has(weekday)) throw httpError(400,'יום בשבוע הוגדר יותר מפעם אחת');
     seen.add(weekday);
     if (!dayType) continue;
-    if (!['work','day_off'].includes(dayType)) throw httpError(400,'סוג היום הקבוע אינו תקין');
+    if (!['work','day_off','as_needed'].includes(dayType)) throw httpError(400,'סוג היום הקבוע אינו תקין');
+    if (dayType === 'as_needed') {
+      if (assignmentMode !== 'substitute') throw httpError(400,'האפשרות לפי צורך זמינה רק למשלימת מקום');
+      rows.push({ weekday, day_type:'as_needed', start_time:null, end_time:null });
+      continue;
+    }
     if (dayType === 'day_off') {
       rows.push({ weekday, day_type:'day_off', start_time:null, end_time:null });
       continue;
@@ -86,13 +91,14 @@ function normalizeWeeklyPatterns(patterns) {
     const start = String(item.start_time || '').slice(0,5);
     const end = String(item.end_time || '').slice(0,5);
     if (!start || !end || timeToMinutes(end) <= timeToMinutes(start)) throw httpError(400,'יש להזין שעות תקינות לכל יום עבודה קבוע');
+    if (weekday === 5 && timeToMinutes(end) > timeToMinutes('12:00')) throw httpError(400,'ביום שישי ניתן להגדיר עבודה עד 12:00');
     rows.push({ weekday, day_type:'work', start_time:start, end_time:end });
   }
   return rows;
 }
 
-async function replaceWeeklyPatterns(employeeId, patterns) {
-  const rows = normalizeWeeklyPatterns(patterns);
+async function replaceWeeklyPatterns(employeeId, patterns, assignmentMode) {
+  const rows = normalizeWeeklyPatterns(patterns, assignmentMode);
   if (rows === null) return;
   assertDb(await db().from('hadas_employee_weekly_patterns').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן את ימי העבודה הקבועים');
   if (rows.length) assertDb(await db().from('hadas_employee_weekly_patterns').insert(rows.map((row) => ({ ...row, employee_id:employeeId }))), 'לא ניתן לשמור את ימי העבודה הקבועים');
@@ -155,7 +161,7 @@ module.exports = async function handler(req,res) {
           active:true,
           must_change_password:true,
         }).select('id').single(), 'לא ניתן ליצור משתמש');
-        await replaceWeeklyPatterns(employee.id,body.weekly_patterns);
+        await replaceWeeklyPatterns(employee.id,body.weekly_patterns,employee.assignment_mode);
         await replaceConstraints(employee.id,body.constraints,caller.employee.id);
         await upsertPrivate(employee.id,body.admin_notes);
         await audit(caller.employee.id,'create','employee',employee.id,{ role });
@@ -203,7 +209,7 @@ module.exports = async function handler(req,res) {
 
       if (Object.keys(employeeUpdate).length) assertDb(await db().from('hadas_employees').update(employeeUpdate).eq('id',employeeId), 'לא ניתן לעדכן עובד');
       if (Object.keys(userUpdate).length) assertDb(await db().from('hadas_users').update(userUpdate).eq('id',user.id), 'לא ניתן לעדכן הרשאה');
-      if (Array.isArray(body.weekly_patterns)) await replaceWeeklyPatterns(employeeId,body.weekly_patterns);
+      if (Array.isArray(body.weekly_patterns)) await replaceWeeklyPatterns(employeeId,body.weekly_patterns,employeeUpdate.assignment_mode || employee.assignment_mode);
       if (Array.isArray(body.constraints)) await replaceConstraints(employeeId,body.constraints,caller.employee.id);
       await upsertPrivate(employeeId,body.admin_notes);
       if (body.reset_password || body.active === false) await revokeUserSessions(user.id);
