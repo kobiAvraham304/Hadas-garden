@@ -48,7 +48,7 @@ test('all RPCs referenced by handlers exist in the clean SQL schema',()=>{
 });
 
 test('SQL blocks and CSS braces are balanced',()=>{
-  for(const file of ['supabase/schema.sql','supabase/update-v0.5.0.sql']){
+  for(const file of ['supabase/schema.sql','supabase/update-v0.5.0.sql','supabase/update-v0.9.0.sql']){
     const sql=read(file); assert.equal((sql.match(/\$\$/g)||[]).length%2,0,file);
   }
   const css=read('styles.css');
@@ -76,6 +76,24 @@ test('0.5 migration is non-destructive and adds publication and audience infrast
   assert.match(migration,/hadas_schedule_changes/);
   assert.match(migration,/hadas_announcement_recipients/);
   assert.match(migration,/schema_version='0\.5\.0'/);
+});
+
+
+
+test('0.9 migration is non-destructive and adds weekly employment patterns safely',()=>{
+  const migration=read('supabase/update-v0.9.0.sql');
+  assert.match(migration,/begin;/i);
+  assert.match(migration,/commit;/i);
+  assert.doesNotMatch(migration,/drop table/i);
+  assert.match(migration,/add column if not exists max_weekly_hours/i);
+  assert.match(migration,/add column if not exists assignment_mode/i);
+  assert.match(migration,/add column if not exists is_schedulable/i);
+  assert.match(migration,/create table if not exists public\.hadas_employee_weekly_patterns/i);
+  assert.match(migration,/day_type in \('work','day_off'\)/i);
+  assert.match(migration,/job_title in \('אחות','מזכירה'\)/);
+  assert.match(migration,/schema_version='0\.9\.0'/);
+  assert.match(migration,/enable row level security/i);
+  assert.match(migration,/grant all on table public\.hadas_employee_weekly_patterns to service_role/i);
 });
 
 test('service role grants remain limited to Hadas objects',()=>{

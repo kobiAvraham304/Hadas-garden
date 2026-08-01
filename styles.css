@@ -492,3 +492,30 @@ button:not(:disabled):active{transform:translateY(1px) scale(.985)}
 
 /* overflow:clip keeps the page narrow without creating a scrolling ancestor that breaks sticky headers */
 html,body{overflow-x:clip}
+
+/* ===== v0.9.0 — כרטיס עובד, ימים קבועים וגרסה ===== */
+.app-version-badge{position:fixed;left:12px;bottom:12px;z-index:35;padding:4px 8px;border:1px solid rgba(111,114,217,.22);border-radius:999px;background:rgba(255,255,255,.82);backdrop-filter:blur(10px);color:#676b91;font-size:.66rem;font-weight:900;letter-spacing:.03em;box-shadow:0 4px 14px rgba(64,66,110,.08);pointer-events:none}
+.weekly-patterns-box{margin:16px 0;border:1px solid var(--border);border-radius:20px;padding:16px;background:linear-gradient(145deg,#fff,#faf9ff)}
+.weekly-patterns-box legend,.constraints-box legend{padding:0 8px;font-weight:950;color:var(--text)}
+.field-help{margin:0 0 12px;color:var(--muted);font-size:.86rem;line-height:1.5}
+.weekly-pattern-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.weekly-pattern-row{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px;border:1px solid #e4e3f1;border-radius:16px;background:#fff;min-width:0;transition:.18s ease}
+.weekly-pattern-row.is-work{border-color:#bcded2;background:#f8fffc;box-shadow:inset 0 3px 0 #69bea2}
+.weekly-pattern-row.is-day-off{border-color:#f0d5a2;background:#fffaf0;box-shadow:inset 0 3px 0 #e5b94f}
+.weekly-pattern-head{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.weekly-pattern-head strong{font-size:1rem}.weekly-pattern-head select{width:auto;min-width:116px;padding:8px 10px;border-radius:11px}
+.weekly-time{font-size:.75rem;color:var(--muted)}.weekly-time input{margin-top:4px;padding:9px;border-radius:10px}
+.weekly-day-off-note{display:none;grid-column:1/-1;padding:9px;text-align:center;border-radius:11px;background:#fff0c8;color:#815b12;font-weight:900}
+.weekly-pattern-row.is-day-off .weekly-day-off-note{display:block}
+.compact-constraint{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:end}
+.constraint-reason-field{min-width:0}.constraint-reason-field input{width:100%}
+.employee-pattern-preview{display:grid;gap:4px;padding:11px 12px;border-radius:13px;background:#f7f7fc;border:1px solid #ecebf4;color:var(--muted);font-size:.8rem;line-height:1.45}
+.employee-pattern-preview small{font-weight:900;color:#666a84}.employee-pattern-preview span{overflow-wrap:anywhere}
+#primaryClassField.hidden{display:none}
+
+@media(max-width:900px){.weekly-pattern-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){
+  .app-version-badge{bottom:calc(78px + env(safe-area-inset-bottom));left:8px;font-size:.6rem;background:rgba(255,255,255,.9)}
+  .weekly-patterns-box{padding:12px;margin-inline:-2px}.weekly-pattern-grid{grid-template-columns:1fr}.weekly-pattern-row{grid-template-columns:1fr 1fr;padding:11px}.weekly-pattern-head select{min-width:112px}
+  .compact-constraint{grid-template-columns:1fr}.employee-pattern-preview{font-size:.77rem}
+}

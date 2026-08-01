@@ -65,3 +65,30 @@ test('coverage validation is compact and never floods one error per time slot', 
   assert.equal(result.errors.filter((item) => item.code === 'missing_leader').length, 18);
   assert.ok(result.errors.every((item) => /07:30–15:30/.test(item.message)));
 });
+
+test('maximum weekly hours is a blocking error and fixed weekly patterns are checked', () => {
+  const employee = { id:'max1', full_name:'עובד בדיקה', active:true, is_schedulable:true, weekly_hours:8, max_weekly_hours:8 };
+  const shifts = [
+    { id:'m1', shift_date:'2026-08-02', class_id:'none', employee_id:'max1', start_time:'07:30', end_time:'15:30', shift_role:'staff' },
+    { id:'m2', shift_date:'2026-08-03', class_id:'none', employee_id:'max1', start_time:'07:30', end_time:'09:30', shift_role:'staff' },
+  ];
+  const result = validateWeek({
+    shifts, classes:[], employees:[employee], settings, weekStart:'2026-08-02',
+    weeklyPatterns:[
+      { employee_id:'max1', weekday:0, day_type:'day_off' },
+      { employee_id:'max1', weekday:1, day_type:'work', start_time:'08:30', end_time:'15:30' },
+    ],
+  });
+  const codes = new Set(result.errors.map((item) => item.code));
+  assert.equal(codes.has('max_weekly_hours'), true);
+  assert.equal(codes.has('fixed_day_off'), true);
+  assert.equal(result.warnings.some((item) => item.code === 'outside_fixed_hours'), true);
+});
+
+test('employees marked as non schedulable do not create personal-hour warnings', () => {
+  const result = validateWeek({
+    shifts:[], classes:[], employees:[{ id:'nurse', full_name:'אחות', active:true, is_schedulable:false, weekly_hours:40, max_weekly_hours:40 }], settings, weekStart:'2026-08-02',
+  });
+  assert.equal(result.errors.length,0);
+  assert.equal(result.warnings.length,0);
+});

@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.8.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.9.0 */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -87,7 +87,10 @@ function timeToMinutes(value) { if (!value) return 0; const [h, m] = String(valu
 function overlaps(aStart, aEnd, bStart, bEnd) { return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart); }
 function initials(name) { return String(name || '').trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join(''); }
 function isManager() { return ['admin', 'scheduler'].includes(state.profile?.role); }
-function canCreateContent() { return Boolean(state.profile?.can_create_content || isManager() || /גננ/.test(String(state.profile?.job_title || ''))); }
+function canCreateContent() {
+  const title = String(state.profile?.job_title || '');
+  return Boolean(state.profile?.can_create_content || isManager() || /גננ/.test(title) || ['אחות','מזכירה'].includes(title));
+}
 function employeeById(id) { return state.employees.find((item) => item.id === id); }
 function classById(id) { return state.classes.find((item) => item.id === id); }
 function currentWeekDates() { return Array.from({ length: 6 }, (_, index) => addDays(state.weekStart, index)); }
@@ -150,7 +153,9 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    $('#loginVersion').textContent = `גרסה ${state.config.version || '0.8.0'}`;
+    const version = state.config.version || '0.9.0';
+    $('#loginVersion').textContent = `גרסה ${version}`;
+    if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     try {
       const me = await apiFetch('/api/auth-me');
@@ -197,6 +202,8 @@ function bindEvents() {
   $('#employeeStatusChips').addEventListener('click', (event) => handleFilterChip(event, '#employeeStatusFilter', 'employeeStatusFilter', renderEmployees));
   $('#employeeTypeChips').addEventListener('click', (event) => handleFilterChip(event, '#employeeTypeFilter', 'employeeTypeFilter', renderEmployees));
   $('#employeeSearch').addEventListener('input', debounce((event) => { state.employeeSearch = event.target.value; renderEmployees(); }));
+  $('#employeeForm [name="job_title"]').addEventListener('change', syncEmployeeAssignmentFields);
+  $('#employeeForm [name="assignment_mode"]').addEventListener('change', syncEmployeeAssignmentFields);
 
   $('#newRequestBtn').addEventListener('click', openRequestDialog);
   $('#requestStatusFilter').addEventListener('change', (event) => { state.requestStatusFilter = event.target.value; syncFilterChips('#requestStatusChips', event.target.value); renderRequests(); });
@@ -218,6 +225,8 @@ function bindEvents() {
   $('#newCalendarBtn').addEventListener('click', () => openCalendarDialog());
 
   $('#shiftForm').addEventListener('submit', saveShift);
+  $('#shiftForm [name="employee_id"]').addEventListener('change', syncShiftHoursFromPattern);
+  $('#shiftForm [name="shift_date"]').addEventListener('change', syncShiftHoursFromPattern);
   $('#employeeForm').addEventListener('submit', saveEmployee);
   $('#requestForm').addEventListener('submit', saveRequest);
   $('#announcementForm').addEventListener('submit', saveAnnouncement);
@@ -458,7 +467,7 @@ function employeePickerHtml(name, selected = []) {
 }
 function populateSelects() {
   const classOptions = state.classes.filter((item) => item.active).map((item) => `<option value="${item.id}">${escapeHtml(item.name)}</option>`).join('');
-  const employeeOptions = state.employees.filter((item) => item.active).map((item) => `<option value="${item.id}">${escapeHtml(item.full_name)} — ${escapeHtml(item.job_title)}</option>`).join('');
+  const employeeOptions = state.employees.filter((item) => item.active && item.is_schedulable !== false).map((item) => `<option value="${item.id}">${escapeHtml(item.full_name)} — ${escapeHtml(item.job_title)}</option>`).join('');
   $('#shiftForm [name="class_id"]').innerHTML = classOptions;
   $('#shiftForm [name="employee_id"]').innerHTML = employeeOptions;
   $('#employeeForm [name="primary_class_id"]').innerHTML = `<option value="">ללא כיתה קבועה</option>${classOptions}`;
@@ -576,9 +585,13 @@ function validateScheduleClient() {
       }
     }
   }
-  for (const employee of state.employees.filter((item) => item.active && item.weekly_hours)) {
+  for (const employee of state.employees.filter((item) => item.active && item.is_schedulable !== false)) {
     const hours = state.shifts.filter((shift) => shift.employee_id === employee.id).reduce((sum, shift) => sum + (timeToMinutes(shift.end_time) - timeToMinutes(shift.start_time)) / 60, 0);
-    if (Math.abs(hours - Number(employee.weekly_hours)) >= 2) warnings.push({ id: `hours-${employee.id}`, kind: 'hours', employeeId: employee.id, title: employee.full_name, text: `שובץ ${hours.toFixed(1)} שעות מתוך ${Number(employee.weekly_hours).toFixed(1)}` });
+    if (employee.max_weekly_hours != null && hours > Number(employee.max_weekly_hours)) {
+      issues.push({ id: `max-hours-${employee.id}`, kind: 'hours', employeeId: employee.id, title: employee.full_name, text: `שובץ ${hours.toFixed(1)} שעות ועבר את המקסימום השבועי ${Number(employee.max_weekly_hours).toFixed(1)}` });
+    } else if (employee.weekly_hours != null && Math.abs(hours - Number(employee.weekly_hours)) >= 2) {
+      warnings.push({ id: `hours-${employee.id}`, kind: 'hours', employeeId: employee.id, title: employee.full_name, text: `שובץ ${hours.toFixed(1)} שעות מתוך ${Number(employee.weekly_hours).toFixed(1)}` });
+    }
   }
   return { errors: issues, warnings };
 }
@@ -680,14 +693,35 @@ function renderSchedule() {
   const acknowledged = state.acknowledgements.some((row) => row.employee_id === state.profile.id);
   $('#ackScheduleBtn').textContent = acknowledged ? 'השיבוץ נקרא ✓' : 'קראתי את השיבוץ'; $('#ackScheduleBtn').disabled = acknowledged;
 }
+function employeePatternForDate(employeeId, dateValue) {
+  const employee = employeeById(employeeId);
+  if (!employee || !dateValue) return null;
+  const weekday = parseDateValue(dateValue).getDay();
+  return (employee.weekly_patterns || []).find((row) => Number(row.weekday) === weekday) || null;
+}
+function syncShiftHoursFromPattern() {
+  const form = $('#shiftForm');
+  const employee = employeeById(form.elements.employee_id.value);
+  if (!employee) return;
+  const pattern = employeePatternForDate(employee.id, form.elements.shift_date.value);
+  if (pattern?.day_type === 'work') {
+    form.elements.start_time.value = trimTime(pattern.start_time) || trimTime(employee.default_start) || '07:30';
+    form.elements.end_time.value = trimTime(pattern.end_time) || trimTime(employee.default_end) || '15:30';
+  } else if (!pattern) {
+    form.elements.start_time.value = trimTime(employee.default_start) || '07:30';
+    form.elements.end_time.value = trimTime(employee.default_end) || '15:30';
+  }
+}
 function openShiftDialog(shift = {}) {
   const form = $('#shiftForm'); form.reset();
   form.elements.id.value = shift.id || '';
   form.elements.shift_date.value = shift.shift_date || dateISO(state.weekStart);
   form.elements.class_id.value = shift.class_id || state.classes.find((item) => item.active)?.id || '';
-  form.elements.employee_id.value = shift.employee_id || state.employees.find((item) => item.active)?.id || '';
-  form.elements.start_time.value = trimTime(shift.start_time) || '07:30';
-  form.elements.end_time.value = trimTime(shift.end_time) || '15:30';
+  form.elements.employee_id.value = shift.employee_id || state.employees.find((item) => item.active && item.is_schedulable !== false)?.id || '';
+  if (shift.id) {
+    form.elements.start_time.value = trimTime(shift.start_time) || '07:30';
+    form.elements.end_time.value = trimTime(shift.end_time) || '15:30';
+  } else syncShiftHoursFromPattern();
   form.elements.shift_role.value = shift.shift_role || 'staff';
   form.elements.public_note.value = shift.public_note || '';
   form.elements.override_day_off.value = 'false';
@@ -849,11 +883,25 @@ async function handleScheduleClick(event) {
 
 function employeeType(employee) {
   const title = String(employee.job_title || '');
-  if (/גננ/.test(title)) return 'teacher';
-  if (/סייע|מטפל/.test(title)) return 'assistant';
-  if (/קלינ|ריפוי|מרפא|פיזיו|פסיכ|עובד.*סוציא|פרא/.test(title)) return 'therapy';
-  if (/מנהלת|אחראית/.test(title) || ['admin', 'scheduler'].includes(employee.role)) return 'management';
+  if (title === 'גננת') return 'teacher';
+  if (['סייעת','סייעת מובילה','סייע'].includes(title)) return 'assistant';
+  if (title === 'אחות') return 'therapy';
+  if (title === 'מנהלת מעון' || ['admin', 'scheduler'].includes(employee.role)) return 'management';
   return 'other';
+}
+function employeeAssignmentLabel(employee) {
+  if (employee.is_schedulable === false || employee.assignment_mode === 'no_schedule') return 'ללא שיבוץ';
+  if (employee.assignment_mode === 'rotation') return 'רוטציה בין כיתות';
+  return classById(employee.primary_class_id)?.name || 'כיתה טרם נקבעה';
+}
+function employeeDaysOffLabel(employee) {
+  const days = (employee.weekly_patterns || []).filter((row) => row.day_type === 'day_off').map((row) => DAY_NAMES[Number(row.weekday)]).filter(Boolean);
+  return days.length ? days.join(', ') : 'ללא ימים קבועים';
+}
+function employeeWorkPatternLabel(employee) {
+  const work = (employee.weekly_patterns || []).filter((row) => row.day_type === 'work');
+  if (!work.length) return 'לא הוגדרו ימים קבועים';
+  return work.map((row) => `${DAY_NAMES[Number(row.weekday)]} ${trimTime(row.start_time)}–${trimTime(row.end_time)}`).join(' · ');
 }
 function renderEmployees() {
   syncFilterChips('#employeeStatusChips', state.employeeStatusFilter); syncFilterChips('#employeeTypeChips', state.employeeTypeFilter);
@@ -862,31 +910,111 @@ function renderEmployees() {
     const statusOk = state.employeeStatusFilter === 'all' || (state.employeeStatusFilter === 'active' ? employee.active : !employee.active);
     const classOk = state.employeeClassFilter === 'all' || (state.employeeClassFilter === 'none' ? !employee.primary_class_id : employee.primary_class_id === state.employeeClassFilter);
     const typeOk = state.employeeTypeFilter === 'all' || employeeType(employee) === state.employeeTypeFilter;
-    const haystack = `${employee.full_name} ${employee.phone || ''} ${employee.job_title || ''}`.toLowerCase();
+    const haystack = `${employee.full_name} ${employee.phone || ''} ${employee.job_title || ''} ${employeeAssignmentLabel(employee)}`.toLowerCase();
     return statusOk && classOk && typeOk && (!term || haystack.includes(term));
   });
-  const active = state.employees.filter((employee) => employee.active).length; const teachers = state.employees.filter((employee) => employee.active && employeeType(employee) === 'teacher').length; const assistants = state.employees.filter((employee) => employee.active && employeeType(employee) === 'assistant').length; const therapy = state.employees.filter((employee) => employee.active && employeeType(employee) === 'therapy').length;
-  $('#employeeSummary').innerHTML = `<div class="mini-stat"><strong>${active}</strong><span>עובדים פעילים</span></div><div class="mini-stat"><strong>${teachers}</strong><span>גננות</span></div><div class="mini-stat"><strong>${assistants}</strong><span>סייעות</span></div><div class="mini-stat"><strong>${therapy}</strong><span>פרא־רפואי</span></div>`;
-  $('#employeesList').innerHTML = filtered.length ? filtered.map((employee) => { const type = employeeType(employee); return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)} · ${escapeHtml(classById(employee.primary_class_id)?.name || 'ללא כיתה קבועה')}</p></div></div><div class="employee-role-strip"><span>${type === 'teacher' ? '✿ גננת/גנן' : type === 'assistant' ? '☀ סייעת' : type === 'therapy' ? '★ פרא־רפואי' : type === 'management' ? '♙ ניהול' : '• צוות'}</span>${employee.can_lead ? '<span>יכול/ה להוביל</span>' : ''}</div><div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות שבועיות</small><strong>${employee.weekly_hours ?? 'לא הוגדר'}</strong></div><div><small>שעות רגילות</small><strong>${timeHtml(employee.default_start, employee.default_end)}</strong></div></div><div class="card-actions"><button class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`; }).join('') : '<div class="empty-state">לא נמצאו עובדים לפי הסינון.</div>';
+  const active = state.employees.filter((employee) => employee.active).length;
+  const schedulable = state.employees.filter((employee) => employee.active && employee.is_schedulable !== false).length;
+  const rotation = state.employees.filter((employee) => employee.active && employee.assignment_mode === 'rotation').length;
+  const content = state.employees.filter((employee) => employee.active && ['גננת','אחות','מזכירה','מנהלת מעון'].includes(employee.job_title)).length;
+  $('#employeeSummary').innerHTML = `<div class="mini-stat"><strong>${active}</strong><span>עובדים פעילים</span></div><div class="mini-stat"><strong>${schedulable}</strong><span>במערך השיבוצים</span></div><div class="mini-stat"><strong>${rotation}</strong><span>ברוטציה</span></div><div class="mini-stat"><strong>${content}</strong><span>יוצרי תוכן</span></div>`;
+  $('#employeesList').innerHTML = filtered.length ? filtered.map((employee) => {
+    const type = employeeType(employee);
+    const titleBadge = type === 'teacher' ? '✿ גננת' : type === 'assistant' ? '☀ צוות סיוע' : type === 'therapy' ? '✚ צוות רפואי' : type === 'management' ? '♙ ניהול' : '• צוות';
+    return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)} · ${escapeHtml(employeeAssignmentLabel(employee))}</p></div></div><div class="employee-role-strip"><span>${titleBadge}</span>${employee.can_lead ? '<span>תפקיד הובלה</span>' : ''}${employee.is_schedulable === false ? '<span>ללא שיבוץ</span>' : ''}</div><div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות מתוכננות / מקסימום</small><strong>${employee.weekly_hours ?? '—'} / ${employee.max_weekly_hours ?? '—'}</strong></div><div><small>ימי חופשה קבועים</small><strong>${escapeHtml(employeeDaysOffLabel(employee))}</strong></div></div><div class="employee-pattern-preview"><small>ימי עבודה קבועים</small><span>${escapeHtml(employeeWorkPatternLabel(employee))}</span></div><div class="card-actions"><button class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`;
+  }).join('') : '<div class="empty-state">לא נמצאו עובדים לפי הסינון.</div>';
 }
 function renderConstraintFields(employee = {}) {
   const existing = state.constraints.filter((constraint) => constraint.employee_id === employee.id);
   $('#constraintsFields').innerHTML = state.classes.filter((item) => item.active).map((item) => {
     const constraint = existing.find((row) => row.class_id === item.id);
-    return `<div class="constraint-row" data-class-id="${item.id}"><label>${escapeHtml(item.name)}<select class="constraint-type"><option value="">ללא מגבלה</option><option value="preferred" ${constraint?.constraint_type === 'preferred' ? 'selected' : ''}>עדיפות</option><option value="avoid" ${constraint?.constraint_type === 'avoid' ? 'selected' : ''}>עדיף להימנע</option><option value="forbidden" ${constraint?.constraint_type === 'forbidden' ? 'selected' : ''}>אסור לשבץ</option></select></label><label>מתאריך<input class="constraint-from" type="date" value="${constraint?.valid_from || ''}"/></label><label>עד תאריך<input class="constraint-to" type="date" value="${constraint?.valid_to || ''}"/></label><label class="full-field">הסבר<input class="constraint-reason" value="${escapeHtml(constraint?.reason || '')}"/></label></div>`;
+    return `<div class="constraint-row compact-constraint" data-class-id="${item.id}"><label>${escapeHtml(item.name)}<select class="constraint-type"><option value="">ללא מגבלה</option><option value="preferred" ${constraint?.constraint_type === 'preferred' ? 'selected' : ''}>עדיפות</option><option value="avoid" ${constraint?.constraint_type === 'avoid' ? 'selected' : ''}>עדיף להימנע</option><option value="forbidden" ${constraint?.constraint_type === 'forbidden' ? 'selected' : ''}>אסור לשבץ</option></select></label><label class="constraint-reason-field">הסבר<input class="constraint-reason" value="${escapeHtml(constraint?.reason || '')}" placeholder="לא חובה"/></label></div>`;
   }).join('');
 }
-function collectConstraints() { return $$('.constraint-row').map((row) => ({ class_id: row.dataset.classId, constraint_type: $('.constraint-type', row).value, valid_from: $('.constraint-from', row).value, valid_to: $('.constraint-to', row).value, reason: $('.constraint-reason', row).value })).filter((row) => row.constraint_type); }
-function openEmployeeDialog(employee = {}) {
-  const form = $('#employeeForm'); form.reset(); form.elements.id.value = employee.id || ''; form.elements.full_name.value = employee.full_name || ''; form.elements.phone.value = employee.phone || ''; form.elements.job_title.value = employee.job_title || 'סייעת'; form.elements.role.value = employee.role || 'employee'; form.elements.primary_class_id.value = employee.primary_class_id || ''; form.elements.can_lead.value = String(Boolean(employee.can_lead)); form.elements.weekly_hours.value = employee.weekly_hours ?? ''; form.elements.employment_percent.value = employee.employment_percent ?? ''; form.elements.fixed_day_off.value = employee.fixed_day_off ?? ''; form.elements.default_start.value = trimTime(employee.default_start) || '07:30'; form.elements.default_end.value = trimTime(employee.default_end) || '15:30'; form.elements.admin_notes.value = employee.admin_notes || ''; renderConstraintFields(employee); $('#employeeDialog').showModal();
+function collectConstraints() {
+  return $$('.constraint-row').map((row) => ({ class_id: row.dataset.classId, constraint_type: $('.constraint-type', row).value, valid_from: null, valid_to: null, reason: $('.constraint-reason', row).value })).filter((row) => row.constraint_type);
 }
-async function saveEmployee(event) { event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button[value="default"]'); const data = formObject(form); data.can_lead = data.can_lead === 'true'; data.constraints = collectConstraints(); setBusy(button, true); try { await apiFetch('/api/employees', { method: data.id ? 'PATCH' : 'POST', body: data }); $('#employeeDialog').close(); await refreshAll(); showToast('כרטיס העובד נשמר', 'success'); } catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); } }
+function syncWeeklyPatternRow(row) {
+  const type = $('.weekly-day-type', row).value;
+  row.classList.toggle('is-work', type === 'work');
+  row.classList.toggle('is-day-off', type === 'day_off');
+  $$('.weekly-time', row).forEach((field) => { field.classList.toggle('hidden', type !== 'work'); field.querySelector('input').required = type === 'work'; });
+}
+function renderWeeklyPatternFields(employee = {}) {
+  const patterns = employee.weekly_patterns || [];
+  $('#weeklyPatternFields').innerHTML = Array.from({ length: 6 }, (_, weekday) => {
+    const pattern = patterns.find((row) => Number(row.weekday) === weekday);
+    const type = pattern?.day_type || '';
+    const start = trimTime(pattern?.start_time) || trimTime(employee.default_start) || '07:30';
+    const end = trimTime(pattern?.end_time) || trimTime(employee.default_end) || '15:30';
+    return `<article class="weekly-pattern-row" data-weekday="${weekday}"><div class="weekly-pattern-head"><strong>${DAY_NAMES[weekday]}</strong><select class="weekly-day-type" aria-label="הגדרת יום ${DAY_NAMES[weekday]}"><option value="" ${!type ? 'selected' : ''}>לא קבוע</option><option value="work" ${type === 'work' ? 'selected' : ''}>יום עבודה</option><option value="day_off" ${type === 'day_off' ? 'selected' : ''}>יום חופשי</option></select></div><label class="weekly-time">התחלה<input class="weekly-start" type="time" value="${start}"/></label><label class="weekly-time">סיום<input class="weekly-end" type="time" value="${end}"/></label><span class="weekly-day-off-note">יום חופשי קבוע</span></article>`;
+  }).join('');
+  $$('.weekly-pattern-row').forEach((row) => { syncWeeklyPatternRow(row); $('.weekly-day-type', row).addEventListener('change', () => syncWeeklyPatternRow(row)); });
+}
+function collectWeeklyPatterns() {
+  return $$('.weekly-pattern-row').map((row) => ({ weekday:Number(row.dataset.weekday), day_type:$('.weekly-day-type', row).value, start_time:$('.weekly-start', row).value, end_time:$('.weekly-end', row).value }));
+}
+function syncEmployeeAssignmentFields() {
+  const form = $('#employeeForm');
+  const title = form.elements.job_title.value;
+  const noSchedule = ['אחות','מזכירה'].includes(title);
+  const assignment = form.elements.assignment_mode;
+  if (noSchedule) assignment.value = 'no_schedule';
+  else if (assignment.value === 'no_schedule') assignment.value = 'rotation';
+  assignment.disabled = noSchedule;
+  const schedulingDisabled = noSchedule || assignment.value === 'no_schedule';
+  const fixed = assignment.value === 'fixed' && !schedulingDisabled;
+  $('#primaryClassField').classList.toggle('hidden', !fixed);
+  form.elements.primary_class_id.required = fixed;
+  $('.weekly-patterns-box', form).classList.toggle('hidden', schedulingDisabled);
+}
+function openEmployeeDialog(employee = {}) {
+  const form = $('#employeeForm'); form.reset();
+  form.elements.id.value = employee.id || '';
+  form.elements.full_name.value = employee.full_name || '';
+  form.elements.phone.value = employee.phone || '';
+  const titleSelect = form.elements.job_title;
+  titleSelect.querySelectorAll('option[data-legacy-title]').forEach((option) => option.remove());
+  const selectedTitle = employee.job_title || 'סייעת';
+  if (selectedTitle && ![...titleSelect.options].some((option) => option.value === selectedTitle)) {
+    const legacyOption = document.createElement('option');
+    legacyOption.value = selectedTitle;
+    legacyOption.textContent = `${selectedTitle} (תפקיד קודם — מומלץ לעדכן)`;
+    legacyOption.dataset.legacyTitle = 'true';
+    titleSelect.append(legacyOption);
+  }
+  titleSelect.value = selectedTitle;
+  form.elements.role.value = employee.role || 'employee';
+  form.elements.assignment_mode.value = employee.assignment_mode || (employee.primary_class_id ? 'fixed' : 'rotation');
+  form.elements.primary_class_id.value = employee.primary_class_id || '';
+  form.elements.weekly_hours.value = employee.weekly_hours ?? '';
+  form.elements.max_weekly_hours.value = employee.max_weekly_hours ?? '';
+  form.elements.employment_percent.value = employee.employment_percent ?? '';
+  form.elements.default_start.value = trimTime(employee.default_start) || '07:30';
+  form.elements.default_end.value = trimTime(employee.default_end) || '15:30';
+  form.elements.admin_notes.value = employee.admin_notes || '';
+  renderWeeklyPatternFields(employee); renderConstraintFields(employee); syncEmployeeAssignmentFields();
+  $('#employeeDialog').showModal();
+}
+async function saveEmployee(event) {
+  event.preventDefault();
+  const form = event.currentTarget; const button = form.querySelector('button[value="default"]');
+  const data = formObject(form);
+  data.assignment_mode = form.elements.assignment_mode.value;
+  data.primary_class_id = data.assignment_mode === 'fixed' ? form.elements.primary_class_id.value : '';
+  data.weekly_patterns = data.assignment_mode === 'no_schedule' ? [] : collectWeeklyPatterns();
+  data.constraints = collectConstraints();
+  setBusy(button, true);
+  try { await apiFetch('/api/employees', { method: data.id ? 'PATCH' : 'POST', body: data }); $('#employeeDialog').close(); await refreshAll(); showToast('כרטיס העובד נשמר', 'success'); }
+  catch (error) { showToast(error.message, 'error'); }
+  finally { setBusy(button, false); }
+}
 async function handleEmployeeClick(event) {
   const button = event.target.closest('[data-action]'); if (!button) return; const employee = employeeById(button.dataset.id); if (!employee) return;
   if (button.dataset.action === 'edit') return openEmployeeDialog(employee);
   if (button.dataset.action === 'reset' && !confirm(`לאפס את הסיסמה של ${employee.full_name} ל-hadas?`)) return;
   if (button.dataset.action === 'toggle' && !confirm(`${employee.active ? 'להשבית' : 'להפעיל'} את ${employee.full_name}?`)) return;
-  try { await apiFetch('/api/employees', { method: 'PATCH', body: { id: employee.id, ...(button.dataset.action === 'reset' ? { reset_password: true } : { active: !employee.active }) } }); await refreshAll(); showToast('העובד עודכנה', 'success'); } catch (error) { showToast(error.message, 'error'); }
+  try { await apiFetch('/api/employees', { method: 'PATCH', body: { id: employee.id, ...(button.dataset.action === 'reset' ? { reset_password: true } : { active: !employee.active }) } }); await refreshAll(); showToast('העובד עודכן', 'success'); } catch (error) { showToast(error.message, 'error'); }
 }
 
 function selectedRequestType() { return $('#requestForm input[name="request_type"]:checked')?.value || 'leave'; }
@@ -1000,7 +1128,7 @@ function renderCalendar() {
   const cells = calendarCells().map((date) => {
     const iso = dateISO(date); const events = state.calendarEvents.filter((event) => event.event_date === iso); const outside = date.getMonth() !== state.calendarMonth.getMonth();
     const shown = events.slice(0, 3).map((event) => `<button class="calendar-event ${event.event_type}" data-event-id="${event.id}" title="${escapeHtml(event.title)}">${EVENT_ICONS[event.event_type]} ${escapeHtml(event.title)}</button>`).join('');
-    return `<div class="calendar-day ${outside ? 'outside' : ''} ${iso === today ? 'today' : ''} ${isManager() ? 'selectable' : ''}" data-calendar-date="${iso}" ${isManager() ? 'role="button" tabindex="0" aria-label="יצירת אירוע בתאריך ' + escapeHtml(formatDate(iso)) + '"' : ''}><div class="calendar-day-number"><span>${date.getDate()}</span><span class="calendar-day-tools">${events.length ? `<small>${events.length}</small>` : ''}${isManager() ? '<i aria-hidden="true">＋</i>' : ''}</span></div><div class="calendar-events">${shown}${events.length > 3 ? `<span class="calendar-more">ועוד ${events.length - 3}</span>` : ''}</div></div>`;
+    return `<div class="calendar-day ${outside ? 'outside' : ''} ${iso === today ? 'today' : ''} ${canCreateContent() ? 'selectable' : ''}" data-calendar-date="${iso}" ${canCreateContent() ? 'role="button" tabindex="0" aria-label="יצירת אירוע בתאריך ' + escapeHtml(formatDate(iso)) + '"' : ''}><div class="calendar-day-number"><span>${date.getDate()}</span><span class="calendar-day-tools">${events.length ? `<small>${events.length}</small>` : ''}${canCreateContent() ? '<i aria-hidden="true">＋</i>' : ''}</span></div><div class="calendar-events">${shown}${events.length > 3 ? `<span class="calendar-more">ועוד ${events.length - 3}</span>` : ''}</div></div>`;
   }).join('');
   $('#calendarGrid').innerHTML = `<div class="calendar-weekdays">${weekdays}</div><div class="calendar-grid">${cells}</div>`;
 }
@@ -1008,7 +1136,8 @@ function openCalendarDialog(event = {}) { const form = $('#calendarForm'); form.
 function openCalendarEvent(event) {
   $('#calendarEventTitle').textContent = event.title;
   $('#calendarEventDetails').innerHTML = `<div class="event-hero"><strong>${EVENT_ICONS[event.event_type]} ${EVENT_LABELS[event.event_type]}</strong><p>${formatDate(event.event_date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}${event.start_time ? ` · ${timeHtml(event.start_time, event.end_time)}` : ''}</p></div><div class="event-detail-row"><strong>נראות</strong><span>${event.visibility === 'all' ? 'כל העובדים' : event.visibility === 'managers' ? 'לינור ואילנית בלבד' : `כיתת ${classById(event.class_id)?.name || ''}`}</span></div>${event.description ? `<div class="event-detail-row"><strong>פירוט</strong><span>${escapeHtml(event.description).replaceAll('\n', '<br>')}</span></div>` : ''}`;
-  $('#calendarEventActions').innerHTML = isManager() ? `<button class="danger-btn" data-action="delete-event" data-id="${event.id}">מחיקת אירוע</button>` : '<button type="button" class="ghost-btn close-dialog-inline">סגירה</button>';
+  const canManage = isManager() || event.created_by === state.profile.id;
+  $('#calendarEventActions').innerHTML = canManage ? `<button class="danger-btn" data-action="delete-event" data-id="${event.id}">מחיקת אירוע</button>` : '<button type="button" class="ghost-btn close-dialog-inline">סגירה</button>';
   $('#calendarEventDialog').showModal();
 }
 async function saveCalendarEvent(event) { event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button[value="default"]'); const data = formObject(form); setBusy(button, true); try { await apiFetch('/api/calendar', { method: 'POST', body: data }); $('#calendarDialog').close(); await setCalendarMonth(state.calendarMonth); showToast('האירוע נשמר', 'success'); } catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); } }
@@ -1020,12 +1149,12 @@ function handleCalendarClick(event) {
     return;
   }
   const day = event.target.closest('[data-calendar-date]');
-  if (day && isManager()) openCalendarDialog({ event_date: day.dataset.calendarDate });
+  if (day && canCreateContent()) openCalendarDialog({ event_date: day.dataset.calendarDate });
 }
 function handleCalendarKeydown(event) {
   if (!['Enter', ' '].includes(event.key)) return;
   const day = event.target.closest('[data-calendar-date]');
-  if (!day || !isManager()) return;
+  if (!day || !canCreateContent()) return;
   event.preventDefault();
   openCalendarDialog({ event_date: day.dataset.calendarDate });
 }

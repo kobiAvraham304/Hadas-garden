@@ -24,13 +24,15 @@ function calendarRange(monthValue) {
   return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
 }
 
-function sanitizeEmployee(employee, manager, usersByEmployee, privateByEmployee) {
+function sanitizeEmployee(employee, manager, usersByEmployee, privateByEmployee, patternsByEmployee) {
   const base = {
     id: employee.id,
     full_name: employee.full_name,
     job_title: employee.job_title,
     primary_class_id: employee.primary_class_id,
     can_lead: employee.can_lead,
+    assignment_mode: employee.assignment_mode || (employee.primary_class_id ? 'fixed' : 'rotation'),
+    is_schedulable: employee.is_schedulable !== false,
     active: employee.active,
   };
   if (!manager) return base;
@@ -38,6 +40,7 @@ function sanitizeEmployee(employee, manager, usersByEmployee, privateByEmployee)
   return {
     ...base,
     weekly_hours: employee.weekly_hours,
+    max_weekly_hours: employee.max_weekly_hours,
     employment_percent: employee.employment_percent,
     default_start: employee.default_start,
     default_end: employee.default_end,
@@ -49,6 +52,7 @@ function sanitizeEmployee(employee, manager, usersByEmployee, privateByEmployee)
     user_active: user?.active ?? false,
     must_change_password: user?.must_change_password ?? true,
     admin_notes: privateByEmployee.get(employee.id)?.admin_notes || '',
+    weekly_patterns: patternsByEmployee.get(employee.id) || [],
   };
 }
 
@@ -81,6 +85,7 @@ module.exports = async function handler(req, res) {
       db().from('hadas_users').select('employee_id,phone,role,active,must_change_password'),
       db().from('hadas_employee_private').select('*'),
       db().from('hadas_employee_class_constraints').select('*'),
+      db().from('hadas_employee_weekly_patterns').select('*').order('weekday'),
       db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
       db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd).order('shift_date').order('start_time'),
       db().from('hadas_attendance').select('*').eq('attendance_date', attendanceDate),
@@ -98,12 +103,13 @@ module.exports = async function handler(req, res) {
       todayWeekStart === weekStart ? Promise.resolve({ data: [], error: null }) : db().from('hadas_schedule_changes').select('*').eq('week_start', todayWeekStart).is('published_revision', 'null').order('created_at'),
     ]);
 
-    const [classesR, employeesR, usersR, privateR, constraintsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR] = results;
+    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR] = results;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
     const employeeRows = assertDb(employeesR, 'לא ניתן לטעון עובדים') || [];
     const userRows = assertDb(usersR, 'לא ניתן לטעון הרשאות') || [];
     const privateRows = assertDb(privateR, 'לא ניתן לטעון הערות ניהוליות') || [];
     const constraints = assertDb(constraintsR, 'לא ניתן לטעון אילוצים') || [];
+    const weeklyPatterns = assertDb(weeklyPatternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [];
     const settings = assertDb(settingsR, 'לא ניתן לטעון הגדרות') || {};
     let shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
     let attendance = assertDb(attendanceR, 'לא ניתן לטעון נוכחות') || [];
@@ -122,7 +128,12 @@ module.exports = async function handler(req, res) {
 
     const usersByEmployee = new Map(userRows.map((row) => [row.employee_id, row]));
     const privateByEmployee = new Map(privateRows.map((row) => [row.employee_id, row]));
-    const employees = employeeRows.map((row) => sanitizeEmployee(row, manager, usersByEmployee, privateByEmployee));
+    const patternsByEmployee = new Map();
+    for (const pattern of weeklyPatterns) {
+      if (!patternsByEmployee.has(pattern.employee_id)) patternsByEmployee.set(pattern.employee_id, []);
+      patternsByEmployee.get(pattern.employee_id).push(pattern);
+    }
+    const employees = employeeRows.map((row) => sanitizeEmployee(row, manager, usersByEmployee, privateByEmployee, patternsByEmployee));
 
     // רשימה מצומצמת ובטוחה להצגת חופשות/היעדרויות לצד השיבוץ לכל הצוות.
     // לא נשלחים נימוקים, הערות מנהלת או מידע אישי אחר.
@@ -138,7 +149,16 @@ module.exports = async function handler(req, res) {
         absence_type: request.request_type,
       });
     }
-    for (const employee of employeeRows.filter((row) => row.active && row.fixed_day_off !== null && row.fixed_day_off !== undefined)) {
+    for (const pattern of weeklyPatterns.filter((row) => row.day_type === 'day_off')) {
+      for (const date of absenceDates) {
+        const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+        if (weekday !== Number(pattern.weekday)) continue;
+        const key = `${pattern.employee_id}:${date}`;
+        if (!absenceMap.has(key)) absenceMap.set(key, { employee_id: pattern.employee_id, absence_date: date, absence_type: 'day_off' });
+      }
+    }
+    // תאימות לעובדים שטרם נשמרה עבורם תבנית שבועית חדשה.
+    for (const employee of employeeRows.filter((row) => row.active && row.fixed_day_off !== null && row.fixed_day_off !== undefined && !patternsByEmployee.has(row.id))) {
       for (const date of absenceDates) {
         const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
         if (weekday !== Number(employee.fixed_day_off)) continue;
@@ -165,7 +185,7 @@ module.exports = async function handler(req, res) {
       const createdTaskIds = new Set(tasks.filter((row) => contentCreator && row.created_by === caller.employee.id).map((row) => row.id));
       tasks = tasks.filter((row) => row.active && (assignedTaskIds.has(row.id) || createdTaskIds.has(row.id)));
       assignees = assignees.filter((row) => row.employee_id === caller.employee.id || createdTaskIds.has(row.task_id));
-      calendar = calendar.filter((row) => row.visibility === 'all' || (row.visibility === 'class' && row.class_id === caller.employee.primary_class_id));
+      calendar = calendar.filter((row) => row.created_by === caller.employee.id || row.visibility === 'all' || (row.visibility === 'class' && row.class_id === caller.employee.primary_class_id));
     }
 
     const now = Date.now();

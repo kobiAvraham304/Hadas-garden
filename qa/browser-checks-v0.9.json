@@ -1,0 +1,104 @@
+[
+  {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "metrics": {
+      "sw": 1440,
+      "cw": 1440,
+      "version": "v0.9.0",
+      "cards": 7,
+      "smallButtons": 9,
+      "overflowing": 0
+    },
+    "dialog": {
+      "left": 330,
+      "right": 1110,
+      "top": 14,
+      "bottom": 986,
+      "width": 780,
+      "titles": [
+        "סייעת",
+        "סייעת מובילה",
+        "סייע",
+        "גננת",
+        "מנהלת מעון",
+        "מזכירה",
+        "אחות"
+      ],
+      "rows": 6,
+      "maxField": true,
+      "version": "v0.9.0"
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "metrics": {
+      "sw": 390,
+      "cw": 390,
+      "version": "v0.9.0",
+      "cards": 7,
+      "smallButtons": 11,
+      "overflowing": 0
+    },
+    "dialog": {
+      "left": 8,
+      "right": 382,
+      "top": 8,
+      "bottom": 836,
+      "width": 374,
+      "titles": [
+        "סייעת",
+        "סייעת מובילה",
+        "סייע",
+        "גננת",
+        "מנהלת מעון",
+        "מזכירה",
+        "אחות"
+      ],
+      "rows": 6,
+      "maxField": true,
+      "version": "v0.9.0"
+    },
+    "errors": []
+  },
+  {
+    "viewport": {
+      "width": 360,
+      "height": 800
+    },
+    "metrics": {
+      "sw": 360,
+      "cw": 360,
+      "version": "v0.9.0",
+      "cards": 7,
+      "smallButtons": 11,
+      "overflowing": 0
+    },
+    "dialog": {
+      "left": 8,
+      "right": 352,
+      "top": 8,
+      "bottom": 792,
+      "width": 344,
+      "titles": [
+        "סייעת",
+        "סייעת מובילה",
+        "סייע",
+        "גננת",
+        "מנהלת מעון",
+        "מזכירה",
+        "אחות"
+      ],
+      "rows": 6,
+      "maxField": true,
+      "version": "v0.9.0"
+    },
+    "errors": []
+  }
+]

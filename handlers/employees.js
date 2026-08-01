@@ -5,23 +5,38 @@ const {
 const { timeToMinutes } = require('../lib/schedule');
 
 const ALLOWED_ROLES = new Set(['admin','scheduler','employee']);
+const JOB_TITLES = new Set(['סייעת','סייעת מובילה','סייע','גננת','מנהלת מעון','מזכירה','אחות']);
+const LEAD_TITLES = new Set(['סייעת מובילה','גננת','מנהלת מעון']);
+const NON_SCHEDULABLE_TITLES = new Set(['מזכירה','אחות']);
+const ASSIGNMENT_MODES = new Set(['fixed','rotation','no_schedule']);
 
 function employeePayload(body) {
   const payload = {};
-  const fields = ['full_name','job_title','primary_class_id','weekly_hours','employment_percent','default_start','default_end','fixed_day_off','active','started_at','ended_at'];
+  const fields = ['full_name','job_title','primary_class_id','weekly_hours','max_weekly_hours','employment_percent','default_start','default_end','active','started_at','ended_at','assignment_mode'];
   for (const field of fields) if (body[field] !== undefined) payload[field] = body[field] === '' ? null : body[field];
-  if (body.can_lead !== undefined) payload.can_lead = Boolean(body.can_lead);
   if (payload.full_name !== undefined) {
     payload.full_name = String(payload.full_name || '').trim();
     if (!payload.full_name) throw httpError(400,'יש להזין שם מלא');
   }
-  if (payload.fixed_day_off !== undefined && payload.fixed_day_off !== null) {
-    payload.fixed_day_off = Number(payload.fixed_day_off);
-    if (!Number.isInteger(payload.fixed_day_off) || payload.fixed_day_off < 0 || payload.fixed_day_off > 6) throw httpError(400,'יום חופשי אינו תקין');
+  if (payload.job_title !== undefined) {
+    payload.job_title = String(payload.job_title || '').trim();
+    const unchangedLegacyTitle = Boolean(body.current_job_title && payload.job_title === body.current_job_title);
+    if (!JOB_TITLES.has(payload.job_title) && !unchangedLegacyTitle) throw httpError(400,'יש לבחור תפקיד מרשימת תפקידי המעון');
+    if (JOB_TITLES.has(payload.job_title)) {
+      payload.can_lead = LEAD_TITLES.has(payload.job_title);
+      payload.is_schedulable = !NON_SCHEDULABLE_TITLES.has(payload.job_title);
+    }
   }
   if (payload.weekly_hours !== undefined && payload.weekly_hours !== null) {
     payload.weekly_hours = Number(payload.weekly_hours);
     if (!Number.isFinite(payload.weekly_hours) || payload.weekly_hours < 0 || payload.weekly_hours > 60) throw httpError(400,'מספר השעות השבועיות אינו תקין');
+  }
+  if (payload.max_weekly_hours !== undefined && payload.max_weekly_hours !== null) {
+    payload.max_weekly_hours = Number(payload.max_weekly_hours);
+    if (!Number.isFinite(payload.max_weekly_hours) || payload.max_weekly_hours < 0 || payload.max_weekly_hours > 80) throw httpError(400,'מקסימום השעות השבועיות אינו תקין');
+  }
+  if (payload.weekly_hours != null && payload.max_weekly_hours != null && payload.max_weekly_hours < payload.weekly_hours) {
+    throw httpError(400,'מקסימום השעות השבועיות לא יכול להיות נמוך מהיקף השעות המתוכנן');
   }
   if (payload.employment_percent !== undefined && payload.employment_percent !== null) {
     payload.employment_percent = Number(payload.employment_percent);
@@ -29,7 +44,58 @@ function employeePayload(body) {
   }
   if (payload.default_start && payload.default_end && timeToMinutes(payload.default_end) <= timeToMinutes(payload.default_start)) throw httpError(400,'שעת הסיום חייבת להיות לאחר שעת ההתחלה');
   if (payload.started_at && payload.ended_at && payload.ended_at < payload.started_at) throw httpError(400,'תאריך הסיום אינו יכול להיות לפני תאריך ההתחלה');
+  if (payload.assignment_mode !== undefined) {
+    payload.assignment_mode = String(payload.assignment_mode || 'fixed');
+    if (!ASSIGNMENT_MODES.has(payload.assignment_mode)) throw httpError(400,'סוג השיוך לכיתה אינו תקין');
+  }
+  const title = payload.job_title ?? body.current_job_title;
+  if (NON_SCHEDULABLE_TITLES.has(title)) {
+    payload.assignment_mode = 'no_schedule';
+    payload.primary_class_id = null;
+    payload.is_schedulable = false;
+    payload.can_lead = false;
+  } else if (payload.assignment_mode === 'no_schedule') {
+    payload.primary_class_id = null;
+    payload.is_schedulable = false;
+  } else if (payload.assignment_mode === 'rotation') {
+    payload.primary_class_id = null;
+    payload.is_schedulable = true;
+  } else if (payload.assignment_mode === 'fixed') {
+    payload.is_schedulable = true;
+    if (body.primary_class_id === '') payload.primary_class_id = null;
+  }
   return payload;
+}
+
+function normalizeWeeklyPatterns(patterns) {
+  if (!Array.isArray(patterns)) return null;
+  const rows = [];
+  const seen = new Set();
+  for (const item of patterns) {
+    const weekday = Number(item.weekday);
+    const dayType = String(item.day_type || '');
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) throw httpError(400,'יום בשבוע אינו תקין');
+    if (seen.has(weekday)) throw httpError(400,'יום בשבוע הוגדר יותר מפעם אחת');
+    seen.add(weekday);
+    if (!dayType) continue;
+    if (!['work','day_off'].includes(dayType)) throw httpError(400,'סוג היום הקבוע אינו תקין');
+    if (dayType === 'day_off') {
+      rows.push({ weekday, day_type:'day_off', start_time:null, end_time:null });
+      continue;
+    }
+    const start = String(item.start_time || '').slice(0,5);
+    const end = String(item.end_time || '').slice(0,5);
+    if (!start || !end || timeToMinutes(end) <= timeToMinutes(start)) throw httpError(400,'יש להזין שעות תקינות לכל יום עבודה קבוע');
+    rows.push({ weekday, day_type:'work', start_time:start, end_time:end });
+  }
+  return rows;
+}
+
+async function replaceWeeklyPatterns(employeeId, patterns) {
+  const rows = normalizeWeeklyPatterns(patterns);
+  if (rows === null) return;
+  assertDb(await db().from('hadas_employee_weekly_patterns').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן את ימי העבודה הקבועים');
+  if (rows.length) assertDb(await db().from('hadas_employee_weekly_patterns').insert(rows.map((row) => ({ ...row, employee_id:employeeId }))), 'לא ניתן לשמור את ימי העבודה הקבועים');
 }
 
 async function replaceConstraints(employeeId, constraints, actorId) {
@@ -89,6 +155,7 @@ module.exports = async function handler(req,res) {
           active:true,
           must_change_password:true,
         }).select('id').single(), 'לא ניתן ליצור משתמש');
+        await replaceWeeklyPatterns(employee.id,body.weekly_patterns);
         await replaceConstraints(employee.id,body.constraints,caller.employee.id);
         await upsertPrivate(employee.id,body.admin_notes);
         await audit(caller.employee.id,'create','employee',employee.id,{ role });
@@ -114,7 +181,7 @@ module.exports = async function handler(req,res) {
       await ensureAdminRemains(user.id,nextRole,nextActive);
       if (employeeId === caller.employee.id && nextActive === false) throw httpError(400,'לא ניתן להשבית את המשתמש המחובר');
 
-      const employeeUpdate = employeePayload(body);
+      const employeeUpdate = employeePayload({ ...body, current_job_title:employee.job_title });
       const userUpdate = {};
       if (body.phone !== undefined) {
         const phone = normalizePhone(body.phone);
@@ -136,6 +203,7 @@ module.exports = async function handler(req,res) {
 
       if (Object.keys(employeeUpdate).length) assertDb(await db().from('hadas_employees').update(employeeUpdate).eq('id',employeeId), 'לא ניתן לעדכן עובד');
       if (Object.keys(userUpdate).length) assertDb(await db().from('hadas_users').update(userUpdate).eq('id',user.id), 'לא ניתן לעדכן הרשאה');
+      if (Array.isArray(body.weekly_patterns)) await replaceWeeklyPatterns(employeeId,body.weekly_patterns);
       if (Array.isArray(body.constraints)) await replaceConstraints(employeeId,body.constraints,caller.employee.id);
       await upsertPrivate(employeeId,body.admin_notes);
       if (body.reset_password || body.active === false) await revokeUserSessions(user.id);

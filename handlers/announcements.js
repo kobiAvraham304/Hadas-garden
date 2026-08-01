@@ -42,7 +42,7 @@ module.exports = async function handler(req, res) {
       return send(res, 200, { ok: true });
     }
 
-    if (!canCreateContent(caller)) throw httpError(403, 'רק מנהל/ת, אחראי/ת שיבוץ או גננת/גנן יכולים לפרסם הודעה');
+    if (!canCreateContent(caller)) throw httpError(403, 'אין הרשאה לפרסם הודעה');
 
     if (req.method === 'POST') {
       const title = String(body.title || '').trim();

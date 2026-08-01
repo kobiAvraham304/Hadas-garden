@@ -20,16 +20,18 @@ module.exports = async function handler(req,res) {
     if (!date || !classId) throw httpError(400,'חסרים תאריך או כיתה');
     const weekStart = sunday(date);
     const weekEnd = addDays(weekStart,5);
-    const [employeesR,shiftsR,requestsR,constraintsR] = await Promise.all([
-      db().from('hadas_employees').select('*').eq('active',true),
+    const [employeesR,shiftsR,requestsR,constraintsR,patternsR] = await Promise.all([
+      db().from('hadas_employees').select('*').eq('active',true).eq('is_schedulable',true),
       db().from('hadas_shifts').select('*').gte('shift_date',weekStart).lte('shift_date',weekEnd),
       db().from('hadas_requests').select('*').eq('request_date',date).in('status',['approved','applied','pending']),
       db().from('hadas_employee_class_constraints').select('*').eq('class_id',classId),
+      db().from('hadas_employee_weekly_patterns').select('*'),
     ]);
     const employees = assertDb(employeesR,'לא ניתן לטעון עובדים') || [];
     const shifts = assertDb(shiftsR,'לא ניתן לטעון שיבוצים') || [];
     const requests = assertDb(requestsR,'לא ניתן לטעון בקשות') || [];
     const constraints = assertDb(constraintsR,'לא ניתן לטעון אילוצים') || [];
+    const weeklyPatterns = assertDb(patternsR,'לא ניתן לטעון ימי עבודה קבועים') || [];
     const day = new Date(`${date}T12:00:00Z`).getUTCDay();
 
     const candidates = [];
@@ -39,15 +41,22 @@ module.exports = async function handler(req,res) {
       if (requests.some((request) => request.requester_id === employee.id && ['leave','day_off','sick'].includes(request.request_type) && ['approved','applied'].includes(request.status))) continue;
       const constraint = constraints.find((item) => item.employee_id === employee.id && (!item.valid_from || item.valid_from <= date) && (!item.valid_to || item.valid_to >= date));
       if (constraint?.constraint_type === 'forbidden') continue;
+      const pattern = weeklyPatterns.find((item) => item.employee_id === employee.id && Number(item.weekday) === day);
+      if (pattern?.day_type === 'day_off' || (!pattern && employee.fixed_day_off === day)) continue;
 
       let score = 0;
       const reasons = [];
       if (!dayShifts.length) { score += 40; reasons.push('אינה משובץ באותו יום'); }
       else { score += 5; reasons.push('פנויה בשעות החסרות'); }
-      if (employee.primary_class_id === classId) { score += 28; reasons.push('זו הכיתה הקבועה שלה'); }
+      if (employee.primary_class_id === classId) { score += 28; reasons.push('זו הכיתה הקבועה שלו'); }
+      else if (employee.assignment_mode === 'rotation') { score += 12; reasons.push('מוגדר ברוטציה בין כיתות'); }
       if (constraint?.constraint_type === 'preferred') { score += 18; reasons.push('מוגדרת בעדיפות לכיתה'); }
       if (constraint?.constraint_type === 'avoid') { score -= 25; reasons.push('עדיף להימנע משיבוץ בכיתה'); }
-      if (employee.fixed_day_off === day) { score -= 35; reasons.push('זהו היום החופשי הקבוע שלה'); }
+      if (pattern?.day_type === 'work') {
+        const sameHours = String(pattern.start_time).slice(0,5) <= start && String(pattern.end_time).slice(0,5) >= end;
+        if (sameHours) { score += 10; reasons.push('השעות תואמות ליום העבודה הקבוע'); }
+        else { score -= 12; reasons.push('השעות שונות מהשעות הקבועות'); }
+      }
       const title = String(employee.job_title || '');
       if (neededRole === 'teacher') {
         if (/(גננת|גנן)/.test(title)) { score += 35; reasons.push('גננת/גנן'); }
@@ -57,6 +66,9 @@ module.exports = async function handler(req,res) {
         score += 5;
       }
       const weeklyMinutes = calculateWeeklyMinutes(shifts,employee.id);
+      const requestedMinutes = Math.max(0, Number(end.slice(0,2))*60 + Number(end.slice(3,5)) - (Number(start.slice(0,2))*60 + Number(start.slice(3,5))));
+      const maxMinutes = employee.max_weekly_hours == null ? null : Number(employee.max_weekly_hours)*60;
+      if (maxMinutes != null && weeklyMinutes + requestedMinutes > maxMinutes) continue;
       const targetMinutes = employee.weekly_hours == null ? null : Number(employee.weekly_hours)*60;
       if (targetMinutes != null) {
         const gap = targetMinutes - weeklyMinutes;

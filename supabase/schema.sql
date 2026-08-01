@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.8.0 (סכמת נתונים 0.5.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.9.0 (סכמת נתונים 0.9.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -26,6 +26,7 @@ DROP TABLE IF EXISTS
   public.hadas_schedule_publications,
   public.hadas_requests,
   public.hadas_shifts,
+  public.hadas_employee_weekly_patterns,
   public.hadas_employee_class_constraints,
   public.hadas_employee_private,
   public.hadas_sessions,
@@ -61,7 +62,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.5.0', '0.8.0')
+values (1, '0.9.0', '0.9.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -82,7 +83,10 @@ create table if not exists public.hadas_employees (
   primary_class_id uuid references public.hadas_classes(id) on delete set null,
   can_lead boolean not null default false,
   weekly_hours numeric(5,2),
+  max_weekly_hours numeric(5,2) check (max_weekly_hours is null or (max_weekly_hours >= 0 and max_weekly_hours <= 80)),
   employment_percent numeric(5,2),
+  assignment_mode text not null default 'fixed' check (assignment_mode in ('fixed','rotation','no_schedule')),
+  is_schedulable boolean not null default true,
   default_start time not null default '07:30',
   default_end time not null default '15:30',
   fixed_day_off smallint check (fixed_day_off between 0 and 6),
@@ -94,7 +98,10 @@ create table if not exists public.hadas_employees (
 );
 
 alter table public.hadas_employees add column if not exists contact_phone text;
+alter table public.hadas_employees add column if not exists max_weekly_hours numeric(5,2);
 alter table public.hadas_employees add column if not exists employment_percent numeric(5,2);
+alter table public.hadas_employees add column if not exists assignment_mode text not null default 'fixed';
+alter table public.hadas_employees add column if not exists is_schedulable boolean not null default true;
 alter table public.hadas_employees add column if not exists started_at date;
 alter table public.hadas_employees add column if not exists ended_at date;
 
@@ -134,6 +141,23 @@ create table if not exists public.hadas_login_security (
   blocked_until timestamptz,
   updated_at timestamptz not null default now()
 );
+
+create table if not exists public.hadas_employee_weekly_patterns (
+  employee_id uuid not null references public.hadas_employees(id) on delete cascade,
+  weekday smallint not null check (weekday between 0 and 6),
+  day_type text not null check (day_type in ('work','day_off')),
+  start_time time,
+  end_time time,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (employee_id, weekday),
+  check (
+    (day_type='day_off' and start_time is null and end_time is null)
+    or
+    (day_type='work' and start_time is not null and end_time is not null and end_time > start_time)
+  )
+);
+create index if not exists hadas_weekly_patterns_weekday_idx on public.hadas_employee_weekly_patterns(weekday, day_type);
 
 create table if not exists public.hadas_employee_class_constraints (
   id uuid primary key default gen_random_uuid(),
@@ -426,7 +450,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_employee_private','hadas_shifts',
+    'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_employee_private','hadas_employee_weekly_patterns','hadas_shifts',
     'hadas_schedule_publications','hadas_requests','hadas_announcements','hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings'
   ] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
@@ -634,7 +658,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'hadas_classes','hadas_employees','hadas_shifts','hadas_attendance','hadas_requests',
+    'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_requests',
     'hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_announcements','hadas_announcement_recipients','hadas_announcement_reads',
     'hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings'
   ] LOOP
@@ -649,7 +673,7 @@ DECLARE t text; r record;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
-    'hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance',
+    'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance',
     'hadas_requests','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings','hadas_announcements',
     'hadas_announcement_recipients','hadas_announcement_reads','hadas_tasks','hadas_task_assignees','hadas_calendar_events',
     'hadas_audit_log','hadas_realtime_events'

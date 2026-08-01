@@ -38,15 +38,18 @@ async function recordChange(caller, type, before, after) {
 async function validateShift(payload, id, overrideDayOff = false) {
   if (!payload.shift_date || !payload.class_id || !payload.employee_id) throw httpError(400, 'חסרים פרטי שיבוץ');
   if (!payload.start_time || !payload.end_time || timeToMinutes(payload.end_time) <= timeToMinutes(payload.start_time)) throw httpError(400, 'שעות השיבוץ אינן תקינות');
-  const [employeeR, classR, settingsR] = await Promise.all([
+  const [employeeR, classR, settingsR, patternR] = await Promise.all([
     db().from('hadas_employees').select('*').eq('id', payload.employee_id).maybeSingle(),
     db().from('hadas_classes').select('*').eq('id', payload.class_id).maybeSingle(),
     db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
+    db().from('hadas_employee_weekly_patterns').select('*').eq('employee_id', payload.employee_id),
   ]);
   const employee = assertDb(employeeR, 'העובד לא נמצא');
   const classItem = assertDb(classR, 'הכיתה לא נמצאה');
   const settings = assertDb(settingsR, 'הגדרות המערכת לא נמצאו');
+  const weeklyPatterns = assertDb(patternR, 'לא ניתן לבדוק את ימי העבודה הקבועים') || [];
   if (!employee?.active) throw httpError(409, 'העובד אינו פעיל');
+  if (employee.is_schedulable === false) throw httpError(409, 'העובד אינו מוגדר כחלק ממערך השיבוצים');
   if (!classItem?.active) throw httpError(409, 'הכיתה אינה פעילה');
   if (timeToMinutes(payload.start_time) < timeToMinutes(settings.opening_time) || timeToMinutes(payload.end_time) > timeToMinutes(settings.closing_time)) {
     throw httpError(409, `השיבוץ חייב להיות בין ${String(settings.opening_time).slice(0, 5)} ל-${String(settings.closing_time).slice(0, 5)}`);
@@ -55,7 +58,9 @@ async function validateShift(payload, id, overrideDayOff = false) {
   const forbidden = constraintRows.find((item) => (!item.valid_from || item.valid_from <= payload.shift_date) && (!item.valid_to || item.valid_to >= payload.shift_date));
   if (forbidden) throw httpError(409, forbidden.reason ? `קיים איסור שיבוץ בכיתה: ${forbidden.reason}` : 'קיים איסור לשבץ את העובד בכיתה זו');
   const day = new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay();
-  if (employee.fixed_day_off === day && !overrideDayOff) throw httpError(409, 'זהו היום החופשי הקבוע של העובד. ניתן לשמור רק לאחר אישור חריגה');
+  const pattern = weeklyPatterns.find((row) => Number(row.weekday) === day);
+  const fixedDayOff = pattern?.day_type === 'day_off' || (!pattern && employee.fixed_day_off === day);
+  if (fixedDayOff && !overrideDayOff) throw httpError(409, 'זהו יום חופשי קבוע של העובד. ניתן לשמור רק לאחר אישור חריגה');
   const existingQuery = db().from('hadas_shifts').select('id').eq('employee_id', payload.employee_id).eq('shift_date', payload.shift_date).lt('start_time', payload.end_time).gt('end_time', payload.start_time);
   if (id) existingQuery.neq('id', id);
   const overlaps = assertDb(await existingQuery, 'בדיקת חפיפה נכשלה') || [];
@@ -65,12 +70,13 @@ async function validateShift(payload, id, overrideDayOff = false) {
 
 async function getWeekValidation(weekStart) {
   const weekEnd = addDays(weekStart, 5);
-  const [shiftsR, classesR, employeesR, settingsR, constraintsR] = await Promise.all([
+  const [shiftsR, classesR, employeesR, settingsR, constraintsR, patternsR] = await Promise.all([
     db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd),
     db().from('hadas_classes').select('*').eq('active', true),
     db().from('hadas_employees').select('*').eq('active', true),
     db().from('hadas_app_settings').select('*').eq('id', 1).single(),
     db().from('hadas_employee_class_constraints').select('*'),
+    db().from('hadas_employee_weekly_patterns').select('*'),
   ]);
   const shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
   return {
@@ -81,6 +87,7 @@ async function getWeekValidation(weekStart) {
       employees: assertDb(employeesR, 'לא ניתן לטעון עובדים') || [],
       settings: assertDb(settingsR, 'לא ניתן לטעון הגדרות') || {},
       constraints: assertDb(constraintsR, 'לא ניתן לטעון אילוצים') || [],
+      weeklyPatterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [],
       weekStart,
     }),
   };
@@ -103,7 +110,7 @@ function restoreLastPublished(currentRows, pendingChanges) {
   return [...result.values()].sort((a, b) => `${a.shift_date}-${a.start_time}`.localeCompare(`${b.shift_date}-${b.start_time}`));
 }
 
-function buildScheduleAbsences(requests, employees, weekStart) {
+function buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart) {
   const dates = Array.from({ length: 6 }, (_, index) => addDays(weekStart, index));
   const validDates = new Set(dates);
   const absenceMap = new Map();
@@ -117,7 +124,16 @@ function buildScheduleAbsences(requests, employees, weekStart) {
       absence_type: request.request_type,
     });
   }
-  for (const employee of employees.filter((row) => row.active && row.fixed_day_off !== null && row.fixed_day_off !== undefined)) {
+  const employeesWithPatterns = new Set(weeklyPatterns.map((row) => row.employee_id));
+  for (const pattern of weeklyPatterns.filter((row) => row.day_type === 'day_off')) {
+    for (const date of dates) {
+      const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+      if (weekday !== Number(pattern.weekday)) continue;
+      const key = `${pattern.employee_id}:${date}`;
+      if (!absenceMap.has(key)) absenceMap.set(key, { employee_id: pattern.employee_id, absence_date: date, absence_type: 'day_off' });
+    }
+  }
+  for (const employee of employees.filter((row) => row.active && row.fixed_day_off !== null && row.fixed_day_off !== undefined && !employeesWithPatterns.has(row.id))) {
     for (const date of dates) {
       const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
       if (weekday !== Number(employee.fixed_day_off)) continue;
@@ -138,13 +154,14 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET') {
       const weekStart = getSunday(String(req.query?.week_start || israelDateISO()));
       const weekEnd = addDays(weekStart, 5);
-      const [shiftsR, publicationR, changesR, ackR, requestsR, employeesR, settingsR] = await Promise.all([
+      const [shiftsR, publicationR, changesR, ackR, requestsR, employeesR, patternsR, settingsR] = await Promise.all([
         db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd).order('shift_date').order('start_time'),
         db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle(),
         db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
         db().from('hadas_schedule_acknowledgements').select('*').eq('week_start', weekStart),
         db().from('hadas_requests').select('requester_id,request_date,request_type,status').gte('request_date', weekStart).lte('request_date', weekEnd),
-        db().from('hadas_employees').select('id,active,fixed_day_off'),
+        db().from('hadas_employees').select('id,active,fixed_day_off,is_schedulable'),
+        db().from('hadas_employee_weekly_patterns').select('*'),
         db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
       ]);
       let shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
@@ -153,6 +170,7 @@ module.exports = async function handler(req, res) {
       let acknowledgements = assertDb(ackR, 'לא ניתן לטעון אישורי קריאה') || [];
       const requests = assertDb(requestsR, 'לא ניתן לטעון היעדרויות') || [];
       const employees = assertDb(employeesR, 'לא ניתן לטעון ימי חופש') || [];
+      const weeklyPatterns = assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [];
       const settings = assertDb(settingsR, 'לא ניתן לטעון הגדרות תקינה') || {};
       if (!isManager(caller)) {
         shifts = restoreLastPublished(shifts, scheduleChanges);
@@ -164,7 +182,7 @@ module.exports = async function handler(req, res) {
         shifts,
         publication,
         scheduleChanges: isManager(caller) ? scheduleChanges : [],
-        scheduleAbsences: buildScheduleAbsences(requests, employees, weekStart),
+        scheduleAbsences: buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart),
         acknowledgements,
         settings,
       });

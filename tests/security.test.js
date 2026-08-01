@@ -27,12 +27,16 @@ test('password hashes are salted and verifiable with scrypt', async () => {
   assert.equal(await verifyPassword('anything', 'invalid-hash'), false);
 });
 
-test('teachers can create announcements and tasks while other employees cannot', () => {
+test('teachers, nurses and secretaries can create content while assistants cannot', () => {
   const teacher={ user:{ role:'employee' }, employee:{ job_title:'גננת' } };
+  const nurse={ user:{ role:'employee' }, employee:{ job_title:'אחות' } };
+  const secretary={ user:{ role:'employee' }, employee:{ job_title:'מזכירה' } };
   const assistant={ user:{ role:'employee' }, employee:{ job_title:'סייעת' } };
   const manager={ user:{ role:'scheduler' }, employee:{ job_title:'גננת' } };
   assert.equal(isTeacher(teacher),true);
   assert.equal(canCreateContent(teacher),true);
+  assert.equal(canCreateContent(nurse),true);
+  assert.equal(canCreateContent(secretary),true);
   assert.equal(canCreateContent(manager),true);
   assert.equal(canCreateContent(assistant),false);
 });

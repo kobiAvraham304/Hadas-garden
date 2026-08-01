@@ -48,6 +48,7 @@
   </main>
 
   <div id="appShell" class="app-shell hidden">
+    <span id="appVersionBadge" class="app-version-badge" aria-label="גרסת מערכת"></span>
     <header class="topbar">
       <div class="brand-row">
         <div class="mini-brand"><span>✿</span><b>הדס</b></div>
@@ -144,7 +145,7 @@
       <section id="calendarPanel" class="panel">
         <div class="section-heading calendar-heading">
           <div><p class="eyebrow">ישיבות, הדרכות ואירועים</p><h2>לוח שנה</h2><p class="muted">לחץ על יום כדי ליצור אירוע חדש, או על אירוע קיים כדי לראות פרטים.</p></div>
-          <button id="newCalendarBtn" class="primary-btn manager-only"><span>＋</span> אירוע חדש</button>
+          <button id="newCalendarBtn" class="primary-btn content-creator-only"><span>＋</span> אירוע חדש</button>
         </div>
         <div class="calendar-toolbar">
           <button id="prevMonthBtn" class="icon-round-btn" title="חודש קודם">‹</button>
@@ -227,18 +228,19 @@
       <input type="hidden" name="id" />
       <section class="form-section"><h4>פרטים בסיסיים</h4><div class="form-grid">
         <label>שם מלא<input name="full_name" required /></label><label>מספר טלפון<input name="phone" type="tel" required /></label>
-        <label>תפקיד במעון<input name="job_title" list="jobTitles" value="סייעת" required /><datalist id="jobTitles"><option value="גננת/גנן"><option value="סייעת"><option value="קלינאית תקשורת"><option value="מרפאה בעיסוק"><option value="פיזיותרפיסטית"><option value="עובד/ת סוציאלי/ת"><option value="מנהלת מעון"></datalist></label>
+        <label>תפקיד במעון<select name="job_title" required><option value="סייעת">סייעת</option><option value="סייעת מובילה">סייעת מובילה</option><option value="סייע">סייע</option><option value="גננת">גננת</option><option value="מנהלת מעון">מנהלת מעון</option><option value="מזכירה">מזכירה</option><option value="אחות">אחות</option></select></label>
         <label>הרשאה במערכת<select name="role"><option value="employee">עובד</option><option value="scheduler">אחראית שיבוץ</option><option value="admin">מנהלת</option></select></label>
-        <label>כיתה קבועה<select name="primary_class_id"><option value="">ללא</option></select></label>
-        <label>יכולה להיות מוביל/ה<select name="can_lead"><option value="false">לא</option><option value="true">כן</option></select></label>
+        <label>אופן שיוך לכיתות<select name="assignment_mode"><option value="fixed">כיתה קבועה</option><option value="rotation">רוטציה בין כיתות</option><option value="no_schedule">ללא שיבוץ</option></select></label>
+        <label id="primaryClassField">כיתה קבועה<select name="primary_class_id"><option value="">בחירת כיתה</option></select></label>
       </div></section>
       <section class="form-section"><h4>משרה ושעות</h4><div class="form-grid">
-        <label>שעות שבועיות<input name="weekly_hours" type="number" min="0" max="60" step="0.25" /></label>
+        <label>שעות שבועיות מתוכננות<input name="weekly_hours" type="number" min="0" max="60" step="0.25" /></label>
+        <label>מקסימום שעות שבועיות<input name="max_weekly_hours" type="number" min="0" max="80" step="0.25" /></label>
         <label>אחוז משרה<input name="employment_percent" type="number" min="0" max="200" step="1" /></label>
-        <label>יום חופשי קבוע<select name="fixed_day_off"><option value="">משתנה / ללא</option><option value="0">ראשון</option><option value="1">שני</option><option value="2">שלישי</option><option value="3">רביעי</option><option value="4">חמישי</option><option value="5">שישי</option></select></label>
-        <label>שעת התחלה רגילה<input name="default_start" type="time" value="07:30" /></label>
-        <label>שעת סיום רגילה<input name="default_end" type="time" value="15:30" /></label>
+        <label>שעת התחלה ברירת מחדל<input name="default_start" type="time" value="07:30" /></label>
+        <label>שעת סיום ברירת מחדל<input name="default_end" type="time" value="15:30" /></label>
       </div></section>
+      <fieldset class="weekly-patterns-box"><legend>ימי עבודה וחופשה קבועים</legend><p class="field-help">לכל יום אפשר לבחור יום עבודה עם שעות משלו, יום חופשי קבוע, או להשאיר ללא קביעה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset>
       <fieldset class="constraints-box"><legend>העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset>
       <label class="full-field">הערה ניהולית<textarea name="admin_notes" rows="3" placeholder="גלוי רק ללינור ולאילנית"></textarea></label>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת העובד</button></div>

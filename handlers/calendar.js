@@ -1,5 +1,5 @@
 const {
-  requireSession, parseBody, db, assertDb, isManager,
+  requireSession, parseBody, db, assertDb, isManager, canCreateContent,
   emitEvent, audit, send, handleError, httpError,
 } = require('../lib/server');
 
@@ -14,9 +14,14 @@ function monthRange(monthValue) {
 
 function canSeeEvent(caller, event) {
   if (isManager(caller)) return true;
+  if (event.created_by === caller.employee.id) return true;
   if (event.visibility === 'managers') return false;
   if (event.visibility === 'class') return event.class_id === caller.employee.primary_class_id;
   return true;
+}
+
+function canManageEvent(caller, event) {
+  return isManager(caller) || event?.created_by === caller.employee.id;
 }
 
 module.exports = async function handler(req, res) {
@@ -29,7 +34,8 @@ module.exports = async function handler(req, res) {
       return send(res, 200, { ok: true, events, range });
     }
 
-    const caller = await requireSession(req, { manager: true });
+    const caller = await requireSession(req);
+    if (!canCreateContent(caller)) throw httpError(403, 'אין הרשאה ליצור או לערוך אירועים');
     const body = parseBody(req);
     if (req.method === 'POST') {
       if (!String(body.title || '').trim() || !body.event_date) throw httpError(400, 'יש להזין כותרת ותאריך');
@@ -52,6 +58,9 @@ module.exports = async function handler(req, res) {
     }
     if (req.method === 'PATCH') {
       if (!body.id) throw httpError(400, 'חסר מזהה אירוע');
+      const current = assertDb(await db().from('hadas_calendar_events').select('*').eq('id', body.id).maybeSingle(), 'האירוע לא נמצא');
+      if (!current) throw httpError(404, 'האירוע לא נמצא');
+      if (!canManageEvent(caller, current)) throw httpError(403, 'ניתן לערוך רק אירוע שיצרת');
       const row = {};
       for (const key of ['title', 'description', 'event_type', 'event_date', 'start_time', 'end_time', 'visibility', 'class_id']) {
         if (body[key] !== undefined) row[key] = body[key] === '' ? null : body[key];
@@ -64,6 +73,9 @@ module.exports = async function handler(req, res) {
     }
     if (req.method === 'DELETE') {
       const id = body.id || req.query?.id;
+      const current = assertDb(await db().from('hadas_calendar_events').select('*').eq('id', id).maybeSingle(), 'האירוע לא נמצא');
+      if (!current) throw httpError(404, 'האירוע לא נמצא');
+      if (!canManageEvent(caller, current)) throw httpError(403, 'ניתן למחוק רק אירוע שיצרת');
       assertDb(await db().from('hadas_calendar_events').delete().eq('id', id), 'לא ניתן למחוק אירוע');
       await audit(caller.employee.id, 'delete', 'calendar_event', id);
       await emitEvent('calendar');
