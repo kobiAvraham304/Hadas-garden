@@ -1,5 +1,5 @@
 const {
-  requireSession, isManager, canCreateContent, db, assertDb, displayPhone, israelDateISO, send, handleError,
+  requireSession, isManager, canViewFullSchedule, canCreateContent, db, assertDb, displayPhone, israelDateISO, send, handleError,
 } = require('../lib/server');
 const { dateRange } = require('../lib/schedule');
 
@@ -70,6 +70,7 @@ module.exports = async function handler(req, res) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, error: 'Method not allowed' });
     const caller = await requireSession(req, { csrf: false });
     const manager = isManager(caller);
+    const fullScheduleViewer = canViewFullSchedule(caller);
     const contentCreator = canCreateContent(caller);
     const weekStart = getSunday(String(req.query?.week_start || israelDateISO()));
     const weekEnd = plusDays(weekStart, 5);
@@ -101,9 +102,10 @@ module.exports = async function handler(req, res) {
       db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle(),
       db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
       todayWeekStart === weekStart ? Promise.resolve({ data: [], error: null }) : db().from('hadas_schedule_changes').select('*').eq('week_start', todayWeekStart).is('published_revision', 'null').order('created_at'),
+      db().from('hadas_notifications').select('*').eq('employee_id', caller.employee.id).order('created_at', { ascending: false }).limit(150),
     ]);
 
-    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR] = results;
+    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, notificationsR] = results;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
     const employeeRows = assertDb(employeesR, 'לא ניתן לטעון עובדים') || [];
     const userRows = assertDb(usersR, 'לא ניתן לטעון הרשאות') || [];
@@ -125,6 +127,7 @@ module.exports = async function handler(req, res) {
     const publication = assertDb(publicationR, 'לא ניתן לטעון מצב פרסום') || null;
     const scheduleChanges = assertDb(changesR, 'לא ניתן לטעון שינויים') || [];
     const todayChanges = todayWeekStart === weekStart ? scheduleChanges : (assertDb(todayChangesR, 'לא ניתן לטעון שינויים') || []);
+    const notifications = assertDb(notificationsR, 'לא ניתן לטעון עדכונים') || [];
 
     const usersByEmployee = new Map(userRows.map((row) => [row.employee_id, row]));
     const privateByEmployee = new Map(privateRows.map((row) => [row.employee_id, row]));
@@ -142,12 +145,15 @@ module.exports = async function handler(req, res) {
     for (const request of requests) {
       if (!['approved', 'applied'].includes(request.status)) continue;
       if (!['leave', 'day_off', 'sick'].includes(request.request_type)) continue;
-      if (!absenceDates.has(request.request_date)) continue;
-      absenceMap.set(`${request.requester_id}:${request.request_date}`, {
-        employee_id: request.requester_id,
-        absence_date: request.request_date,
-        absence_type: request.request_type,
-      });
+      const endDate = request.request_end_date || request.request_date;
+      for (const cursor of absenceDates) {
+        if (cursor < request.request_date || cursor > endDate) continue;
+        absenceMap.set(`${request.requester_id}:${cursor}`, {
+          employee_id: request.requester_id,
+          absence_date: cursor,
+          absence_type: request.request_type,
+        });
+      }
     }
     for (const pattern of weeklyPatterns.filter((row) => row.day_type === 'day_off')) {
       for (const date of absenceDates) {
@@ -166,11 +172,13 @@ module.exports = async function handler(req, res) {
         if (!absenceMap.has(key)) absenceMap.set(key, { employee_id: employee.id, absence_date: date, absence_type: 'day_off' });
       }
     }
-    const scheduleAbsences = [...absenceMap.values()].sort((a, b) => `${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`));
-
     if (!manager) {
       shifts = restoreLastPublished(shifts, scheduleChanges);
       todayShifts = restoreLastPublished(todayShifts, todayChanges);
+      if (!fullScheduleViewer) {
+        shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
+        todayShifts = todayShifts.filter((row) => row.employee_id === caller.employee.id);
+      }
       attendance = attendance.filter((row) => row.employee_id === caller.employee.id);
       requests = requests.filter((row) => row.requester_id === caller.employee.id || row.target_employee_id === caller.employee.id);
       acknowledgements = acknowledgements.filter((row) => row.employee_id === caller.employee.id);
@@ -187,6 +195,16 @@ module.exports = async function handler(req, res) {
       assignees = assignees.filter((row) => row.employee_id === caller.employee.id || createdTaskIds.has(row.task_id));
       calendar = calendar.filter((row) => row.created_by === caller.employee.id || row.visibility === 'all' || (row.visibility === 'class' && row.class_id === caller.employee.primary_class_id));
     }
+
+    if (!fullScheduleViewer) {
+      for (const [key, value] of [...absenceMap.entries()]) if (value.employee_id !== caller.employee.id) absenceMap.delete(key);
+    }
+    const visibleScheduleAbsences = [...absenceMap.values()].sort((a, b) => `${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`));
+    requests = requests.map((request) => ({
+      ...request,
+      has_attachment: Boolean(request.attachment_path),
+      attachment_path: undefined,
+    }));
 
     const now = Date.now();
     announcements = announcements.filter((row) => {
@@ -207,6 +225,7 @@ module.exports = async function handler(req, res) {
         phone: displayPhone(caller.user.phone),
         must_change_password: caller.user.must_change_password,
         can_create_content: contentCreator,
+        can_view_full_schedule: fullScheduleViewer,
       },
       classes,
       employees,
@@ -225,7 +244,8 @@ module.exports = async function handler(req, res) {
       calendarEvents: calendar,
       publication,
       scheduleChanges: manager ? scheduleChanges : [],
-      scheduleAbsences,
+      scheduleAbsences: visibleScheduleAbsences,
+      notifications,
       weekDates: dateRange(weekStart, 6),
     });
   } catch (error) { handleError(res, error); }

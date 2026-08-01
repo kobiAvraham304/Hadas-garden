@@ -109,6 +109,10 @@
     {
       "source": "/api/tasks",
       "destination": "/api/index?route=tasks"
+    },
+    {
+      "source": "/api/notifications",
+      "destination": "/api/index?route=notifications"
     }
   ]
 }

@@ -519,3 +519,48 @@ html,body{overflow-x:clip}
   .weekly-patterns-box{padding:12px;margin-inline:-2px}.weekly-pattern-grid{grid-template-columns:1fr}.weekly-pattern-row{grid-template-columns:1fr 1fr;padding:11px}.weekly-pattern-head select{min-width:112px}
   .compact-constraint{grid-template-columns:1fr}.employee-pattern-preview{font-size:.77rem}
 }
+
+/* 0.10.0 — מרכז עדכונים, בקשות טווח ואישור מחלה */
+.notification-button{position:relative}
+.notification-button .nav-badge{position:absolute;inset:-6px auto auto -6px;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:var(--coral);color:#fff;font-size:11px;font-weight:900;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 4px 12px rgba(35,39,82,.2)}
+.notifications-toolbar{display:flex;justify-content:flex-start;margin:-4px 0 10px}
+.notifications-list{display:grid;gap:12px;max-height:min(68vh,680px);overflow:auto;padding:2px}
+.notification-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;padding:15px;border:1px solid var(--line);border-radius:22px;background:#fff;transition:.18s ease;box-shadow:0 8px 24px rgba(52,56,104,.06)}
+.notification-card.unread{border-color:rgba(111,114,217,.35);background:linear-gradient(135deg,#fff,#f6f5ff)}
+.notification-card.requires-action{box-shadow:inset -4px 0 0 var(--coral),0 8px 24px rgba(52,56,104,.07)}
+.notification-card.read{opacity:.72}
+.notification-card:hover{transform:translateY(-1px);box-shadow:0 12px 28px rgba(52,56,104,.1)}
+.notification-icon{width:44px;height:44px;border-radius:16px;background:var(--primary-soft);color:var(--primary);display:grid;place-items:center;font-size:21px;font-weight:900}
+.notification-card p{margin:5px 0;color:var(--muted);line-height:1.45}
+.notification-card small{color:var(--muted);font-size:12px}
+.notification-title-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.notification-title-row i{font-style:normal;background:var(--coral);color:#fff;border-radius:999px;padding:2px 8px;font-size:10px;font-weight:900}
+.attachment-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:16px;background:#f7f8ff;border:1px dashed rgba(111,114,217,.28);margin-top:10px}
+#swapCandidatesHint{display:block;margin-top:6px;color:var(--muted);line-height:1.35}
+.sick-attachment input[type="file"]{padding:10px;background:#fff}
+#scheduleMode button.hidden{display:none!important}
+
+@media(max-width:760px){
+  .notification-button .desktop-label{display:none}
+  .notification-button{min-width:46px}
+  .notification-card{grid-template-columns:auto minmax(0,1fr);align-items:start;padding:13px;border-radius:18px}
+  .notification-card>button{grid-column:1/-1;width:100%}
+  .notification-icon{width:40px;height:40px;border-radius:14px}
+  .attachment-row{align-items:stretch;flex-direction:column}
+  .attachment-row button{width:100%}
+  .notifications-list{max-height:62vh}
+}
+
+/* 0.10.0 — personal updates and inclusive request flow */
+.summary-card-button{appearance:none;-webkit-appearance:none;width:100%;font:inherit;text-align:right;cursor:pointer;border:1px solid var(--border);color:inherit}
+.summary-card-button:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.summary-card-button:focus-visible{outline:3px solid color-mix(in srgb,var(--primary) 35%,transparent);outline-offset:3px}
+.notification-button{position:relative}
+.notification-button .nav-badge{position:absolute;inset:-7px auto auto -7px;min-width:22px;height:22px;padding:0 6px;display:grid;place-items:center;border-radius:999px;background:var(--coral);color:#fff;font-size:12px;font-weight:900;border:2px solid #fff}
+@media(max-width:760px){
+  .notification-button{min-width:48px;padding-inline:12px}
+  .notification-button .desktop-label{display:none}
+  .notifications-modal .modal-card{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
+  .notification-card{grid-template-columns:42px minmax(0,1fr);gap:10px}
+  .notification-card>button{grid-column:1/-1;width:100%}
+}

@@ -6,7 +6,7 @@ process.env.SUPABASE_PUBLISHABLE_KEY = 'publishable-test';
 process.env.SUPABASE_SECRET_KEY = 'server-test-key';
 
 const {
-  normalizePhone, displayPhone, hashPassword, verifyPassword, isTeacher, canCreateContent,
+  normalizePhone, displayPhone, hashPassword, verifyPassword, isTeacher, canCreateContent, canViewFullSchedule,
 } = require('../lib/server');
 
 test('normalizes Israeli phone numbers without using email', () => {
@@ -39,6 +39,18 @@ test('teachers, nurses and secretaries can create content while assistants canno
   assert.equal(canCreateContent(secretary),true);
   assert.equal(canCreateContent(manager),true);
   assert.equal(canCreateContent(assistant),false);
+});
+
+
+
+test('full schedule visibility is limited to teachers, nurse, manager and secretary', () => {
+  const employee=(job_title,role='employee')=>({ user:{ role }, employee:{ job_title } });
+  for(const caller of [employee('גננת'),employee('גנן'),employee('אחות'),employee('מזכירה'),employee('מנהלת מעון'),employee('סייעת','scheduler')]) {
+    assert.equal(canViewFullSchedule(caller),true,caller.employee.job_title);
+  }
+  for(const caller of [employee('סייעת'),employee('סייעת מובילה'),employee('סייע'),employee('קלינאית תקשורת')]) {
+    assert.equal(canViewFullSchedule(caller),false,caller.employee.job_title);
+  }
 });
 
 test('the clean SQL initial password hash is exactly the temporary password hadas', async () => {

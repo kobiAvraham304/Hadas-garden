@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.9.0 (סכמת נתונים 0.9.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.10.0 (סכמת נתונים 0.10.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -17,6 +17,7 @@ END $$;
 
 -- ניקוי התקנות חלקיות או גרסאות קודמות של מערכת הדס בלבד.
 DROP TABLE IF EXISTS
+  public.hadas_notifications,
   public.hadas_announcement_recipients,
   public.hadas_announcement_reads,
   public.hadas_task_assignees,
@@ -62,7 +63,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.9.0', '0.9.0')
+values (1, '0.10.0', '0.10.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -237,8 +238,9 @@ create table if not exists public.hadas_attendance (
 create table if not exists public.hadas_requests (
   id uuid primary key default gen_random_uuid(),
   requester_id uuid not null references public.hadas_employees(id) on delete cascade,
-  request_type text not null check (request_type in ('leave','day_off','late_start','early_finish','sick','swap','other')),
+  request_type text not null check (request_type in ('leave','day_off','late_start','early_finish','sick','swap')),
   request_date date not null,
+  request_end_date date,
   requested_start time,
   requested_end time,
   shift_id uuid references public.hadas_shifts(id) on delete set null,
@@ -246,14 +248,34 @@ create table if not exists public.hadas_requests (
   target_shift_id uuid references public.hadas_shifts(id) on delete set null,
   target_approved boolean not null default false,
   reason text,
+  attachment_path text,
+  attachment_name text,
+  attachment_type text,
+  attachment_size integer,
   status text not null default 'pending' check (status in ('pending','approved','rejected','applied','cancelled')),
   manager_note text,
   decided_by uuid references public.hadas_employees(id) on delete set null,
   decided_at timestamptz,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  check (request_end_date is null or request_end_date >= request_date)
 );
 create index if not exists hadas_requests_date_idx on public.hadas_requests(request_date);
+
+
+create table if not exists public.hadas_notifications (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references public.hadas_employees(id) on delete cascade,
+  notification_type text not null default 'info',
+  title text not null,
+  message text,
+  entity_type text,
+  entity_id text,
+  action_required boolean not null default false,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists hadas_notifications_employee_idx on public.hadas_notifications(employee_id, read_at, created_at desc);
 
 create table if not exists public.hadas_schedule_acknowledgements (
   id uuid primary key default gen_random_uuid(),
@@ -441,6 +463,11 @@ BEGIN
   END IF;
 END $$;
 
+
+insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
+values ('hadas-sick-certificates','hadas-sick-certificates',false,3145728,array['application/pdf','image/jpeg','image/png','image/webp']::text[])
+on conflict (id) do update set public=false, file_size_limit=excluded.file_size_limit, allowed_mime_types=excluded.allowed_mime_types;
+
 create or replace function public.hadas_set_updated_at()
 returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end;
@@ -472,7 +499,7 @@ begin
       and new.start_time < s.end_time
       and new.end_time > s.start_time
   ) then
-    raise exception 'העובדת כבר משובצת בשעות חופפות';
+    raise exception 'העובד כבר משובץ בשעות חופפות';
   end if;
   return new;
 end;
@@ -486,21 +513,21 @@ returns void language plpgsql security definer set search_path=public as $$
 declare
   r public.hadas_requests%rowtype;
   first_shift public.hadas_shifts%rowtype;
-  second_shift public.hadas_shifts%rowtype;
   first_after public.hadas_shifts%rowtype;
-  second_after public.hadas_shifts%rowtype;
   affected_shift public.hadas_shifts%rowtype;
-  first_week_start date;
-  second_week_start date;
+  v_end_date date;
+  v_week_start date;
 begin
   select * into r from public.hadas_requests where id=p_request_id for update;
   if not found then raise exception 'הבקשה לא נמצאה'; end if;
   if r.status <> 'approved' then raise exception 'יש לאשר את הבקשה לפני הזרמתה'; end if;
+  v_end_date := coalesce(r.request_end_date, r.request_date);
 
   if r.request_type in ('leave','day_off','sick') then
     for affected_shift in
       select * from public.hadas_shifts
-      where employee_id=r.requester_id and shift_date=r.request_date
+      where employee_id=r.requester_id
+        and shift_date between r.request_date and v_end_date
       for update
     loop
       insert into public.hadas_schedule_changes(
@@ -529,16 +556,14 @@ begin
       end if;
       update public.hadas_shifts
       set start_time=r.requested_start, status='draft'
-      where id=first_shift.id
-      returning * into first_after;
+      where id=first_shift.id returning * into first_after;
     else
       if r.requested_end is null or r.requested_end >= first_shift.end_time or r.requested_end <= first_shift.start_time then
         raise exception 'שעת הסיום המבוקשת אינה מתאימה עוד לשיבוץ';
       end if;
       update public.hadas_shifts
       set end_time=r.requested_end, status='draft'
-      where id=first_shift.id
-      returning * into first_after;
+      where id=first_shift.id returning * into first_after;
     end if;
 
     insert into public.hadas_schedule_changes(
@@ -553,72 +578,77 @@ begin
     );
 
   elsif r.request_type='swap' then
-    if r.target_approved is not true then raise exception 'העובדת השנייה עדיין לא אישרה את ההחלפה'; end if;
-    if r.shift_id is null or r.target_shift_id is null or r.shift_id=r.target_shift_id then
+    if r.target_approved is not true then raise exception 'העובד שנבחר עדיין לא אישר את ההחלפה'; end if;
+    if r.target_employee_id is null or r.target_employee_id=r.requester_id then
       raise exception 'פרטי ההחלפה אינם תקינים';
     end if;
-
-    select * into first_shift from public.hadas_shifts where id=r.shift_id for update;
-    select * into second_shift from public.hadas_shifts where id=r.target_shift_id for update;
-    if first_shift.id is null or second_shift.id is null then raise exception 'אחד השיבוצים אינו קיים'; end if;
-    if first_shift.employee_id <> r.requester_id or second_shift.employee_id <> r.target_employee_id then
-      raise exception 'השיבוצים השתנו מאז שליחת הבקשה';
-    end if;
-    if not exists(select 1 from public.hadas_employees where id=first_shift.employee_id and active=true)
-       or not exists(select 1 from public.hadas_employees where id=second_shift.employee_id and active=true) then
-      raise exception 'אחת העובדות אינה פעילה';
-    end if;
-    if exists (
-      select 1 from public.hadas_employee_class_constraints c
-      where c.employee_id=second_shift.employee_id and c.class_id=first_shift.class_id
-        and c.constraint_type='forbidden'
-        and (c.valid_from is null or c.valid_from <= first_shift.shift_date)
-        and (c.valid_to is null or c.valid_to >= first_shift.shift_date)
-    ) or exists (
-      select 1 from public.hadas_employee_class_constraints c
-      where c.employee_id=first_shift.employee_id and c.class_id=second_shift.class_id
-        and c.constraint_type='forbidden'
-        and (c.valid_from is null or c.valid_from <= second_shift.shift_date)
-        and (c.valid_to is null or c.valid_to >= second_shift.shift_date)
-    ) then
-      raise exception 'ההחלפה מפרה אילוץ כיתה של אחת העובדות';
-    end if;
+    if not exists (
+      select 1 from public.hadas_employees e
+      where e.id=r.target_employee_id and e.active=true and e.is_schedulable=true
+    ) then raise exception 'העובד שנבחר אינו זמין לשיבוץ'; end if;
     if exists (
       select 1 from public.hadas_shifts s
-      where s.employee_id=second_shift.employee_id and s.shift_date=first_shift.shift_date
-        and s.id not in(first_shift.id,second_shift.id)
-        and first_shift.start_time < s.end_time and first_shift.end_time > s.start_time
-    ) or exists (
+      where s.employee_id=r.target_employee_id and s.shift_date=r.request_date
+    ) then raise exception 'העובד שנבחר כבר משובץ ביום זה'; end if;
+    if not (
+      exists (
+        select 1 from public.hadas_employee_weekly_patterns p
+        where p.employee_id=r.target_employee_id
+          and p.weekday=extract(dow from r.request_date)::integer
+          and p.day_type='day_off'
+      )
+      or exists (
+        select 1 from public.hadas_requests q
+        where q.requester_id=r.target_employee_id
+          and q.request_type='day_off'
+          and q.status in ('approved','applied')
+          and r.request_date between q.request_date and coalesce(q.request_end_date,q.request_date)
+      )
+      or exists (
+        select 1 from public.hadas_employees e
+        where e.id=r.target_employee_id
+          and e.fixed_day_off=extract(dow from r.request_date)::integer
+          and not exists (
+            select 1 from public.hadas_employee_weekly_patterns p2
+            where p2.employee_id=e.id and p2.weekday=extract(dow from r.request_date)::integer
+          )
+      )
+    ) then raise exception 'ניתן לבחור להחלפה רק עובד שנמצא ביום חופשי'; end if;
+    if not exists (
       select 1 from public.hadas_shifts s
-      where s.employee_id=first_shift.employee_id and s.shift_date=second_shift.shift_date
-        and s.id not in(first_shift.id,second_shift.id)
-        and second_shift.start_time < s.end_time and second_shift.end_time > s.start_time
-    ) then
-      raise exception 'ההחלפה יוצרת חפיפה בשיבוץ';
-    end if;
+      where s.employee_id=r.requester_id and s.shift_date=r.request_date
+    ) then raise exception 'למבקש אין שיבוץ ביום שנבחר'; end if;
 
-    perform set_config('app.swap_mode','on',true);
-    update public.hadas_shifts
-    set employee_id = case
-          when id=first_shift.id then second_shift.employee_id
-          when id=second_shift.id then first_shift.employee_id
-          else employee_id
-        end,
-        status='draft'
-    where id in(first_shift.id,second_shift.id);
+    for affected_shift in
+      select * from public.hadas_shifts
+      where employee_id=r.requester_id and shift_date=r.request_date
+      order by start_time
+      for update
+    loop
+      if exists (
+        select 1 from public.hadas_employee_class_constraints c
+        where c.employee_id=r.target_employee_id and c.class_id=affected_shift.class_id
+          and c.constraint_type='forbidden'
+          and (c.valid_from is null or c.valid_from <= affected_shift.shift_date)
+          and (c.valid_to is null or c.valid_to >= affected_shift.shift_date)
+      ) then raise exception 'ההחלפה מפרה אילוץ כיתה של העובד שנבחר'; end if;
 
-    select * into first_after from public.hadas_shifts where id=first_shift.id;
-    select * into second_after from public.hadas_shifts where id=second_shift.id;
-    first_week_start := first_shift.shift_date - extract(dow from first_shift.shift_date)::integer;
-    second_week_start := second_shift.shift_date - extract(dow from second_shift.shift_date)::integer;
+      perform set_config('app.swap_mode','on',true);
+      update public.hadas_shifts
+      set employee_id=r.target_employee_id, status='draft'
+      where id=affected_shift.id
+      returning * into first_after;
 
-    insert into public.hadas_schedule_changes(
-      week_start, shift_id, change_type, before_data, after_data, created_by
-    ) values
-      (first_week_start, first_shift.id, 'update', to_jsonb(first_shift), to_jsonb(first_after), p_actor_id),
-      (second_week_start, second_shift.id, 'update', to_jsonb(second_shift), to_jsonb(second_after), p_actor_id);
+      v_week_start := affected_shift.shift_date - extract(dow from affected_shift.shift_date)::integer;
+      insert into public.hadas_schedule_changes(
+        week_start, shift_id, change_type, before_data, after_data, created_by
+      ) values (
+        v_week_start, affected_shift.id, 'update',
+        to_jsonb(affected_shift), to_jsonb(first_after), p_actor_id
+      );
+    end loop;
 
-  elsif r.request_type <> 'other' then
+  else
     raise exception 'סוג הבקשה אינו נתמך להזרמה';
   end if;
 
@@ -658,7 +688,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_requests',
+    'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_requests','hadas_notifications',
     'hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_announcements','hadas_announcement_recipients','hadas_announcement_reads',
     'hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings'
   ] LOOP
@@ -674,7 +704,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
     'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance',
-    'hadas_requests','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings','hadas_announcements',
+    'hadas_requests','hadas_notifications','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings','hadas_announcements',
     'hadas_announcement_recipients','hadas_announcement_reads','hadas_tasks','hadas_task_assignees','hadas_calendar_events',
     'hadas_audit_log','hadas_realtime_events'
   ] LOOP

@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.9.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.10.0 */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -6,7 +6,7 @@ const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמיש
 const ROLE_LABELS = { admin: 'מנהלת מעון', scheduler: 'אחראית שיבוץ', employee: 'עובד' };
 const SHIFT_ROLE_LABELS = { teacher: 'גננת/גנן', lead: 'מוביל/ה', staff: 'איש/ת צוות', replacement: 'מחליף/ה' };
 const SHIFT_STATUS_LABELS = { draft: 'ממתין לפרסום', published: 'פורסם' };
-const REQUEST_LABELS = { leave: 'חופשה', day_off: 'יום חופשי', late_start: 'התחלה מאוחרת', early_finish: 'סיום מוקדם', sick: 'מחלה', swap: 'החלפת שיבוץ', other: 'בקשה אחרת' };
+const REQUEST_LABELS = { leave: 'חופשה', day_off: 'יום חופשי', late_start: 'התחלה מאוחרת', early_finish: 'סיום מוקדם', sick: 'מחלה', swap: 'החלפת שיבוץ', other: 'בקשה ישנה' };
 const REQUEST_STATUS_LABELS = { pending: 'ממתין', approved: 'אושר', rejected: 'נדחה', applied: 'הוזרם', cancelled: 'בוטל' };
 const REQUEST_ICONS = { leave: '☀', day_off: '⌂', late_start: '◷', early_finish: '◴', sick: '✚', swap: '↔', other: '✎' };
 const ATTENDANCE_LABELS = { scheduled: 'טרם עודכן', present: 'נכח', late: 'איחר', left_early: 'יצא מוקדם', absent: 'נעדר', sick: 'מחלה', replacement: 'החליף עובד' };
@@ -38,6 +38,9 @@ const state = {
   tasks: [],
   taskAssignees: [],
   calendarEvents: [],
+  notifications: [],
+  swapCandidates: [],
+  swapCandidatesLoading: false,
   publication: null,
   scheduleChanges: [],
   scheduleAbsences: [],
@@ -87,9 +90,13 @@ function timeToMinutes(value) { if (!value) return 0; const [h, m] = String(valu
 function overlaps(aStart, aEnd, bStart, bEnd) { return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart); }
 function initials(name) { return String(name || '').trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join(''); }
 function isManager() { return ['admin', 'scheduler'].includes(state.profile?.role); }
+function canViewFullSchedule() {
+  const title = String(state.profile?.job_title || '');
+  return Boolean(state.profile?.can_view_full_schedule || isManager() || /גנ(?:נ|ן)/.test(title) || ['אחות','מנהלת מעון','מזכירה'].includes(title));
+}
 function canCreateContent() {
   const title = String(state.profile?.job_title || '');
-  return Boolean(state.profile?.can_create_content || isManager() || /גננ/.test(title) || ['אחות','מזכירה'].includes(title));
+  return Boolean(state.profile?.can_create_content || isManager() || /גנ(?:נ|ן)/.test(title) || ['אחות','מזכירה'].includes(title));
 }
 function employeeById(id) { return state.employees.find((item) => item.id === id); }
 function classById(id) { return state.classes.find((item) => item.id === id); }
@@ -153,7 +160,7 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.9.0';
+    const version = state.config.version || '0.10.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -170,6 +177,9 @@ function bindEvents() {
   $('#loginForm').addEventListener('submit', handleLogin);
   $('#passwordForm').addEventListener('submit', handlePasswordChange);
   $('#logoutBtn').addEventListener('click', logout);
+  $('#notificationsBtn').addEventListener('click', openNotificationsDialog);
+  $('#markAllNotificationsBtn').addEventListener('click', markAllNotificationsRead);
+  $('#notificationsList').addEventListener('click', handleNotificationClick);
   $('#refreshBtn').addEventListener('click', () => refreshAll(true));
   $$('.nav-btn[data-tab]').forEach((button) => button.addEventListener('click', () => switchTab(button.dataset.tab)));
   $('#mobileMoreBtn').addEventListener('click', openMobileMore);
@@ -210,7 +220,7 @@ function bindEvents() {
   $('#requestStatusChips').addEventListener('click', (event) => handleFilterChip(event, '#requestStatusFilter', 'requestStatusFilter', renderRequests));
   $('#requestSearch').addEventListener('input', debounce((event) => { state.requestSearch = event.target.value; renderRequests(); }));
   $$('input[name="request_type"]', $('#requestForm')).forEach((input) => input.addEventListener('change', updateRequestFields));
-  $('#requestForm [name="target_employee_id"]').addEventListener('change', populateTargetShifts);
+  $('#requestForm [name="request_date"]').addEventListener('change', handleRequestDateChange);
   $('#requestForm [name="shift_id"]').addEventListener('change', syncRequestDateFromShift);
 
   $('#attendanceDate').addEventListener('change', async (event) => { state.attendanceDate = event.target.value; await refreshAll(); });
@@ -250,7 +260,12 @@ function bindEvents() {
   $('#calendarGrid').addEventListener('keydown', handleCalendarKeydown);
   $('#calendarEventActions').addEventListener('click', handleCalendarEventAction);
   $('#suggestionsList').addEventListener('click', handleSuggestionClick);
-  $('#dashboardPanel').addEventListener('click', (event) => { const button = event.target.closest('[data-dashboard-tab]'); if (button) switchTab(button.dataset.dashboardTab); });
+  $('#dashboardPanel').addEventListener('click', (event) => {
+    const notificationButton = event.target.closest('[data-dashboard-notifications]');
+    if (notificationButton) return openNotificationsDialog();
+    const button = event.target.closest('[data-dashboard-tab]');
+    if (button) switchTab(button.dataset.dashboardTab);
+  });
 
   window.addEventListener('online', () => { setSyncState('online', 'חזר החיבור — מעדכן'); refreshAll(); });
   window.addEventListener('offline', () => setSyncState('offline', 'אין חיבור — הנתונים נשארים במסך'));
@@ -296,6 +311,12 @@ function applyPermissions() {
   $$('.manager-only').forEach((element) => element.classList.toggle('hidden', !isManager()));
   $$('.employee-only').forEach((element) => element.classList.toggle('hidden', isManager()));
   $$('.content-creator-only').forEach((element) => element.classList.toggle('hidden', !canCreateContent()));
+  const fullSchedule = canViewFullSchedule();
+  $$('#scheduleMode [data-mode="week"], #scheduleMode [data-mode="day"]').forEach((element) => element.classList.toggle('hidden', !fullSchedule));
+  if (!fullSchedule) {
+    state.scheduleMode = 'mine';
+    storageSet('localStorage', 'hadas-schedule-mode', 'mine');
+  }
   $('#userName').textContent = state.profile?.full_name || '';
   $('#userRole').textContent = `${ROLE_LABELS[state.profile?.role] || state.profile?.role || ''} · ${state.profile?.job_title || ''}`;
 }
@@ -430,6 +451,7 @@ async function refreshAll(showSuccess = false) {
       tasks: data.tasks,
       taskAssignees: data.taskAssignees,
       calendarEvents: data.calendarEvents,
+      notifications: data.notifications || [],
       publication: data.publication || null,
       scheduleChanges: data.scheduleChanges || [],
       scheduleAbsences: data.scheduleAbsences || [],
@@ -471,7 +493,7 @@ function populateSelects() {
   $('#shiftForm [name="class_id"]').innerHTML = classOptions;
   $('#shiftForm [name="employee_id"]').innerHTML = employeeOptions;
   $('#employeeForm [name="primary_class_id"]').innerHTML = `<option value="">ללא כיתה קבועה</option>${classOptions}`;
-  $('#requestForm [name="target_employee_id"]').innerHTML = `<option value="">בחר עובד</option>${state.employees.filter((item) => item.active && item.id !== state.profile.id).map((item) => `<option value="${item.id}">${escapeHtml(item.full_name)}</option>`).join('')}`;
+  $('#requestForm [name="target_employee_id"]').innerHTML = '<option value="">בחרו תאריך כדי לראות עובדים זמינים</option>';
   $('#announcementForm [name="class_id"]').innerHTML = `<option value="">בחר כיתה</option>${classOptions}`;
   $('#taskForm [name="target_id"]').innerHTML = `<option value="">בחר כיתה</option>${classOptions}`;
   $('#calendarForm [name="class_id"]').innerHTML = `<option value="">ללא</option>${classOptions}`;
@@ -493,7 +515,8 @@ function renderAll() { renderDashboard(); renderPanel(state.activeTab); renderNa
 function renderNavBadges() {
   const unread = state.announcements.filter((announcement) => !state.announcementReads.some((read) => read.announcement_id === announcement.id && read.employee_id === state.profile.id)).length;
   const openTasks = state.taskAssignees.filter((assignment) => assignment.employee_id === state.profile.id && assignment.status !== 'done').length;
-  for (const [id, count] of [['announcementBadge', unread], ['taskBadge', openTasks]]) { const element = $(`#${id}`); element.textContent = count > 99 ? '99+' : String(count); element.classList.toggle('hidden', !count); }
+  const notificationCount = state.notifications.filter((item) => !item.read_at).length;
+  for (const [id, count] of [['announcementBadge', unread], ['taskBadge', openTasks], ['notificationBadge', notificationCount]]) { const element = $(`#${id}`); if (!element) continue; element.textContent = count > 99 ? '99+' : String(count); element.classList.toggle('hidden', !count); }
 }
 
 function coverageFor(rows) {
@@ -522,22 +545,26 @@ function shiftLineHtml(shift) {
   return `<div class="employee-line"><span><strong>${escapeHtml(employee?.full_name || 'עובד')}</strong><small>${SHIFT_ROLE_LABELS[shift.shift_role]}${shift.public_note ? ` · ${escapeHtml(shift.public_note)}` : ''}</small></span>${timeHtml(shift.start_time, shift.end_time)}</div>`;
 }
 function renderDashboard() {
-  const today = dateISO(new Date());
-  const shifts = state.todayShifts.length ? state.todayShifts : state.shifts.filter((shift) => shift.shift_date === today && shift.status === 'published');
-  const staffed = new Set(shifts.map((shift) => shift.employee_id));
-  const mine = shifts.filter((shift) => shift.employee_id === state.profile.id);
-  const pending = state.requests.filter((request) => request.status === 'pending').length;
-  const dueTasks = state.taskAssignees.filter((assignment) => assignment.employee_id === state.profile.id && assignment.status !== 'done').length;
-  const unread = state.announcements.filter((announcement) => !state.announcementReads.some((read) => read.announcement_id === announcement.id && read.employee_id === state.profile.id)).length;
-  const absentToday = state.scheduleAbsences.filter((item) => item.absence_date === today).length;
-  const classCards = state.classes.filter((item) => item.active).map((item, index) => {
-    const rows = shifts.filter((shift) => shift.class_id === item.id); const result = coverageFor(rows);
-    return `<article class="class-card class-tone-${index % 4}"><div class="class-card-top"><span class="class-symbol">${['☁','✿','☀','★'][index % 4]}</span><div class="card-heading"><h3>${escapeHtml(item.name)}</h3><span class="status-chip ${result.ok ? 'ok' : 'error'}">${result.ok ? 'תקין' : 'דורש טיפול'}</span></div></div>${rows.length ? rows.map(shiftLineHtml).join('') : '<div class="empty-state compact">אין שיבוץ להיום</div>'}<p class="small-note">${result.count} משובצים · ${result.closing} בסגירה · ${result.leader ? 'יש גננת/גנן או מוביל/ה' : 'חסר גנן/ת או מוביל/ה'}</p></article>`;
-  }).join('');
-  const quickActions = isManager()
-    ? `<section class="quick-actions"><button data-dashboard-tab="schedule" class="quick-blue"><span>▦</span><strong>בניית שיבוץ</strong><small>הוספה, בדיקה ופרסום</small></button><button data-dashboard-tab="employees" class="quick-lilac"><span>♙</span><strong>ניהול עובדים</strong><small>שעות, כיתה ואילוצים</small></button><button data-dashboard-tab="requests" class="quick-coral"><span>↔</span><strong>בקשות והחלפות</strong><small>${pending} ממתינים לטיפול</small></button><button data-dashboard-tab="attendance" class="quick-sun"><span>✓</span><strong>נוכחות היום</strong><small>עדכון ביצוע בפועל</small></button></section>`
-    : `<section class="quick-actions"><button data-dashboard-tab="schedule" class="quick-blue"><span>▦</span><strong>השיבוץ השבועי</strong><small>כל הכיתות וכל העובדים</small></button><button data-dashboard-tab="requests" class="quick-coral"><span>↔</span><strong>בקשה חדשה</strong><small>חופשה, מחלה או החלפה</small></button><button data-dashboard-tab="tasks" class="quick-lilac"><span>☑</span><strong>המשימות שלי</strong><small>${dueTasks} פתוחות</small></button><button data-dashboard-tab="announcements" class="quick-sun"><span>◉</span><strong>הודעות</strong><small>${unread} טרם נקראו</small></button></section>`;
-  $('#dashboardPanel').innerHTML = `<div class="dashboard-welcome"><div class="welcome-copy"><span class="welcome-kicker">✿ יום נעים במעון הדס</span><h2>שלום ${escapeHtml(state.profile.full_name)}</h2><p>${formatDate(today, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div><div class="welcome-illustration" aria-hidden="true"><span class="cloud cloud-one"></span><span class="cloud cloud-two"></span><span class="sun-shape">☀</span><span class="flower-shape">✿</span></div><span class="dashboard-role">${escapeHtml(ROLE_LABELS[state.profile.role] || state.profile.job_title)}</span></div><div class="dashboard-grid"><article class="summary-card tone-blue"><span class="summary-icon">▦</span><span class="caption">השיבוץ שלי היום</span><span class="metric">${mine.length || '—'}</span><small>${mine.length ? mine.map((shift) => `${classById(shift.class_id)?.name || ''} ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`).join(' · ') : 'אין שיבוץ'}</small></article><article class="summary-card tone-lilac"><span class="summary-icon">♙</span><span class="caption">עובדים משובצים</span><span class="metric">${staffed.size}</span><small>בכל המעון היום</small></article><article class="summary-card tone-coral"><span class="summary-icon">↔</span><span class="caption">בקשות ממתינות</span><span class="metric">${pending}</span><small>${isManager() ? 'דורשות טיפול' : 'הבקשות שלך והחלפות'}</small></article><article class="summary-card tone-sun"><span class="summary-icon">☀</span><span class="caption">חופשות והיעדרויות</span><span class="metric">${absentToday}</span><small>${dueTasks} משימות פתוחות · ${unread} הודעות</small></article></div>${quickActions}<div class="section-heading dashboard-section"><div><p class="eyebrow">תמונת מצב יומית</p><h2>מצב הכיתות היום</h2><p class="muted">לפי השיבוץ האחרון שפורסם</p></div></div><div class="dashboard-grid class-grid">${classCards}</div>`;
+  const today=dateISO(new Date());
+  const shifts=state.todayShifts.length?state.todayShifts:state.shifts.filter((shift)=>shift.shift_date===today&&shift.status==='published');
+  const mine=shifts.filter((shift)=>shift.employee_id===state.profile.id);
+  const fullSchedule=canViewFullSchedule();
+  const staffed=new Set(shifts.map((shift)=>shift.employee_id));
+  const pending=state.requests.filter((request)=>request.status==='pending').length;
+  const dueTasks=state.taskAssignees.filter((assignment)=>assignment.employee_id===state.profile.id&&assignment.status!=='done').length;
+  const unread=state.announcements.filter((announcement)=>!state.announcementReads.some((read)=>read.announcement_id===announcement.id&&read.employee_id===state.profile.id)).length;
+  const unreadNotifications=state.notifications.filter((item)=>!item.read_at).length;
+  const absentToday=state.scheduleAbsences.filter((item)=>item.absence_date===today).length;
+  const quickActions=isManager()?`<section class="quick-actions"><button data-dashboard-tab="schedule" class="quick-blue"><span>▦</span><strong>בניית שיבוץ</strong><small>הוספה, בדיקה ופרסום</small></button><button data-dashboard-tab="employees" class="quick-lilac"><span>♙</span><strong>ניהול עובדים</strong><small>שעות, כיתה ואילוצים</small></button><button data-dashboard-tab="requests" class="quick-coral"><span>↔</span><strong>בקשות והחלפות</strong><small>${pending} ממתינים לטיפול</small></button><button data-dashboard-tab="attendance" class="quick-sun"><span>✓</span><strong>נוכחות היום</strong><small>עדכון ביצוע בפועל</small></button></section>`:`<section class="quick-actions"><button data-dashboard-tab="schedule" class="quick-blue"><span>▦</span><strong>${fullSchedule?'השיבוץ השבועי':'השיבוץ שלי'}</strong><small>${fullSchedule?'צפייה בכל צוות המעון':'הימים והשעות שלי'}</small></button><button data-dashboard-tab="requests" class="quick-coral"><span>↔</span><strong>בקשה חדשה</strong><small>חופשה, מחלה או החלפה</small></button><button data-dashboard-tab="tasks" class="quick-lilac"><span>☑</span><strong>המשימות שלי</strong><small>${dueTasks} פתוחות</small></button><button data-dashboard-tab="announcements" class="quick-sun"><span>◉</span><strong>הודעות</strong><small>${unread} טרם נקראו</small></button></section>`;
+  const summary=`<div class="dashboard-grid"><article class="summary-card tone-blue"><span class="summary-icon">▦</span><span class="caption">השיבוץ שלי היום</span><span class="metric">${mine.length||'—'}</span><small>${mine.length?mine.map((shift)=>`${classById(shift.class_id)?.name||''} ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`).join(' · '):'אין שיבוץ'}</small></article><button type="button" class="summary-card tone-lilac summary-card-button" data-dashboard-notifications><span class="summary-icon">🔔</span><span class="caption">עדכונים חדשים</span><span class="metric">${unreadNotifications}</span><small>לחצו לצפייה בבקשות, שיבוצים ופעולות</small></button><article class="summary-card tone-coral"><span class="summary-icon">↔</span><span class="caption">בקשות ממתינות</span><span class="metric">${pending}</span><small>${isManager()?'דורשות טיפול':'הבקשות שלך והחלפות'}</small></article><article class="summary-card tone-sun"><span class="summary-icon">☑</span><span class="caption">משימות והודעות</span><span class="metric">${dueTasks+unread}</span><small>${dueTasks} משימות · ${unread} הודעות</small></article></div>`;
+  let details='';
+  if(fullSchedule){
+    const classCards=state.classes.filter((item)=>item.active).map((item,index)=>{ const rows=shifts.filter((shift)=>shift.class_id===item.id); const result=coverageFor(rows); return `<article class="class-card class-tone-${index%4}"><div class="class-card-top"><span class="class-symbol">${['☁','✿','☀','★'][index%4]}</span><div class="card-heading"><h3>${escapeHtml(item.name)}</h3><span class="status-chip ${result.ok?'ok':'error'}">${result.ok?'תקין':'דורש טיפול'}</span></div></div>${rows.length?rows.map(shiftLineHtml).join(''):'<div class="empty-state compact">אין שיבוץ להיום</div>'}<p class="small-note">${result.count} משובצים · ${result.closing} בסגירה · ${result.leader?'יש גננת/גנן או מוביל/ה':'חסר גנן/ת או מוביל/ה'}</p></article>`; }).join('');
+    details=`<div class="section-heading dashboard-section"><div><p class="eyebrow">תמונת מצב יומית</p><h2>מצב הכיתות היום</h2><p class="muted">${staffed.size} עובדים משובצים · ${absentToday} בחופשה או בהיעדרות</p></div></div><div class="dashboard-grid class-grid">${classCards}</div>`;
+  }else{
+    details=`<div class="section-heading dashboard-section"><div><p class="eyebrow">היום שלי</p><h2>פרטי השיבוץ שלי</h2></div></div><div class="my-schedule-list">${mine.length?mine.map((shift)=>`<article class="my-day-card"><div class="my-day-date"><strong>${escapeHtml(classById(shift.class_id)?.name||'')}</strong><span>${timeHtml(shift.start_time,shift.end_time)}</span></div><div class="my-day-shifts"><div class="shift-item"><strong>${SHIFT_ROLE_LABELS[shift.shift_role]}</strong><small>${escapeHtml(shift.public_note||'ללא הערה')}</small></div></div></article>`).join(''):'<div class="empty-state">אין לך שיבוץ היום.</div>'}</div>`;
+  }
+  $('#dashboardPanel').innerHTML=`<div class="dashboard-welcome"><div class="welcome-copy"><span class="welcome-kicker">✿ יום נעים במעון הדס</span><h2>שלום ${escapeHtml(state.profile.full_name)}</h2><p>${formatDate(today,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</p></div><div class="welcome-illustration" aria-hidden="true"><span class="cloud cloud-one"></span><span class="cloud cloud-two"></span><span class="sun-shape">☀</span><span class="flower-shape">✿</span></div><span class="dashboard-role">${escapeHtml(ROLE_LABELS[state.profile.role]||state.profile.job_title)}</span></div>${summary}${quickActions}${details}`;
 }
 
 function compactProblemRanges(rows, includeCounts = false) {
@@ -1017,37 +1044,125 @@ async function handleEmployeeClick(event) {
   try { await apiFetch('/api/employees', { method: 'PATCH', body: { id: employee.id, ...(button.dataset.action === 'reset' ? { reset_password: true } : { active: !employee.active }) } }); await refreshAll(); showToast('העובד עודכן', 'success'); } catch (error) { showToast(error.message, 'error'); }
 }
 
-function selectedRequestType() { return $('#requestForm input[name="request_type"]:checked')?.value || 'leave'; }
-function openRequestDialog() { const form = $('#requestForm'); form.reset(); form.elements.request_date.value = dateISO(new Date()); $('input[name="request_type"][value="leave"]', form).checked = true; updateRequestShiftOptions(); updateRequestFields(); $('#requestDialog').showModal(); }
-function updateRequestFields() {
-  const form = $('#requestForm'); const type = selectedRequestType(); const needsShift = ['late_start', 'early_finish', 'swap'].includes(type);
-  $$('.request-start').forEach((element) => element.classList.toggle('hidden', type !== 'late_start')); $$('.request-end').forEach((element) => element.classList.toggle('hidden', type !== 'early_finish')); $$('.shift-choice-field').forEach((element) => element.classList.toggle('hidden', !needsShift)); $$('.swap-field').forEach((element) => element.classList.toggle('hidden', type !== 'swap'));
-  form.elements.shift_id.required = needsShift; form.elements.target_employee_id.required = type === 'swap'; form.elements.target_shift_id.required = type === 'swap'; form.elements.requested_start.required = type === 'late_start'; form.elements.requested_end.required = type === 'early_finish';
+function notificationIcon(type) {
+  return ({ swap:'↔',request:'◷',schedule:'▦',announcement:'◉',task:'☑',calendar:'◫' })[type] || '●';
 }
-function updateRequestShiftOptions() { const mine = state.shifts.filter((shift) => shift.employee_id === state.profile.id); $('#requestForm [name="shift_id"]').innerHTML = `<option value="">בחר שיבוץ</option>${mine.map((shift) => `<option value="${shift.id}">${formatDate(shift.shift_date)} · ${classById(shift.class_id)?.name || ''} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</option>`).join('')}`; populateTargetShifts(); }
-function syncRequestDateFromShift() { const form = $('#requestForm'); const shift = state.shifts.find((item) => item.id === form.elements.shift_id.value); if (shift) form.elements.request_date.value = shift.shift_date; }
-function populateTargetShifts() { const id = $('#requestForm [name="target_employee_id"]').value; $('#requestForm [name="target_shift_id"]').innerHTML = `<option value="">בחר שיבוץ</option>${state.shifts.filter((shift) => shift.employee_id === id).map((shift) => `<option value="${shift.id}">${formatDate(shift.shift_date)} · ${classById(shift.class_id)?.name || ''} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</option>`).join('')}`; }
-async function saveRequest(event) { event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button[value="default"]'); const data = formObject(form); data.request_type = selectedRequestType(); setBusy(button, true, 'שולחת…'); try { await apiFetch('/api/requests', { method: 'POST', body: { action: 'create', ...data } }); $('#requestDialog').close(); await refreshAll(); showToast('הבקשה נשלח', 'success'); } catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); } }
+function renderNotifications() {
+  const list = $('#notificationsList');
+  if (!list) return;
+  list.innerHTML = state.notifications.length ? state.notifications.map((item) => `
+    <article class="notification-card ${item.read_at ? 'read' : 'unread'} ${item.action_required ? 'requires-action' : ''}" data-id="${item.id}" data-entity-type="${escapeHtml(item.entity_type || '')}" data-entity-id="${escapeHtml(item.entity_id || '')}">
+      <span class="notification-icon">${notificationIcon(item.notification_type)}</span>
+      <div><div class="notification-title-row"><strong>${escapeHtml(item.title)}</strong>${!item.read_at ? '<i>חדש</i>' : ''}</div><p>${escapeHtml(item.message || '')}</p><small>${formatDate(item.created_at,{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})}${item.action_required ? ' · דורש פעולה' : ''}</small></div>
+      <button type="button" class="ghost-btn" data-action="open-notification">פתיחה</button>
+    </article>`).join('') : '<div class="empty-state">אין עדכונים חדשים.</div>';
+}
+function openNotificationsDialog() { renderNotifications(); $('#notificationsDialog').showModal(); }
+async function markAllNotificationsRead() {
+  try { await apiFetch('/api/notifications',{method:'POST',body:{action:'mark_all_read'}}); state.notifications=state.notifications.map((item)=>({...item,read_at:item.read_at||new Date().toISOString()})); renderNotifications(); renderNavBadges(); } catch(error){ showToast(error.message,'error'); }
+}
+async function handleNotificationClick(event) {
+  const button=event.target.closest('[data-action="open-notification"]'); if(!button)return;
+  const card=button.closest('[data-id]'); const id=card.dataset.id; const item=state.notifications.find((row)=>row.id===id);
+  try { if(item && !item.read_at) await apiFetch('/api/notifications',{method:'POST',body:{action:'mark_read',id}}); } catch {}
+  if(item) item.read_at=item.read_at||new Date().toISOString();
+  $('#notificationsDialog').close(); renderNavBadges();
+  const type=card.dataset.entityType;
+  if(type==='request') switchTab('requests');
+  else if(type==='schedule') switchTab('schedule');
+  else if(type==='announcement') switchTab('announcements');
+  else if(type==='task') switchTab('tasks');
+  else if(type==='calendar') switchTab('calendar');
+}
+
+function selectedRequestType() { return $('#requestForm input[name="request_type"]:checked')?.value || 'leave'; }
+function requestDateLabel(request) { return request.request_end_date && request.request_end_date !== request.request_date ? `${formatDate(request.request_date)} – ${formatDate(request.request_end_date)}` : formatDate(request.request_date); }
+function openRequestDialog() {
+  const form = $('#requestForm'); form.reset();
+  form.elements.request_date.value = dateISO(new Date());
+  form.elements.request_end_date.value = dateISO(new Date());
+  $('input[name="request_type"][value="leave"]', form).checked = true;
+  state.swapCandidates=[]; updateRequestShiftOptions(); updateRequestFields();
+  $('#requestDialog').showModal();
+}
+function updateRequestFields() {
+  const form = $('#requestForm'); const type = selectedRequestType();
+  const needsShift = ['late_start','early_finish'].includes(type);
+  const range = ['leave','sick'].includes(type);
+  $$('.request-start').forEach((element)=>element.classList.toggle('hidden',type!=='late_start'));
+  $$('.request-end').forEach((element)=>element.classList.toggle('hidden',type!=='early_finish'));
+  $$('.request-range-end').forEach((element)=>element.classList.toggle('hidden',!range));
+  $$('.shift-choice-field').forEach((element)=>element.classList.toggle('hidden',!needsShift));
+  $$('.swap-field').forEach((element)=>element.classList.toggle('hidden',type!=='swap'));
+  $$('.sick-attachment').forEach((element)=>element.classList.toggle('hidden',type!=='sick'));
+  form.elements.shift_id.required=needsShift;
+  form.elements.target_employee_id.required=type==='swap';
+  form.elements.request_end_date.required=range;
+  form.elements.requested_start.required=type==='late_start';
+  form.elements.requested_end.required=type==='early_finish';
+  $('.request-date-start',form).firstChild.textContent=range?'מתאריך':'תאריך';
+  if(range && !form.elements.request_end_date.value) form.elements.request_end_date.value=form.elements.request_date.value;
+  if(type==='swap') loadSwapCandidates();
+}
+function updateRequestShiftOptions() {
+  const mine=state.shifts.filter((shift)=>shift.employee_id===state.profile.id);
+  $('#requestForm [name="shift_id"]').innerHTML=`<option value="">בחר שיבוץ</option>${mine.map((shift)=>`<option value="${shift.id}">${formatDate(shift.shift_date)} · ${classById(shift.class_id)?.name||''} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}</option>`).join('')}`;
+}
+function syncRequestDateFromShift() { const form=$('#requestForm'); const shift=state.shifts.find((item)=>item.id===form.elements.shift_id.value); if(shift){ form.elements.request_date.value=shift.shift_date; form.elements.request_end_date.value=shift.shift_date; } }
+function handleRequestDateChange() { const form=$('#requestForm'); if(['leave','sick'].includes(selectedRequestType()) && (!form.elements.request_end_date.value || form.elements.request_end_date.value<form.elements.request_date.value)) form.elements.request_end_date.value=form.elements.request_date.value; if(selectedRequestType()==='swap') loadSwapCandidates(); }
+async function loadSwapCandidates() {
+  const form=$('#requestForm'); const select=form.elements.target_employee_id; const hint=$('#swapCandidatesHint'); const date=form.elements.request_date.value;
+  if(!date){ select.innerHTML='<option value="">בחרו תאריך</option>'; return; }
+  state.swapCandidatesLoading=true; select.disabled=true; select.innerHTML='<option value="">טוען עובדים ביום חופשי…</option>'; hint.textContent='בודק מי נמצא ביום חופשי ואינו משובץ…';
+  try {
+    const result=await apiFetch('/api/requests',{method:'POST',body:{action:'swap_candidates',request_date:date}});
+    state.swapCandidates=result.candidates||[];
+    select.innerHTML=state.swapCandidates.length?`<option value="">בחרו עובד</option>${state.swapCandidates.map((item)=>`<option value="${item.id}">${escapeHtml(item.full_name)} — ${escapeHtml(item.job_title)}</option>`).join('')}`:'<option value="">לא נמצאו עובדים ביום חופשי</option>';
+    hint.textContent=state.swapCandidates.length?`נמצאו ${state.swapCandidates.length} עובדים זמינים להחלפה.`:'אין עובד ביום חופשי שאינו משובץ בתאריך זה.';
+  } catch(error){ select.innerHTML='<option value="">לא ניתן לטעון עובדים</option>'; hint.textContent=error.message; }
+  finally { state.swapCandidatesLoading=false; select.disabled=false; }
+}
+function fileToDataUrl(file) { return new Promise((resolve,reject)=>{ const reader=new FileReader(); reader.onload=()=>resolve(reader.result); reader.onerror=()=>reject(new Error('לא ניתן לקרוא את הקובץ')); reader.readAsDataURL(file); }); }
+async function saveRequest(event) {
+  event.preventDefault(); const form=event.currentTarget; const button=form.querySelector('button[value="default"]'); const data=formObject(form); data.request_type=selectedRequestType(); delete data.sick_certificate;
+  if(!['leave','sick'].includes(data.request_type)) delete data.request_end_date;
+  const file=form.elements.sick_certificate.files?.[0];
+  if(file?.size>3*1024*1024)return showToast('אישור המחלה חייב להיות עד 3MB','error');
+  setBusy(button,true,'שולח…');
+  try {
+    if(file){ data.attachment_data=await fileToDataUrl(file); data.attachment_name=file.name; }
+    await apiFetch('/api/requests',{method:'POST',body:{action:'create',...data},timeout:20000});
+    $('#requestDialog').close(); await refreshAll(); showToast(data.request_type==='swap'?'הבקשה נשלחה לאישור העובד שנבחר':'הבקשה נשלחה','success');
+  } catch(error){ showToast(error.message,'error'); } finally { setBusy(button,false); }
+}
 function requestFlowHtml(request) {
-  const steps = request.request_type === 'swap' ? ['נשלח', 'הסכמת העובד', 'אישור', 'הוזרם'] : ['נשלח', 'אישור', 'הוזרם'];
-  const activeIndex = request.status === 'pending' ? 0 : request.status === 'approved' ? steps.length - 2 : request.status === 'applied' ? steps.length - 1 : 0;
-  return `<div class="request-flow">${steps.map((step, index) => `<span class="flow-step ${index <= activeIndex ? 'active' : ''}">${step}</span>`).join('<span>›</span>')}</div>`;
+  const steps=request.request_type==='swap'?['נשלח','הסכמת העובד','אישור מנהלה','הוזרם']:['נשלח','אישור','הוזרם'];
+  let activeIndex=request.status==='pending'?0:request.status==='approved'?steps.length-2:request.status==='applied'?steps.length-1:0;
+  if(request.request_type==='swap'&&request.status==='pending'&&request.target_approved)activeIndex=1;
+  return `<div class="request-flow">${steps.map((step,index)=>`<span class="flow-step ${index<=activeIndex?'active':''}">${step}</span>`).join('<span>›</span>')}</div>`;
 }
 function renderRequests() {
-  syncFilterChips('#requestStatusChips', state.requestStatusFilter);
-  const counts = { pending: 0, approved: 0, applied: 0, closed: 0 }; state.requests.forEach((request) => { if (request.status === 'pending') counts.pending += 1; else if (request.status === 'approved') counts.approved += 1; else if (request.status === 'applied') counts.applied += 1; else counts.closed += 1; });
-  $('#requestSummary').innerHTML = `<div class="mini-stat"><strong>${counts.pending}</strong><span>ממתינים</span></div><div class="mini-stat"><strong>${counts.approved}</strong><span>אושרו</span></div><div class="mini-stat"><strong>${counts.applied}</strong><span>הוזרמו</span></div><div class="mini-stat"><strong>${counts.closed}</strong><span>סגורות</span></div>`;
-  const term = state.requestSearch.trim().toLowerCase();
-  const visible = state.requests.filter((request) => {
-    const statusOk = state.requestStatusFilter === 'all' || request.status === state.requestStatusFilter || (state.requestStatusFilter === 'open' && ['pending', 'approved'].includes(request.status)) || (state.requestStatusFilter === 'closed' && ['rejected', 'applied', 'cancelled'].includes(request.status));
-    const requester = employeeById(request.requester_id); const target = employeeById(request.target_employee_id); const haystack = `${requester?.full_name || ''} ${target?.full_name || ''} ${request.reason || ''} ${REQUEST_LABELS[request.request_type] || ''}`.toLowerCase(); return statusOk && (!term || haystack.includes(term));
-  });
-  $('#requestsList').innerHTML = visible.length ? visible.map((request) => {
-    const requester = employeeById(request.requester_id); const target = employeeById(request.target_employee_id); const statusClass = request.status === 'rejected' || request.status === 'cancelled' ? 'error' : request.status === 'applied' ? 'ok' : 'warn';
-    return `<article class="request-card type-${request.request_type}"><div class="card-heading"><div class="request-title"><span class="request-avatar">${REQUEST_ICONS[request.request_type]}</span><div><h3>${REQUEST_LABELS[request.request_type]}</h3><p class="muted">${escapeHtml(requester?.full_name || '')} · ${formatDate(request.request_date)}</p></div></div><span class="status-chip ${statusClass}">${REQUEST_STATUS_LABELS[request.status]}</span></div>${requestFlowHtml(request)}<div class="meta-grid"><div class="meta-item"><small>פירוט</small>${escapeHtml(request.reason || 'ללא פירוט')}</div><div class="meta-item"><small>שעות</small>${request.requested_start || request.requested_end ? timeHtml(request.requested_start, request.requested_end) : 'לא רלוונטי'}</div><div class="meta-item"><small>החלפה עם</small>${escapeHtml(target?.full_name || 'לא רלוונטי')}${request.request_type === 'swap' ? ` · ${request.target_approved ? 'אישרה' : 'טרם אישרה'}` : ''}</div></div>${request.manager_note ? `<div class="notice"><strong>הערת מנהלת:</strong> ${escapeHtml(request.manager_note)}</div>` : ''}<div class="card-actions">${request.request_type === 'swap' && request.target_employee_id === state.profile.id && !request.target_approved && request.status === 'pending' ? `<button class="secondary-btn" data-action="target_accept" data-id="${request.id}">אני מסכימה להחלפה</button>` : ''}${request.requester_id === state.profile.id && request.status === 'pending' ? `<button class="ghost-btn" data-action="cancel" data-id="${request.id}">ביטול הבקשה</button>` : ''}${isManager() && request.status === 'pending' ? `<button class="primary-btn" data-action="approve" data-id="${request.id}">אישור</button><button class="danger-btn" data-action="reject" data-id="${request.id}">דחייה</button>` : ''}${isManager() && request.status === 'approved' ? `<button class="publish-btn" data-action="apply" data-id="${request.id}">הזרמה לשיבוץ</button>` : ''}</div></article>`;
-  }).join('') : '<div class="empty-state">אין בקשות לפי הסינון שנבחר.</div>';
+  syncFilterChips('#requestStatusChips',state.requestStatusFilter);
+  const counts={pending:0,approved:0,applied:0,closed:0}; state.requests.forEach((request)=>{ if(request.status==='pending')counts.pending+=1; else if(request.status==='approved')counts.approved+=1; else if(request.status==='applied')counts.applied+=1; else counts.closed+=1; });
+  $('#requestSummary').innerHTML=`<div class="mini-stat"><strong>${counts.pending}</strong><span>ממתינים</span></div><div class="mini-stat"><strong>${counts.approved}</strong><span>אושרו</span></div><div class="mini-stat"><strong>${counts.applied}</strong><span>הוזרמו</span></div><div class="mini-stat"><strong>${counts.closed}</strong><span>סגורות</span></div>`;
+  const term=state.requestSearch.trim().toLowerCase();
+  const visible=state.requests.filter((request)=>{ const statusOk=state.requestStatusFilter==='all'||request.status===state.requestStatusFilter||(state.requestStatusFilter==='open'&&['pending','approved'].includes(request.status))||(state.requestStatusFilter==='closed'&&['rejected','applied','cancelled'].includes(request.status)); const requester=employeeById(request.requester_id); const target=employeeById(request.target_employee_id); const haystack=`${requester?.full_name||''} ${target?.full_name||''} ${request.reason||''} ${REQUEST_LABELS[request.request_type]||''}`.toLowerCase(); return statusOk&&(!term||haystack.includes(term)); });
+  $('#requestsList').innerHTML=visible.length?visible.map((request)=>{
+    const requester=employeeById(request.requester_id); const target=employeeById(request.target_employee_id); const statusClass=request.status==='rejected'||request.status==='cancelled'?'error':request.status==='applied'?'ok':'warn';
+    const canApprove=isManager()&&request.status==='pending'&&(request.request_type!=='swap'||request.target_approved);
+    return `<article class="request-card type-${request.request_type}"><div class="card-heading"><div class="request-title"><span class="request-avatar">${REQUEST_ICONS[request.request_type]||'●'}</span><div><h3>${REQUEST_LABELS[request.request_type]||'בקשה'}</h3><p class="muted">${escapeHtml(requester?.full_name||'')} · ${requestDateLabel(request)}</p></div></div><span class="status-chip ${statusClass}">${REQUEST_STATUS_LABELS[request.status]}</span></div>${requestFlowHtml(request)}<div class="meta-grid"><div class="meta-item"><small>פירוט</small>${escapeHtml(request.reason||'ללא פירוט')}</div><div class="meta-item"><small>שעות</small>${request.requested_start||request.requested_end?timeHtml(request.requested_start,request.requested_end):'לא רלוונטי'}</div><div class="meta-item"><small>החלפה עם</small>${escapeHtml(target?.full_name||'לא רלוונטי')}${request.request_type==='swap'?` · ${request.target_approved?'אושר על ידי העובד':'ממתין להסכמת העובד'}`:''}</div></div>${request.has_attachment?`<div class="attachment-row"><span>📎 צורף אישור מחלה</span><button class="ghost-btn" data-action="attachment_url" data-id="${request.id}">צפייה באישור</button></div>`:''}${request.manager_note?`<div class="notice"><strong>הערת מנהלה:</strong> ${escapeHtml(request.manager_note)}</div>`:''}<div class="card-actions">${request.request_type==='swap'&&request.target_employee_id===state.profile.id&&!request.target_approved&&request.status==='pending'?`<button class="secondary-btn" data-action="target_accept" data-id="${request.id}">אישור ההחלפה</button><button class="danger-btn" data-action="target_reject" data-id="${request.id}">דחיית ההחלפה</button>`:''}${request.requester_id===state.profile.id&&request.status==='pending'?`<button class="ghost-btn" data-action="cancel" data-id="${request.id}">ביטול הבקשה</button>`:''}${canApprove?`<button class="primary-btn" data-action="approve" data-id="${request.id}">אישור</button><button class="danger-btn" data-action="reject" data-id="${request.id}">דחייה</button>`:''}${isManager()&&request.status==='pending'&&request.request_type==='swap'&&!request.target_approved?'<span class="small-note">ממתין לאישור העובד שנבחר</span>':''}${isManager()&&request.status==='approved'?`<button class="publish-btn" data-action="apply" data-id="${request.id}">הזרמה לשיבוץ</button>`:''}</div></article>`;
+  }).join(''):'<div class="empty-state">אין בקשות לפי הסינון שנבחר.</div>';
 }
-async function handleRequestClick(event) { const button = event.target.closest('[data-action]'); if (!button) return; let body = { id: button.dataset.id, action: button.dataset.action }; if (button.dataset.action === 'approve' || button.dataset.action === 'reject') body = { ...body, action: 'decide', status: button.dataset.action === 'approve' ? 'approved' : 'rejected', manager_note: prompt('הערה לעובד (אפשר להשאיר ריק):') || '' }; if (button.dataset.action === 'apply' && !confirm('להזרים את הבקשה לשיבוץ בפועל?')) return; try { await apiFetch('/api/requests', { method: 'POST', body }); await refreshAll(); showToast('הבקשה עודכנה', 'success'); } catch (error) { showToast(error.message, 'error'); } }
+async function handleRequestClick(event) {
+  const button=event.target.closest('[data-action]'); if(!button)return;
+  if(button.dataset.action==='attachment_url'){
+    try { const result=await apiFetch('/api/requests',{method:'POST',body:{action:'attachment_url',id:button.dataset.id}}); window.open(result.url,'_blank','noopener'); } catch(error){ showToast(error.message,'error'); } return;
+  }
+  let body={id:button.dataset.id,action:button.dataset.action};
+  if(button.dataset.action==='approve'||button.dataset.action==='reject')body={...body,action:'decide',status:button.dataset.action==='approve'?'approved':'rejected',manager_note:prompt('הערה לעובד (אפשר להשאיר ריק):')||''};
+  if(button.dataset.action==='apply'&&!confirm('להזרים את הבקשה לטיוטת השיבוץ?'))return;
+  try { await apiFetch('/api/requests',{method:'POST',body}); await refreshAll(); showToast('הבקשה עודכנה','success'); } catch(error){ showToast(error.message,'error'); }
+}
 
 function renderAttendance() {
   const shifts = state.shifts.filter((shift) => shift.shift_date === state.attendanceDate && (isManager() || shift.employee_id === state.profile.id));

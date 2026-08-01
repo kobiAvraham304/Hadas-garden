@@ -56,6 +56,7 @@
       </div>
       <div class="user-area">
         <div><strong id="userName"></strong><small id="userRole"></small></div>
+        <button id="notificationsBtn" class="icon-text-btn notification-button" title="עדכונים והתראות"><span aria-hidden="true">🔔</span><span class="desktop-label">עדכונים</span><span id="notificationBadge" class="nav-badge hidden"></span></button>
         <button id="refreshBtn" class="icon-text-btn" title="רענון נתונים"><span aria-hidden="true">↻</span><span class="desktop-label">רענון</span></button>
         <button id="logoutBtn" class="icon-text-btn"><span aria-hidden="true">⇥</span><span class="desktop-label">יציאה</span></button>
       </div>
@@ -250,22 +251,22 @@
   <dialog id="requestDialog" class="modal">
     <form id="requestForm" method="dialog" class="modal-card large-modal">
       <div class="modal-heading"><div><p class="eyebrow">פנייה ללינור ולאילנית</p><h3>בקשה חדשה</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <fieldset class="request-type-picker"><legend>מה תרצי לבקש?</legend><div class="request-type-grid">
+      <fieldset class="request-type-picker"><legend>מה מבקשים?</legend><div class="request-type-grid">
         <label class="request-type-card"><input type="radio" name="request_type" value="leave" checked /><span class="request-icon">☀</span><strong>חופשה</strong><small>בקשת חופשה מראש</small></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="day_off" /><span class="request-icon">⌂</span><strong>יום חופשי</strong><small>בקשה חד־פעמית</small></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="late_start" /><span class="request-icon">◷</span><strong>התחלה מאוחרת</strong><small>שינוי שעת התחלה</small></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="early_finish" /><span class="request-icon">◴</span><strong>סיום מוקדם</strong><small>יציאה לפני הזמן</small></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="sick" /><span class="request-icon">✚</span><strong>מחלה</strong><small>דיווח היעדרות</small></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="swap" /><span class="request-icon">↔</span><strong>החלפה</strong><small>החלפת שיבוץ עם עובד</small></label>
-        <label class="request-type-card"><input type="radio" name="request_type" value="other" /><span class="request-icon">✎</span><strong>אחר</strong><small>בקשה חופשית</small></label>
       </div></fieldset>
       <div class="form-grid request-details">
-        <label>תאריך<input name="request_date" type="date" required /></label>
+        <label class="request-date-start">תאריך<input name="request_date" type="date" required /></label>
+        <label class="request-range-end hidden">עד תאריך<input name="request_end_date" type="date" /></label>
         <label class="request-start hidden">שעת התחלה מבוקשת<input name="requested_start" type="time" /></label>
         <label class="request-end hidden">שעת סיום מבוקשת<input name="requested_end" type="time" /></label>
         <label class="shift-choice-field hidden">השיבוץ הרלוונטי<select name="shift_id"></select></label>
-        <label class="swap-field hidden">עובד שני<select name="target_employee_id"></select></label>
-        <label class="swap-field hidden full-field">השיבוץ שלה<select name="target_shift_id"></select></label>
+        <label class="swap-field hidden full-field">עובד שנמצא ביום חופשי<select name="target_employee_id"><option value="">בחרו תאריך כדי לראות עובדים זמינים</option></select><small id="swapCandidatesHint">יוצגו רק עובדים שנמצאים ביום חופשי ואינם משובצים.</small></label>
+        <label class="sick-attachment hidden full-field">אישור מחלה (PDF או תמונה, עד 3MB)<input name="sick_certificate" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" /></label>
         <label class="full-field">פירוט<textarea name="reason" rows="3" placeholder="אפשר להוסיף הסבר או מידע חשוב"></textarea></label>
       </div>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שליחת הבקשה</button></div>
@@ -297,6 +298,14 @@
   </form></dialog>
 
   <dialog id="calendarEventDialog" class="modal"><div class="modal-card"><div class="modal-heading"><div><p class="eyebrow">פרטי אירוע</p><h3 id="calendarEventTitle"></h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="calendarEventDetails" class="event-details"></div><div id="calendarEventActions" class="modal-actions"></div></div></dialog>
+
+  <dialog id="notificationsDialog" class="modal notifications-modal">
+    <div class="modal-card large-modal">
+      <div class="modal-heading"><div><p class="eyebrow">עדכונים אישיים</p><h3>התראות ועדכונים</h3><p class="muted">בקשות, שיבוצים ופעולות שקשורות אליך.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <div class="notifications-toolbar"><button id="markAllNotificationsBtn" type="button" class="ghost-btn">סימון הכול כנקרא</button></div>
+      <div id="notificationsList" class="notifications-list"></div>
+    </div>
+  </dialog>
 
   <dialog id="settingsDialog" class="modal"><form id="settingsForm" method="dialog" class="modal-card standards-modal">
     <div class="modal-heading"><div><p class="eyebrow">חוקי שיבוץ ובקרת כוח אדם</p><h3>הגדרות תקינה</h3><p class="muted">המערכת בודקת כל כיתה לאורך היום ומתריעה לפני פרסום.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>

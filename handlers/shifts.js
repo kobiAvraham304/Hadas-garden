@@ -1,5 +1,5 @@
 const {
-  requireSession, parseBody, db, assertDb, emitEvent, audit, isManager,
+  requireSession, parseBody, db, assertDb, emitEvent, audit, isManager, canViewFullSchedule, notifyEmployees,
   send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
 const { validateWeek, timeToMinutes } = require('../lib/schedule');
@@ -117,12 +117,15 @@ function buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart) {
   for (const request of requests) {
     if (!['approved', 'applied'].includes(request.status)) continue;
     if (!['leave', 'day_off', 'sick'].includes(request.request_type)) continue;
-    if (!validDates.has(request.request_date)) continue;
-    absenceMap.set(`${request.requester_id}:${request.request_date}`, {
-      employee_id: request.requester_id,
-      absence_date: request.request_date,
-      absence_type: request.request_type,
-    });
+    const endDate = request.request_end_date || request.request_date;
+    for (const cursor of dates) {
+      if (cursor < request.request_date || cursor > endDate) continue;
+      absenceMap.set(`${request.requester_id}:${cursor}`, {
+        employee_id: request.requester_id,
+        absence_date: cursor,
+        absence_type: request.request_type,
+      });
+    }
   }
   const employeesWithPatterns = new Set(weeklyPatterns.map((row) => row.employee_id));
   for (const pattern of weeklyPatterns.filter((row) => row.day_type === 'day_off')) {
@@ -159,7 +162,7 @@ module.exports = async function handler(req, res) {
         db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle(),
         db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
         db().from('hadas_schedule_acknowledgements').select('*').eq('week_start', weekStart),
-        db().from('hadas_requests').select('requester_id,request_date,request_type,status').gte('request_date', weekStart).lte('request_date', weekEnd),
+        db().from('hadas_requests').select('requester_id,request_date,request_end_date,request_type,status').lte('request_date', weekEnd),
         db().from('hadas_employees').select('id,active,fixed_day_off,is_schedulable'),
         db().from('hadas_employee_weekly_patterns').select('*'),
         db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
@@ -172,17 +175,21 @@ module.exports = async function handler(req, res) {
       const employees = assertDb(employeesR, 'לא ניתן לטעון ימי חופש') || [];
       const weeklyPatterns = assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [];
       const settings = assertDb(settingsR, 'לא ניתן לטעון הגדרות תקינה') || {};
+      const fullScheduleViewer = canViewFullSchedule(caller);
       if (!isManager(caller)) {
         shifts = restoreLastPublished(shifts, scheduleChanges);
+        if (!fullScheduleViewer) shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
         acknowledgements = acknowledgements.filter((row) => row.employee_id === caller.employee.id);
       }
+      let scheduleAbsences = buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart);
+      if (!fullScheduleViewer) scheduleAbsences = scheduleAbsences.filter((row) => row.employee_id === caller.employee.id);
       return send(res, 200, {
         ok: true,
         weekStart,
         shifts,
         publication,
         scheduleChanges: isManager(caller) ? scheduleChanges : [],
-        scheduleAbsences: buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart),
+        scheduleAbsences,
         acknowledgements,
         settings,
       });
@@ -228,6 +235,12 @@ module.exports = async function handler(req, res) {
       assertDb(await db().from('hadas_schedule_changes').update({ published_revision: revision }).eq('week_start', weekStart).is('published_revision', 'null'), 'לא ניתן לסיים את רישום השינויים');
       assertDb(await db().from('hadas_schedule_acknowledgements').delete().eq('week_start', weekStart), 'לא ניתן לאפס אישורי קריאה');
       await audit(caller.employee.id, 'publish', 'schedule', weekStart, { revision, errors: 0, warnings: validation.warnings.length });
+      const activeUsers = assertDb(await db().from('hadas_users').select('employee_id').eq('active', true), 'לא ניתן לטעון משתמשים לעדכון') || [];
+      await notifyEmployees(activeUsers.map((row) => row.employee_id), {
+        type:'schedule', title:'פורסם שיבוץ שבועי חדש',
+        message:`השיבוץ לשבוע שמתחיל בתאריך ${weekStart} פורסם וזמין לצפייה.`,
+        entityType:'schedule', entityId:weekStart,
+      });
       await emitEvent('shifts');
       return send(res, 200, { ok: true, revision, publishedAt: now, validation });
     }

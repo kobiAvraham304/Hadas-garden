@@ -1,6 +1,6 @@
 const {
   requireSession, parseBody, db, assertDb, isManager, canCreateContent,
-  emitEvent, audit, send, handleError, httpError,
+  emitEvent, audit, notifyEmployees, send, handleError, httpError,
 } = require('../lib/server');
 
 function cleanEmployeeIds(value) {
@@ -35,6 +35,7 @@ async function replaceAssignees(taskId, targetType, targetId, employeeIds = []) 
     completed_at: existingMap.get(employee.id)?.completed_at || null,
   }));
   assertDb(await db().from('hadas_task_assignees').insert(rows), 'לא ניתן לשייך משימה');
+  return employees.map((employee) => employee.id);
 }
 
 async function getTask(id) {
@@ -80,12 +81,14 @@ module.exports = async function handler(req, res) {
         created_by: caller.employee.id,
       };
       const task = assertDb(await db().from('hadas_tasks').insert(row).select('*').single(), 'לא ניתן ליצור משימה');
+      let assigneeIds = [];
       try {
-        await replaceAssignees(task.id, targetType, row.target_id, body.employee_ids);
+        assigneeIds = await replaceAssignees(task.id, targetType, row.target_id, body.employee_ids);
       } catch (error) {
         await db().from('hadas_tasks').delete().eq('id', task.id);
         throw error;
       }
+      await notifyEmployees(assigneeIds.filter((id) => id !== caller.employee.id), { type:'task', title:`משימה חדשה: ${title}`, message:row.description || 'נוספה עבורך משימה חדשה.', entityType:'task', entityId:task.id, actionRequired:true });
       await audit(caller.employee.id, 'create', 'task', task.id, { targetType });
       await emitEvent('tasks');
       return send(res, 201, { ok: true, task });

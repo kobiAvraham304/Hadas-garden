@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.9.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.10.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
@@ -50,7 +50,7 @@ test('initial accounts and schema version are present in clean installer', () =>
   const schema=read('supabase/schema.sql');
   assert.match(schema,/אילנית זאדייב/); assert.match(schema,/\+972544594513/); assert.match(schema,/'admin'/);
   assert.match(schema,/לינור אברהם/); assert.match(schema,/\+972542521780/); assert.match(schema,/'scheduler'/);
-  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.9\.0'/);
+  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.10\.0'/);
   assert.match(schema,/ENABLE ROW LEVEL SECURITY/i); assert.match(schema,/REVOKE ALL ON TABLE/i);
   assert.match(schema,/hadas_realtime_public_read/); assert.match(schema,/ALTER PUBLICATION supabase_realtime ADD TABLE/i);
 });
@@ -130,10 +130,10 @@ test('non-manager employee payload excludes private employment fields', () => {
   assert.match(dataApi,/if \(!manager\) return base/);
 });
 
-test('health page is CSP-compatible and references 0.9 migration', () => {
+test('health page is CSP-compatible and references 0.10 migration', () => {
   const html=read('health.html'); const js=read('health.js');
   assert.match(html,/src="\/health\.js"/); assert.doesNotMatch(html,/<script>[^<]/);
-  assert.match(js,/update-v0\.9\.0\.sql/);
+  assert.match(js,/update-v0\.10\.0\.sql/);
 });
 
 test('runtime avoids unsafe dynamic JavaScript and inline DOM handlers', () => {
@@ -194,7 +194,8 @@ test('week navigation uses lightweight endpoint, cache and adjacent prefetching'
   assert.match(app,/prefetchAdjacentWeeks/); assert.match(app,/renderAll\(\); prefetchAdjacentWeeks\(\)/); assert.match(app,/refreshScheduleWeek/);
   assert.match(app,/\/api\/shifts\?week_start=/);
   assert.match(shifts,/if \(req\.method === 'GET'\)/);
-  assert.match(shifts,/scheduleAbsences: buildScheduleAbsences/);
+  assert.match(shifts,/let scheduleAbsences = buildScheduleAbsences/);
+  assert.match(shifts,/scheduleAbsences,/);
 });
 
 test('calendar days are directly selectable for creating events with keyboard support', () => {
@@ -299,4 +300,64 @@ test('0.9 nurse and secretary content permissions and version badge are wired', 
   assert.match(server,/\['אחות','מזכירה'\]/);
   assert.match(calendar,/canCreateContent/);
   assert.match(html,/id="newCalendarBtn" class="primary-btn content-creator-only"/);
+});
+
+test('0.10 schedule privacy gives full view only to approved roles and personal view to assistants', () => {
+  const server=read('lib/server.js'); const data=read('handlers/data.js'); const shifts=read('handlers/shifts.js'); const app=read('app.js');
+  assert.match(server,/function canViewFullSchedule/);
+  assert.match(server,/\['אחות','מנהלת מעון','מזכירה'\]/);
+  assert.match(data,/if \(!fullScheduleViewer\) \{[\s\S]*?shifts = shifts\.filter\(\(row\) => row\.employee_id === caller\.employee\.id\)/);
+  assert.match(shifts,/if \(!fullScheduleViewer\) shifts = shifts\.filter\(\(row\) => row\.employee_id === caller\.employee\.id\)/);
+  assert.match(app,/state\.scheduleMode = 'mine'/);
+  assert.match(app,/#scheduleMode \[data-mode="week"\], #scheduleMode \[data-mode="day"\]/);
+});
+
+test('0.10 swap requests use only day-off employees and require target approval before management', () => {
+  const html=read('index.html'); const app=read('app.js'); const requests=read('handlers/requests.js'); const schema=read('supabase/schema.sql');
+  assert.match(html,/עובד שנמצא ביום חופשי/);
+  assert.doesNotMatch(html,/name="target_shift_id"/);
+  assert.match(requests,/action === 'swap_candidates'/);
+  assert.match(requests,/requestedOff\.has\(employee\.id\) \|\| pattern === 'day_off'/);
+  assert.match(requests,/activeAccounts\.has\(employee\.id\)/);
+  assert.match(requests,/unavailable\.has\(employee\.id\)/);
+  assert.match(requests,/action === 'target_accept'/);
+  assert.match(requests,/action === 'target_reject'/);
+  assert.match(requests,/body\.status === 'approved' && !request\.target_approved/);
+  assert.match(app,/data-action="target_accept"/);
+  assert.match(app,/data-action="target_reject"/);
+  assert.match(schema,/r\.target_approved is not true/);
+  assert.match(schema,/set employee_id=r\.target_employee_id, status='draft'/);
+});
+
+test('0.10 vacation and sick requests support ranges and private medical certificates', () => {
+  const html=read('index.html'); const app=read('app.js'); const requests=read('handlers/requests.js'); const migration=read('supabase/update-v0.10.0.sql');
+  assert.match(html,/name="request_end_date"/);
+  assert.match(html,/name="sick_certificate"/);
+  assert.match(app,/\['leave','sick'\]\.includes/);
+  assert.match(app,/fileToDataUrl/);
+  assert.match(requests,/CERTIFICATE_BUCKET = 'hadas-sick-certificates'/);
+  assert.match(requests,/action === 'attachment_url'/);
+  assert.match(requests,/request_end_date:endDate/);
+  assert.match(migration,/request_end_date date/);
+  assert.match(migration,/attachment_path text/);
+  assert.match(migration,/hadas-sick-certificates/);
+  assert.match(migration,/public=false/);
+});
+
+test('0.10 notifications are personal, actionable and available from header and dashboard', () => {
+  const html=read('index.html'); const app=read('app.js'); const notifications=read('handlers/notifications.js'); const data=read('handlers/data.js');
+  for(const id of ['notificationsBtn','notificationBadge','notificationsDialog','notificationsList','markAllNotificationsBtn']) assert.match(html,new RegExp(`id="${id}"`));
+  assert.match(notifications,/eq\('employee_id', caller\.employee\.id\)/);
+  assert.match(data,/hadas_notifications/);
+  assert.match(app,/renderNotifications/);
+  assert.match(app,/data-dashboard-notifications/);
+  assert.match(app,/if\(type==='request'\) switchTab\('requests'\)/);
+});
+
+test('0.10 removes the generic Other request from both UI and API', () => {
+  const html=read('index.html'); const requests=read('handlers/requests.js'); const schema=read('supabase/schema.sql');
+  const requestPicker=html.match(/<fieldset class="request-type-picker"[\s\S]*?<\/fieldset>/)?.[0]||'';
+  assert.doesNotMatch(requestPicker,/value="other"|>אחר</);
+  assert.doesNotMatch(requests,/REQUEST_TYPES[^\n]*other/);
+  assert.doesNotMatch(schema,/request_type in \([^)]*'other'/);
 });

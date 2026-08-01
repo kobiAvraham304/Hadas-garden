@@ -1,6 +1,6 @@
 const {
   requireSession, parseBody, db, assertDb, isManager, canCreateContent,
-  emitEvent, audit, send, handleError, httpError,
+  emitEvent, audit, notifyEmployees, send, handleError, httpError,
 } = require('../lib/server');
 
 function cleanEmployeeIds(value) {
@@ -16,6 +16,15 @@ async function replaceRecipients(announcementId, audienceType, employeeIds) {
   const active = assertDb(await db().from('hadas_employees').select('id').in('id', ids).eq('active', true), 'לא ניתן לבדוק עובדים') || [];
   if (active.length !== ids.length) throw httpError(409, 'אחד העובדים שנבחרו אינו פעיל');
   assertDb(await db().from('hadas_announcement_recipients').insert(ids.map((employeeId) => ({ announcement_id: announcementId, employee_id: employeeId }))), 'לא ניתן לשמור את מקבלי ההודעה');
+}
+
+
+async function audienceEmployeeIds(audienceType, classId, employeeIds = []) {
+  if (audienceType === 'employees') return cleanEmployeeIds(employeeIds);
+  let query = db().from('hadas_employees').select('id').eq('active', true);
+  if (audienceType === 'class') query = query.eq('primary_class_id', classId);
+  const rows = assertDb(await query, 'לא ניתן למצוא מקבלי הודעה') || [];
+  return rows.map((row) => row.id);
 }
 
 async function getAnnouncement(id) {
@@ -68,6 +77,8 @@ module.exports = async function handler(req, res) {
         await db().from('hadas_announcements').delete().eq('id', item.id);
         throw error;
       }
+      const notifyIds = (await audienceEmployeeIds(audienceType, row.class_id, body.employee_ids)).filter((id) => id !== caller.employee.id);
+      await notifyEmployees(notifyIds, { type:'announcement', title:`הודעה חדשה: ${title}`, message:content.slice(0,220), entityType:'announcement', entityId:item.id });
       await audit(caller.employee.id, 'create', 'announcement', item.id, { audienceType });
       await emitEvent('announcements');
       return send(res, 201, { ok: true, item });
