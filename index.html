@@ -132,6 +132,18 @@
       <section id="dailyPanel" class="panel manager-only">
         <div class="section-heading daily-heading"><div><p class="eyebrow">ניהול היום בזמן אמת</p><h2>תפעול יומי</h2><p class="muted">דיווח היעדרות, איחור או שחרור מוקדם וקבלת הצעות להחלפה או מעבר חירום בין כיתות.</p></div><label class="date-control">תאריך<input id="dailyDate" type="date" /></label></div>
         <div id="dailySummary" class="daily-summary"></div>
+        <div class="daily-command-center">
+          <div class="daily-filter-row" id="dailyStatusChips" role="group" aria-label="סינון תפעול יומי">
+            <button type="button" class="filter-chip active" data-value="all">כל העובדים</button>
+            <button type="button" class="filter-chip" data-value="attention">דורש טיפול</button>
+            <button type="button" class="filter-chip" data-value="unreported">טרם דווחה נוכחות</button>
+            <button type="button" class="filter-chip" data-value="resolved">טופל</button>
+          </div>
+          <div class="daily-command-actions">
+            <button id="markAllPresentBtn" type="button" class="secondary-btn"><span>✓</span> סימון מי שלא עודכן כנוכח</button>
+            <button id="dailyRefreshBtn" type="button" class="ghost-btn"><span>↻</span> רענון היום</button>
+          </div>
+        </div>
         <div id="dailyClasses" class="daily-classes"></div>
       </section>
 
@@ -200,7 +212,11 @@
       <div class="form-grid">
         <label>תאריך<input name="shift_date" type="date" required /></label>
         <label>כיתה<select name="class_id" required></select></label>
-        <label class="full-field">עובד<select name="employee_id" required></select></label>
+        <section class="shift-recommendation-section full-field" aria-live="polite">
+          <div class="shift-recommendation-heading"><div><strong>עובדים מומלצים לשיבוץ</strong><small>לפי כיתה, שעות, תפקיד, רוטציה, העדפות והיקף משרה</small></div><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span></div>
+          <div id="shiftRecommendations" class="shift-recommendations"><div class="empty-state compact">בחרו תאריך, כיתה ושעות כדי לקבל המלצות.</div></div>
+        </section>
+        <label class="full-field">בחירת עובד<select name="employee_id" required></select><small id="shiftEmployeeHint">המומלצים מוצגים ראשונים; ניתן לבחור גם עובד אחר מהרשימה.</small></label>
         <label>שעת התחלה<input name="start_time" type="time" value="07:30" required /></label>
         <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
         <label>תפקיד באותו יום<select name="shift_role"><option value="teacher">גננת/גנן</option><option value="lead">מוביל/ה</option><option value="staff" selected>איש/ת צוות</option><option value="replacement">מחליף/ה</option></select></label>
@@ -335,7 +351,32 @@
     <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת דיווח</button></div>
   </form></dialog>
 
-  <dialog id="dailySuggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">כיסוי מיידי</p><h3>אפשרויות החלפה והעברה</h3><p class="muted">המערכת מציגה רק אפשרויות שאינן מפרות אילוצי כיתה או תקינת מקור.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="dailySuggestionsList" class="cards-list"></div></div></dialog>
+  <dialog id="dailySuggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">כיסוי מיידי</p><h3>אפשרויות החלפה והעברה</h3><p class="muted">האפשרויות מדורגות לפי התאמה, תקינה, העדפות ושעות עבודה.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="dailySuggestionsList" class="cards-list"></div></div></dialog>
+
+  <dialog id="dailyAttendanceDialog" class="modal">
+    <form id="dailyAttendanceForm" method="dialog" class="modal-card">
+      <div class="modal-heading"><div><p class="eyebrow">נוכחות שמשפיעה על התפעול</p><h3>עדכון נוכחות עובד</h3><p id="dailyAttendanceEmployee" class="muted"></p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <input type="hidden" name="shift_id" />
+      <div class="attendance-status-grid">
+        <label><input type="radio" name="status" value="present" checked /><span>✓</span><strong>נכח</strong></label>
+        <label><input type="radio" name="status" value="late" /><span>◷</span><strong>איחור</strong></label>
+        <label><input type="radio" name="status" value="left_early" /><span>◴</span><strong>שחרור מוקדם</strong></label>
+        <label><input type="radio" name="status" value="absent" /><span>×</span><strong>נעדר</strong></label>
+        <label><input type="radio" name="status" value="sick" /><span>✚</span><strong>מחלה</strong></label>
+      </div>
+      <div class="form-grid"><label>התחלה בפועל<input name="actual_start" type="time" /></label><label>סיום בפועל<input name="actual_end" type="time" /></label><label class="full-field">הערה<input name="note" placeholder="מידע תפעולי קצר" /></label></div>
+      <div class="notice soft-notice">מחלה, היעדרות, איחור או יציאה מוקדמת יוצרים אוטומטית אירוע בתפעול היומי.</div>
+      <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת נוכחות ועדכון תפעול</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="postPublishChangeDialog" class="modal">
+    <div class="modal-card publish-change-modal">
+      <div class="modal-heading"><div><p class="eyebrow">השיבוץ כבר פורסם</p><h3>לפרסם את השינוי לצוות?</h3><p class="muted">השינוי נשמר בטיוטה. עד לפרסום העובדים ממשיכים לראות את הגרסה הקודמת.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <div id="postPublishChangeDetails" class="publish-change-details"></div>
+      <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">להמשיך לערוך</button><button id="publishChangeNowBtn" type="button" class="publish-btn">בדיקה ופרסום השינוי</button></div>
+    </div>
+  </dialog>
 
 <dialog id="suggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">סיוע אוטומטי</p><h3>מחליפים אפשריים</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="suggestionsList" class="cards-list"></div></div></dialog>
 <div id="printExportRoot" class="print-export-root" aria-hidden="true"></div>

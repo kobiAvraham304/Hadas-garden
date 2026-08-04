@@ -11,17 +11,18 @@ function minutes(value) { return timeToMinutes(String(value || '').slice(0,5)); 
 function sunday(dateString) { const d=new Date(`${dateString}T12:00:00Z`); d.setUTCDate(d.getUTCDate()-d.getUTCDay()); return d.toISOString().slice(0,10); }
 function addDays(dateString,days){ const d=new Date(`${dateString}T12:00:00Z`); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10); }
 function dayOf(dateString){ return new Date(`${dateString}T12:00:00Z`).getUTCDay(); }
+function shortTime(value){ return value ? String(value).slice(0,5) : null; }
 
 function affectedRange(operation, shift) {
-  if (['sick','absent'].includes(operation.operation_type)) return { start:String(shift.start_time).slice(0,5), end:String(shift.end_time).slice(0,5) };
-  if (operation.operation_type === 'late') return { start:String(shift.start_time).slice(0,5), end:String(operation.start_time || shift.end_time).slice(0,5) };
-  if (operation.operation_type === 'early_release') return { start:String(operation.end_time || shift.start_time).slice(0,5), end:String(shift.end_time).slice(0,5) };
-  return { start:String(operation.start_time || shift.start_time).slice(0,5), end:String(operation.end_time || shift.end_time).slice(0,5) };
+  if (['sick','absent'].includes(operation.operation_type)) return { start:shortTime(shift.start_time), end:shortTime(shift.end_time) };
+  if (operation.operation_type === 'late') return { start:shortTime(shift.start_time), end:shortTime(operation.start_time || shift.end_time) };
+  if (operation.operation_type === 'early_release') return { start:shortTime(operation.end_time || shift.start_time), end:shortTime(shift.end_time) };
+  return { start:shortTime(operation.start_time || shift.start_time), end:shortTime(operation.end_time || shift.end_time) };
 }
 
 async function loadContext(date) {
   const weekStart=sunday(date), weekEnd=addDays(weekStart,5);
-  const [employeesR,shiftsR,requestsR,constraintsR,patternsR,settingsR,operationsR] = await Promise.all([
+  const [employeesR,shiftsR,requestsR,constraintsR,patternsR,settingsR,operationsR,attendanceR] = await Promise.all([
     db().from('hadas_employees').select('*').eq('active',true),
     db().from('hadas_shifts').select('*').gte('shift_date',weekStart).lte('shift_date',weekEnd),
     db().from('hadas_requests').select('*').in('request_type',['leave','day_off','sick']).in('status',['approved','applied']).lte('request_date',date),
@@ -29,23 +30,38 @@ async function loadContext(date) {
     db().from('hadas_employee_weekly_patterns').select('*'),
     db().from('hadas_app_settings').select('*').eq('id',1).single(),
     db().from('hadas_daily_operations').select('*').eq('operation_date',date),
+    db().from('hadas_attendance').select('*').eq('attendance_date',date),
   ]);
   return {
     employees:assertDb(employeesR,'לא ניתן לטעון עובדים')||[], shifts:assertDb(shiftsR,'לא ניתן לטעון שיבוצים')||[],
     requests:(assertDb(requestsR,'לא ניתן לטעון היעדרויות')||[]).filter(r=>date<=String(r.request_end_date||r.request_date)),
     constraints:assertDb(constraintsR,'לא ניתן לטעון העדפות')||[], patterns:assertDb(patternsR,'לא ניתן לטעון ימים קבועים')||[],
     settings:assertDb(settingsR,'לא ניתן לטעון תקינה')||{}, operations:assertDb(operationsR,'לא ניתן לטעון תפעול יומי')||[],
+    attendance:assertDb(attendanceR,'לא ניתן לטעון נוכחות')||[],
   };
 }
 
 function isForbidden(context, employeeId, classId, date) {
-  return context.constraints.some(c=>c.employee_id===employeeId&&c.class_id===classId&&c.constraint_type==='forbidden'&&(!c.valid_from||c.valid_from<=date)&&(!c.valid_to||c.valid_to>=date));
+  return (context.constraints||[]).some(c=>c.employee_id===employeeId&&c.class_id===classId&&c.constraint_type==='forbidden'&&(!c.valid_from||c.valid_from<=date)&&(!c.valid_to||c.valid_to>=date));
 }
-function isUnavailable(context, employeeId, date) {
-  return context.requests.some(r=>r.requester_id===employeeId&&r.request_date<=date&&date<=String(r.request_end_date||r.request_date))
-    || context.operations.some(o=>o.employee_id===employeeId&&o.operation_date===date);
+function requestUnavailable(context, employeeId, date) {
+  return (context.requests||[]).some(r=>r.requester_id===employeeId&&r.request_date<=date&&date<=String(r.request_end_date||r.request_date));
 }
-function dayPattern(context, employeeId, date) { return context.patterns.find(p=>p.employee_id===employeeId&&Number(p.weekday)===dayOf(date)); }
+function operationRange(context, operation) {
+  const shift=(context.shifts||[]).find((row)=>row.id===operation.shift_id);
+  return shift ? affectedRange(operation,shift) : { start:shortTime(operation.start_time),end:shortTime(operation.end_time) };
+}
+function unavailableInRange(context, employeeId, date, start, end, ignoredOperationId=null) {
+  if (requestUnavailable(context,employeeId,date)) return true;
+  const attendance=(context.attendance||[]).find((row)=>row.employee_id===employeeId&&row.attendance_date===date);
+  if (attendance && ['absent','sick'].includes(attendance.status)) return true;
+  return (context.operations||[]).some((operation)=>{
+    if(operation.id===ignoredOperationId||operation.employee_id!==employeeId||operation.operation_date!==date)return false;
+    const range=operationRange(context,operation);
+    return range.start&&range.end&&overlaps(range.start,range.end,start,end);
+  });
+}
+function dayPattern(context, employeeId, date) { return (context.patterns||[]).find(p=>p.employee_id===employeeId&&Number(p.weekday)===dayOf(date)); }
 function activeInRange(shift,start,end){ return overlaps(shift.start_time,shift.end_time,start,end); }
 
 function sourceClassCanRelease(context, sourceClassId, employeeId, date, start, end) {
@@ -57,9 +73,9 @@ function sourceClassCanRelease(context, sourceClassId, employeeId, date, start, 
     const slotStart=`${String(Math.floor(point/60)).padStart(2,'0')}:${String(point%60).padStart(2,'0')}`;
     const slotEndMinutes=Math.min(point+slot,minutes(end),close);
     const slotEnd=`${String(Math.floor(slotEndMinutes/60)).padStart(2,'0')}:${String(slotEndMinutes%60).padStart(2,'0')}`;
-    const unavailableIds=new Set(context.operations.filter(o=>o.operation_date===date&&o.employee_id!==employeeId&&activeInRange({start_time:o.start_time||slotStart,end_time:o.end_time||slotEnd},slotStart,slotEnd)).map(o=>o.employee_id));
-    const transferredIds=new Set(context.operations.filter(o=>o.operation_date===date&&o.status==='resolved'&&o.replacement_type==='transfer'&&o.replacement_from_class_id===sourceClassId&&activeInRange({start_time:o.replacement_start||slotStart,end_time:o.replacement_end||slotEnd},slotStart,slotEnd)).map(o=>o.replacement_employee_id));
-    const remainingShifts=context.shifts.filter(s=>s.shift_date===date&&s.class_id===sourceClassId&&s.employee_id!==employeeId&&!unavailableIds.has(s.employee_id)&&!transferredIds.has(s.employee_id)&&activeInRange(s,slotStart,slotEnd));
+    const unavailableIds=new Set((context.employees||[]).filter((item)=>item.id!==employeeId&&unavailableInRange(context,item.id,date,slotStart,slotEnd)).map((item)=>item.id));
+    const transferredIds=new Set((context.operations||[]).filter(o=>o.operation_date===date&&o.status==='resolved'&&o.replacement_type==='transfer'&&o.replacement_from_class_id===sourceClassId&&activeInRange({start_time:o.replacement_start||slotStart,end_time:o.replacement_end||slotEnd},slotStart,slotEnd)).map(o=>o.replacement_employee_id));
+    const remainingShifts=(context.shifts||[]).filter(s=>s.shift_date===date&&s.class_id===sourceClassId&&s.employee_id!==employeeId&&!unavailableIds.has(s.employee_id)&&!transferredIds.has(s.employee_id)&&activeInRange(s,slotStart,slotEnd));
     const people=new Set(remainingShifts.map(s=>s.employee_id));
     const required=point>=close-closingWindow?Number(context.settings.closing_required_staff||3):Number(context.settings.required_staff||4);
     if(people.size<required) return false;
@@ -68,14 +84,27 @@ function sourceClassCanRelease(context, sourceClassId, employeeId, date, start, 
   return true;
 }
 
+
+function employeeCanLead(employee) {
+  return Boolean(employee?.can_lead || /(גננת|גנן|סייעת מובילה)/.test(String(employee?.job_title || '')));
+}
+function targetNeedsLeader(context, operation, shift, range) {
+  if (context.settings?.require_leader === false) return false;
+  if (!['teacher','lead'].includes(shift.shift_role)) return false;
+  const otherLeaders=(context.shifts||[]).filter((row)=>row.shift_date===operation.operation_date&&row.class_id===operation.class_id&&row.employee_id!==operation.employee_id&&['teacher','lead'].includes(row.shift_role)&&activeInRange(row,range.start,range.end));
+  return !otherLeaders.some((row)=>!unavailableInRange(context,row.employee_id,operation.operation_date,range.start,range.end,operation.id));
+}
+
 function buildSuggestions(context, operation, shift) {
   const date=operation.operation_date;
   const range=affectedRange(operation,shift);
   if(!range.start||!range.end||minutes(range.end)<=minutes(range.start)) return [];
-  const weeklyShifts=context.shifts;
+  const weeklyShifts=context.shifts||[];
   const suggestions=[];
-  for(const employee of context.employees.filter(e=>e.is_schedulable!==false&&e.id!==operation.employee_id)){
-    if(isUnavailable(context,employee.id,date)||isForbidden(context,employee.id,operation.class_id,date)) continue;
+  const needsLeader=targetNeedsLeader(context,operation,shift,range);
+  for(const employee of (context.employees||[]).filter(e=>e.is_schedulable!==false&&e.id!==operation.employee_id)){
+    if(unavailableInRange(context,employee.id,date,range.start,range.end,operation.id)||isForbidden(context,employee.id,operation.class_id,date)) continue;
+    if(needsLeader&&!employeeCanLead(employee)) continue;
     const dayShifts=weeklyShifts.filter(s=>s.employee_id===employee.id&&s.shift_date===date);
     const overlapping=dayShifts.filter(s=>activeInRange(s,range.start,range.end));
     const pattern=dayPattern(context,employee.id,date);
@@ -87,31 +116,43 @@ function buildSuggestions(context, operation, shift) {
       if(pattern?.day_type==='day_off') continue;
       if(pattern?.day_type==='work'&&(minutes(range.start)<minutes(pattern.start_time)||minutes(range.end)>minutes(pattern.end_time))) continue;
       let score=50; const reasons=['פנוי/ה בשעות החסרות'];
-      if(employee.assignment_mode==='substitute'){score+=35;reasons.push('משלימ/ת מקום');}
+      if(employee.assignment_mode==='substitute'){score+=35;reasons.push('משלימ/ת מקום — עדיפות גבוהה');}
       if(employee.assignment_mode==='rotation'){score+=22;reasons.push('ברוטציה בין כיתות');}
       if(pattern?.day_type==='as_needed'){score+=25;reasons.push('מוגדר/ת לפי צורך ביום זה');}
       if(pattern?.day_type==='work'){score+=8;reasons.push('השעות בתוך יום העבודה הקבוע');}
       if(employee.primary_class_id===operation.class_id){score+=18;reasons.push('מכיר/ה את הכיתה');}
-      const preferred=context.constraints.some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='preferred');
-      const avoid=context.constraints.some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='avoid');
-      if(preferred){score+=16;reasons.push('עדיפות לכיתה');}
-      if(avoid){score-=18;reasons.push('קיימת העדפה להימנע מהכיתה — מוצג כאפשרות אחרונה');}
+      if(needsLeader){score+=24;reasons.push('מורשה להוביל את הכיתה');}else if(employeeCanLead(employee)){score+=5;reasons.push('יכול/ה לסייע גם בהובלת הכיתה');}
+      const preferred=(context.constraints||[]).some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='preferred');
+      const avoid=(context.constraints||[]).some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='avoid');
+      if(preferred){score+=16;reasons.push('עדיפות מפורשת לכיתה');}
+      if(avoid){score-=18;reasons.push('עדיף להימנע מהכיתה — אפשרות אחרונה');}
       suggestions.push({ employee_id:employee.id, full_name:employee.full_name, job_title:employee.job_title, replacement_type:'replacement', from_class_id:null, start_time:range.start, end_time:range.end, score, reasons });
       continue;
     }
 
     const source=overlapping.find(s=>s.class_id!==operation.class_id);
     if(!source||!sourceClassCanRelease(context,source.class_id,employee.id,date,range.start,range.end)) continue;
-    let score=28; const reasons=['ניתן להעביר זמנית מכיתה אחרת בלי לפגוע בתקן המקור'];
+    let score=28; const reasons=['ניתן להעביר זמנית בלי לפגוע בתקינת כיתת המקור'];
     if(employee.assignment_mode==='rotation') {score+=18;reasons.push('מוגדר/ת ברוטציה');}
     if(employee.assignment_mode==='substitute') {score+=15;reasons.push('משלימ/ת מקום');}
-    const preferred=context.constraints.some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='preferred');
-    const avoid=context.constraints.some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='avoid');
+    if(needsLeader){score+=20;reasons.push('מורשה להוביל את כיתת היעד');}
+    const preferred=(context.constraints||[]).some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='preferred');
+    const avoid=(context.constraints||[]).some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='avoid');
     if(preferred){score+=14;reasons.push('עדיפות לכיתת היעד');}
     if(avoid){score-=20;reasons.push('עדיף להימנע מכיתת היעד — אפשרות אחרונה');}
     suggestions.push({ employee_id:employee.id, full_name:employee.full_name, job_title:employee.job_title, replacement_type:'transfer', from_class_id:source.class_id, start_time:range.start, end_time:range.end, score, reasons });
   }
   return suggestions.sort((a,b)=>b.score-a.score||a.full_name.localeCompare(b.full_name,'he')).slice(0,16);
+}
+
+function validateReport(type, body, shift) {
+  if(!TYPES.has(type)) throw httpError(400,'סיבת ההיעדרות אינה תקינה');
+  let start=body.start_time||null,end=body.end_time||null;
+  if(type==='late'){ if(!start||minutes(start)<=minutes(shift.start_time)||minutes(start)>=minutes(shift.end_time)) throw httpError(400,'יש להזין שעת הגעה מאוחרת תקינה'); end=shift.end_time; }
+  if(type==='early_release'){ if(!end||minutes(end)<=minutes(shift.start_time)||minutes(end)>=minutes(shift.end_time)) throw httpError(400,'יש להזין שעת שחרור מוקדם תקינה'); start=shift.start_time; }
+  if(['sick','absent'].includes(type)){ start=shift.start_time; end=shift.end_time; }
+  if(type==='other'&&(!start||!end||minutes(end)<=minutes(start))) throw httpError(400,'יש להזין טווח שעות תקין');
+  return { start,end };
 }
 
 module.exports=async function handler(req,res){
@@ -120,26 +161,22 @@ module.exports=async function handler(req,res){
     const body=parseBody(req);
     if(req.method==='GET'){
       const date=String(req.query?.date||israelDateISO());
-      const [rowsR,shiftsR]=await Promise.all([db().from('hadas_daily_operations').select('*').eq('operation_date',date).order('created_at',{ascending:false}),db().from('hadas_shifts').select('*').eq('shift_date',date).order('start_time')]);
-      const rows=assertDb(rowsR,'לא ניתן לטעון תפעול יומי')||[];
-      const shifts=assertDb(shiftsR,'לא ניתן לטעון את שיבוץ היום')||[];
-      return send(res,200,{ok:true,operations:rows,shifts,date});
+      const [rowsR,shiftsR,attendanceR]=await Promise.all([
+        db().from('hadas_daily_operations').select('*').eq('operation_date',date).order('created_at',{ascending:false}),
+        db().from('hadas_shifts').select('*').eq('shift_date',date).order('start_time'),
+        db().from('hadas_attendance').select('*').eq('attendance_date',date),
+      ]);
+      return send(res,200,{ok:true,operations:assertDb(rowsR,'לא ניתן לטעון תפעול יומי')||[],shifts:assertDb(shiftsR,'לא ניתן לטעון את שיבוץ היום')||[],attendance:assertDb(attendanceR,'לא ניתן לטעון נוכחות')||[],date});
     }
     if(req.method!=='POST') return send(res,405,{ok:false,error:'Method not allowed'});
     const action=String(body.action||'report');
     if(action==='report'){
       const shift=assertDb(await db().from('hadas_shifts').select('*').eq('id',body.shift_id).maybeSingle(),'השיבוץ לא נמצא');
       if(!shift) throw httpError(404,'השיבוץ לא נמצא');
-      const type=String(body.operation_type||'');
-      if(!TYPES.has(type)) throw httpError(400,'סיבת ההיעדרות אינה תקינה');
-      let start=body.start_time||null,end=body.end_time||null;
-      if(type==='late'){ if(!start||minutes(start)<=minutes(shift.start_time)||minutes(start)>=minutes(shift.end_time)) throw httpError(400,'יש להזין שעת הגעה מאוחרת תקינה'); end=shift.end_time; }
-      if(type==='early_release'){ if(!end||minutes(end)<=minutes(shift.start_time)||minutes(end)>=minutes(shift.end_time)) throw httpError(400,'יש להזין שעת שחרור מוקדם תקינה'); start=shift.start_time; }
-      if(['sick','absent'].includes(type)){ start=shift.start_time; end=shift.end_time; }
-      if(type==='other'&&(!start||!end||minutes(end)<=minutes(start))) throw httpError(400,'יש להזין טווח שעות תקין');
-      const existing=assertDb(await db().from('hadas_daily_operations').select('id,status').eq('shift_id',shift.id).eq('operation_date',shift.shift_date).maybeSingle(),'לא ניתן לבדוק דיווח קיים');
-      if(existing) throw httpError(409,'כבר קיים דיווח תפעולי לשיבוץ הזה. אפשר לפתוח או לעדכן אותו במסך התפעול.');
-      const row={ operation_date:shift.shift_date,shift_id:shift.id,employee_id:shift.employee_id,class_id:shift.class_id,operation_type:type,start_time:start,end_time:end,note:String(body.note||'').trim()||null,status:'open',created_by:caller.employee.id };
+      const type=String(body.operation_type||''); const {start,end}=validateReport(type,body,shift);
+      const existing=assertDb(await db().from('hadas_daily_operations').select('*').eq('shift_id',shift.id).eq('operation_date',shift.shift_date).maybeSingle(),'לא ניתן לבדוק דיווח קיים');
+      if(existing) throw httpError(409,'כבר קיים דיווח לשיבוץ הזה. אפשר לעדכן אותו דרך כרטיס האירוע בתפעול היומי.');
+      const row={ operation_date:shift.shift_date,shift_id:shift.id,employee_id:shift.employee_id,class_id:shift.class_id,operation_type:type,start_time:start,end_time:end,note:String(body.note||'').trim()||null,status:'open',source:'manual',created_by:caller.employee.id };
       const operation=assertDb(await db().from('hadas_daily_operations').insert(row).select('*').single(),'לא ניתן לשמור דיווח תפעולי');
       await audit(caller.employee.id,'create','daily_operation',operation.id,row); await emitEvent('daily_operations');
       return send(res,201,{ok:true,operation});
@@ -148,6 +185,23 @@ module.exports=async function handler(req,res){
     if(!operation) throw httpError(404,'הדיווח לא נמצא');
     const shift=assertDb(await db().from('hadas_shifts').select('*').eq('id',operation.shift_id).maybeSingle(),'השיבוץ לא נמצא');
     if(!shift) throw httpError(404,'השיבוץ לא נמצא');
+
+    if(action==='update_report'){
+      const type=String(body.operation_type||operation.operation_type); const {start,end}=validateReport(type,body,shift);
+      const update={operation_type:type,start_time:start,end_time:end,note:String(body.note||'').trim()||null,source:'manual',status:'open',replacement_employee_id:null,replacement_from_class_id:null,replacement_type:null,replacement_start:null,replacement_end:null,resolved_by:null,resolved_at:null};
+      const updated=assertDb(await db().from('hadas_daily_operations').update(update).eq('id',operation.id).select('*').single(),'לא ניתן לעדכן את הדיווח');
+      await audit(caller.employee.id,'update','daily_operation',operation.id,update);await emitEvent('daily_operations');return send(res,200,{ok:true,operation:updated});
+    }
+    if(action==='delete'){
+      assertDb(await db().from('hadas_daily_operations').delete().eq('id',operation.id),'לא ניתן למחוק את הדיווח');
+      await audit(caller.employee.id,'delete','daily_operation',operation.id,operation);await emitEvent('daily_operations');return send(res,200,{ok:true});
+    }
+    if(action==='resolve_without_replacement'){
+      const update={status:'resolved',replacement_employee_id:null,replacement_from_class_id:null,replacement_type:null,replacement_start:null,replacement_end:null,resolved_by:caller.employee.id,resolved_at:new Date().toISOString(),note:String(body.note||operation.note||'').trim()||null};
+      assertDb(await db().from('hadas_daily_operations').update(update).eq('id',operation.id),'לא ניתן לסגור את האירוע');
+      await audit(caller.employee.id,'resolve_without_replacement','daily_operation',operation.id,update);await emitEvent('daily_operations');return send(res,200,{ok:true});
+    }
+
     const context=await loadContext(operation.operation_date);
     const suggestions=buildSuggestions(context,operation,shift);
     if(action==='suggestions') return send(res,200,{ok:true,suggestions,range:affectedRange(operation,shift)});
@@ -170,7 +224,9 @@ module.exports=async function handler(req,res){
   }catch(error){handleError(res,error);}
 };
 
-// Exposed for deterministic automated tests of the recommendation engine.
 module.exports.buildSuggestions = buildSuggestions;
 module.exports.sourceClassCanRelease = sourceClassCanRelease;
 module.exports.affectedRange = affectedRange;
+module.exports.unavailableInRange = unavailableInRange;
+module.exports.targetNeedsLeader = targetNeedsLeader;
+module.exports.employeeCanLead = employeeCanLead;

@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.11.0 (סכמת נתונים 0.11.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.12.0 (סכמת נתונים 0.12.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -64,7 +64,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.11.0', '0.11.0')
+values (1, '0.12.0', '0.12.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -236,6 +236,8 @@ create table if not exists public.hadas_attendance (
   check (actual_end is null or actual_start is null or actual_end > actual_start)
 );
 
+create index if not exists hadas_attendance_date_status_idx on public.hadas_attendance(attendance_date,status,employee_id);
+
 create table if not exists public.hadas_daily_operations (
   id uuid primary key default gen_random_uuid(),
   operation_date date not null,
@@ -243,6 +245,7 @@ create table if not exists public.hadas_daily_operations (
   employee_id uuid not null references public.hadas_employees(id) on delete restrict,
   class_id uuid not null references public.hadas_classes(id) on delete restrict,
   operation_type text not null check (operation_type in ('sick','absent','late','early_release','other')),
+  source text not null default 'manual' check (source in ('manual','attendance')),
   start_time time,
   end_time time,
   note text,
@@ -261,6 +264,7 @@ create table if not exists public.hadas_daily_operations (
 create index if not exists hadas_daily_operations_date_idx on public.hadas_daily_operations(operation_date,class_id,status);
 create unique index if not exists hadas_daily_operations_shift_unique on public.hadas_daily_operations(shift_id,operation_date) where shift_id is not null;
 create index if not exists hadas_daily_operations_employee_idx on public.hadas_daily_operations(employee_id,operation_date);
+create index if not exists hadas_daily_operations_source_idx on public.hadas_daily_operations(operation_date,source,status);
 
 create table if not exists public.hadas_requests (
   id uuid primary key default gen_random_uuid(),

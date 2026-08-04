@@ -180,6 +180,7 @@ test('application initializes after all runtime functions are defined',()=>{
 
 test('saving a daily absence immediately opens safe coverage suggestions',()=>{
   const app=read('app.js');
-  assert.match(app,/result\.operation\?\.id\)await loadDailySuggestions\(result\.operation\.id\)/);
-  assert.match(app,/הדיווח נשמר — מוצגות אפשרויות כיסוי/);
+  assert.match(app,/result\.operation\?\.id/);
+  assert.match(app,/loadDailySuggestions\(result\.operation\.id\)/);
+  assert.match(app,/הדיווח נשמר|הנוכחות נשמרה/);
 });

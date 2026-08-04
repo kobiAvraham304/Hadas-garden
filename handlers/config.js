@@ -12,7 +12,7 @@ module.exports = async function handler(req, res) {
       ok:true,
       supabaseUrl,
       supabasePublishableKey,
-      version:'0.11.0',
+      version:'0.12.0',
       healthUrl:'/health',
     });
   } catch (error) { handleError(res, error); }

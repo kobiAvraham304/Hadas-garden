@@ -48,7 +48,7 @@ test('all RPCs referenced by handlers exist in the clean SQL schema',()=>{
 });
 
 test('SQL blocks and CSS braces are balanced',()=>{
-  for(const file of ['supabase/schema.sql','supabase/update-v0.5.0.sql','supabase/update-v0.11.0.sql']){
+  for(const file of ['supabase/schema.sql','supabase/update-v0.5.0.sql','supabase/update-v0.11.0.sql','supabase/update-v0.12.0.sql']){
     const sql=read(file); assert.equal((sql.match(/\$\$/g)||[]).length%2,0,file);
   }
   const css=read('styles.css');

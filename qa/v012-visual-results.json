@@ -1,0 +1,26 @@
+[
+  {
+    "sw": 390,
+    "cw": 390,
+    "sh": 2189,
+    "tooSmall": [],
+    "name": "mobile",
+    "errors": []
+  },
+  {
+    "sw": 360,
+    "cw": 360,
+    "sh": 2228,
+    "tooSmall": [],
+    "name": "mobile360",
+    "errors": []
+  },
+  {
+    "sw": 1440,
+    "cw": 1440,
+    "sh": 1561,
+    "tooSmall": [],
+    "name": "desktop",
+    "errors": []
+  }
+]

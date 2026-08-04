@@ -107,10 +107,11 @@ module.exports = async function handler(req, res) {
       todayWeekStart === weekStart ? Promise.resolve({ data: [], error: null }) : db().from('hadas_schedule_changes').select('*').eq('week_start', todayWeekStart).is('published_revision', 'null').order('created_at'),
       manager ? db().from('hadas_daily_operations').select('*').eq('operation_date', dailyDate).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
       manager ? db().from('hadas_shifts').select('*').eq('shift_date', dailyDate).order('start_time') : Promise.resolve({ data: [], error: null }),
+      manager ? db().from('hadas_attendance').select('*').eq('attendance_date', dailyDate) : Promise.resolve({ data: [], error: null }),
       db().from('hadas_notifications').select('*').eq('employee_id', caller.employee.id).order('created_at', { ascending: false }).limit(150),
     ]);
 
-    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, dailyShiftsR, notificationsR] = results;
+    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, dailyShiftsR, dailyAttendanceR, notificationsR] = results;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
     const employeeRows = assertDb(employeesR, 'לא ניתן לטעון עובדים') || [];
     const userRows = assertDb(usersR, 'לא ניתן לטעון הרשאות') || [];
@@ -134,6 +135,7 @@ module.exports = async function handler(req, res) {
     const todayChanges = todayWeekStart === weekStart ? scheduleChanges : (assertDb(todayChangesR, 'לא ניתן לטעון שינויים') || []);
     const dailyOperations = assertDb(dailyOperationsR, 'לא ניתן לטעון תפעול יומי') || [];
     const dailyShifts = assertDb(dailyShiftsR, 'לא ניתן לטעון את שיבוץ התפעול היומי') || [];
+    const dailyAttendance = assertDb(dailyAttendanceR, 'לא ניתן לטעון את נוכחות התפעול היומי') || [];
     const notifications = assertDb(notificationsR, 'לא ניתן לטעון עדכונים') || [];
 
     const usersByEmployee = new Map(userRows.map((row) => [row.employee_id, row]));
@@ -262,6 +264,7 @@ module.exports = async function handler(req, res) {
       scheduleAbsences: visibleScheduleAbsences,
       dailyOperations: manager ? dailyOperations : [],
       dailyShifts: manager ? dailyShifts : [],
+      dailyAttendance: manager ? dailyAttendance : [],
       dailyDate,
       notifications,
       weekDates: dateRange(weekStart, 6),
