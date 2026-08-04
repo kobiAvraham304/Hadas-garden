@@ -673,3 +673,48 @@ html,body{overflow-x:clip}
   .match-score{min-width:70px}.shift-recommendation-card .match-score{grid-column:3;grid-row:1/3}.employee-registration-summary{align-items:flex-start}.employee-login-state{align-items:flex-start}
 }
 @media(max-width:390px){.schedule-issue-card{grid-template-columns:1fr}.issue-icon{width:36px;height:36px}.issue-actions{grid-column:auto}.match-score{min-width:64px;padding:6px}.shift-recommendation-card{grid-template-columns:auto minmax(0,1fr)}.shift-recommendation-card .match-score{grid-column:1/-1;grid-row:auto;width:100%}}
+
+/* ========================================================================== */
+/* v0.14.0 — מיתוג שיתוף, כרטיסי עובדים וטופס עובד נגיש                     */
+/* ========================================================================== */
+button.is-busy{position:relative;cursor:wait!important;opacity:.82!important;padding-inline-start:38px!important}
+button.is-busy::before{content:"";position:absolute;inset-inline-start:13px;top:50%;width:15px;height:15px;margin-top:-8px;border:2px solid currentColor;border-inline-start-color:transparent;border-radius:50%;animation:button-busy-spin .72s linear infinite}
+@keyframes button-busy-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){button.is-busy::before{animation-duration:1.5s}}
+
+.employee-card{gap:11px}
+.employee-card-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-height:24px}
+.employee-card-status{position:static!important;inset:auto!important;padding:3px 8px!important;font-size:.66rem!important;line-height:1.2}
+.employee-registration-badge{display:inline-flex;align-items:center;gap:4px;min-height:23px;padding:3px 7px;border:1px solid #e5e6ef;border-radius:999px;background:#fafafe;color:#70738a;font-size:.61rem;font-weight:900;line-height:1.15;white-space:nowrap}
+.employee-registration-badge i{display:grid;place-items:center;width:14px;height:14px;border-radius:50%;background:#eeeeF6;font-style:normal;font-size:.58rem}
+.employee-registration-badge.registered{border-color:#cce7da;background:#f1faf6;color:#247258}.employee-registration-badge.registered i{background:#d9f3e6;color:#247258}
+.employee-registration-badge.started{border-color:#ecdcae;background:#fffaf0;color:#856119}.employee-registration-badge.started i{background:#fff0c2;color:#856119}
+.employee-card-head{align-items:flex-start}.employee-card-head p{line-height:1.45;overflow-wrap:anywhere}
+.employee-card-meta{gap:6px}.employee-card-meta div{padding:7px 8px}.employee-card-meta small{font-size:.67rem}.employee-card-meta strong{font-size:.8rem}
+.employee-pattern-preview{padding:9px 10px}
+.employee-card .card-actions button{min-height:44px}
+
+.employee-form-nav{position:sticky;top:-1px;z-index:6;display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;margin:0 -4px 12px;padding:7px 4px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-bottom:1px solid #ececf4}
+.employee-form-nav::-webkit-scrollbar{display:none}.employee-form-nav button{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:7px 11px;border:1px solid #e1e2ec;border-radius:13px;background:#fff;color:#676a82;font-size:.76rem;font-weight:900;white-space:nowrap}
+.employee-form-nav button span,.section-number{display:grid;place-items:center;flex:0 0 24px;width:24px;height:24px;border-radius:9px;background:#efeff8;color:#686bb0;font-size:.72rem;font-weight:950}
+.employee-form-nav button.active{border-color:#a8a6e8;background:#f2f1ff;color:#5255a8;box-shadow:0 5px 16px rgba(92,88,180,.10)}.employee-form-nav button.active span{background:#6f72d9;color:#fff}
+.employee-form-section,.employee-form-details{scroll-margin-top:74px}
+.employee-form-section{padding:16px;background:linear-gradient(145deg,#fff,#fdfdff);border-color:#e3e4ef}
+.form-section-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:13px}.form-section-heading>div{display:flex;align-items:flex-start;gap:10px}.form-section-heading h4{margin:0;color:#3f425d}.form-section-heading p{margin:3px 0 0;color:var(--muted);font-size:.76rem;line-height:1.4}
+.field-title{display:block;margin-bottom:6px;color:#4c4f69;font-size:.79rem;font-weight:900}.employee-form-section label>small,.employee-form-details label>small{display:block;margin-top:5px;color:var(--muted);font-size:.68rem;line-height:1.35}
+.employee-form-details{margin:11px 0;border:1px solid #e1e2ed;border-radius:19px;background:#fff;overflow:hidden}.employee-form-details>summary{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:13px 15px;cursor:pointer;list-style:none;user-select:none}.employee-form-details>summary::-webkit-details-marker{display:none}.employee-form-details>summary strong,.employee-form-details>summary small{display:block}.employee-form-details>summary strong{color:#44475f}.employee-form-details>summary small{margin-top:2px;color:var(--muted);font-size:.7rem;font-weight:650}.employee-form-details>summary i{font-style:normal;color:#8588a0;transition:transform .18s ease}.employee-form-details[open]>summary{border-bottom:1px solid #ececf3;background:#fbfbff}.employee-form-details[open]>summary i{transform:rotate(180deg)}
+.employee-form-details .weekly-patterns-box,.employee-form-details .constraints-box{margin:0;border:0;border-radius:0;box-shadow:none;background:#fdfdff}.employee-admin-note{display:block;padding:14px}.employee-admin-note textarea{margin-top:6px}
+#employeeDialog .modal-actions button{min-height:46px}
+
+@media(max-width:760px){
+  .employee-card-head{padding-left:0!important}.employee-card-badges{margin-bottom:-2px}.employee-registration-badge{font-size:.59rem;padding:3px 6px}
+  .employee-card-meta{grid-template-columns:1fr 1fr}.employee-card .card-actions{grid-template-columns:1fr 1fr}.employee-card .card-actions .secondary-btn{grid-column:1/-1}
+  .employee-form-nav{top:54px;margin-inline:-14px;padding-inline:14px;border-radius:0}.employee-form-nav button{min-height:42px;padding:8px 11px}
+  .employee-form-section{padding:12px;border-radius:17px}.employee-form-section .form-grid{gap:10px}.form-section-heading p{font-size:.72rem}
+  .employee-form-details{border-radius:17px}.employee-form-details>summary{padding:12px}.employee-form-details>summary small{font-size:.66rem}
+  #employeeDialog .modal-actions{display:grid;grid-template-columns:1fr 1fr}#employeeDialog .modal-actions button{width:100%;min-height:48px}
+}
+@media(max-width:390px){
+  .employee-card-meta{grid-template-columns:1fr}.employee-card-badges{gap:5px}.employee-registration-badge{max-width:145px;overflow:hidden;text-overflow:ellipsis}
+  .employee-form-nav button{padding-inline:9px}.employee-form-nav button span{width:22px;height:22px;flex-basis:22px}
+}

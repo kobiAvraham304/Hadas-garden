@@ -4,10 +4,27 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#6f72d9" />
-  <meta name="description" content="מערכת ניהול שיבוצים מעון הדס" />
+  <meta name="description" content="מערכת ניהול השיבוצים של מעון הדס — שיבוצים, נוכחות, בקשות ועדכונים לצוות." />
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="he_IL" />
+  <meta property="og:site_name" content="מעון הדס" />
+  <meta property="og:url" content="https://hadas-garden-1.vercel.app/" />
+  <meta property="og:title" content="מערכת ניהול שיבוצים מעון הדס" />
+  <meta property="og:description" content="כניסה למערכת השיבוצים, הנוכחות והעדכונים של צוות מעון הדס." />
+  <meta property="og:image" content="https://hadas-garden-1.vercel.app/og-image.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="מערכת ניהול שיבוצים מעון הדס" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="מערכת ניהול שיבוצים מעון הדס" />
+  <meta name="twitter:description" content="כניסה למערכת השיבוצים, הנוכחות והעדכונים של צוות מעון הדס." />
+  <meta name="twitter:image" content="https://hadas-garden-1.vercel.app/og-image.png" />
   <title>מערכת ניהול שיבוצים מעון הדס</title>
+  <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
@@ -258,23 +275,32 @@
       <div class="modal-heading"><div><p class="eyebrow">כרטיס צוות</p><h3>פרטי עובד</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
       <input type="hidden" name="id" />
       <div class="notice privacy-notice">🔒 המידע בכרטיס העובד חסוי ונגיש רק למנהלת המעון ולאחראית השיבוץ.</div>
-      <section class="form-section"><h4>פרטים בסיסיים</h4><div class="form-grid">
-        <label>שם מלא<input name="full_name" required /></label><label>מספר טלפון<input name="phone" type="tel" required /></label>
-        <label>תפקיד במעון<select name="job_title" required><option value="סייעת/ סייע">סייעת/ סייע</option><option value="סייעת מובילה">סייעת מובילה</option><option value="גננת">גננת</option><option value="מנהלת מעון">מנהלת מעון</option><option value="מזכירה">מזכירה</option><option value="אחות">אחות</option></select></label>
-        <label>הרשאה במערכת<select name="role"><option value="employee">עובד</option><option value="scheduler">אחראית שיבוץ</option><option value="admin">מנהלת</option></select></label>
-        <label id="assignmentModeField">אופן שיוך לכיתות<select name="assignment_mode"><option value="fixed">כיתה קבועה</option><option value="rotation">רוטציה בין כיתות</option><option value="substitute">משלימ/ת מקום</option></select><small id="assignmentModeHelp">בחרו כיצד העובד משויך לכיתות.</small></label>
-        <label id="primaryClassField">בחירת כיתה קבועה<select name="primary_class_id"><option value="">בחירת כיתה</option></select></label>
+      <nav class="employee-form-nav" aria-label="חלקי כרטיס העובד">
+        <button type="button" data-employee-section="employeeBasicsSection" class="active"><span>1</span>פרטים</button>
+        <button type="button" data-employee-section="employeeAssignmentSection"><span>2</span>שיוך</button>
+        <button type="button" data-employee-section="employeeWorkSection"><span>3</span>משרה</button>
+        <button type="button" data-employee-section="employeeScheduleSection"><span>4</span>ימים ושעות</button>
+      </nav>
+      <section id="employeeBasicsSection" class="form-section employee-form-section"><div class="form-section-heading"><div><span class="section-number">1</span><div><h4>פרטים בסיסיים</h4><p>פרטי הזיהוי וההרשאה למערכת.</p></div></div></div><div class="form-grid">
+        <label><span class="field-title">שם מלא</span><input name="full_name" autocomplete="name" placeholder="שם פרטי ומשפחה" required /></label>
+        <label><span class="field-title">מספר טלפון</span><input name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" required /></label>
+        <label><span class="field-title">תפקיד במעון</span><select name="job_title" required><option value="סייעת/ סייע">סייעת/ סייע</option><option value="סייעת מובילה">סייעת מובילה</option><option value="גננת">גננת</option><option value="מנהלת מעון">מנהלת מעון</option><option value="מזכירה">מזכירה</option><option value="אחות">אחות</option></select><small>התפקיד הקבוע של העובד במעון.</small></label>
+        <label><span class="field-title">הרשאה במערכת</span><select name="role"><option value="employee">עובד</option><option value="scheduler">אחראית שיבוץ</option><option value="admin">מנהלת</option></select><small>קובע אילו מסכים ופעולות יהיו זמינים.</small></label>
       </div></section>
-      <section class="form-section"><h4>משרה ושעות</h4><div class="form-grid">
-        <label>שעות שבועיות מתוכננות<input name="weekly_hours" type="number" min="0" max="60" step="0.25" /></label>
-        <label>מקסימום שעות שבועיות<input name="max_weekly_hours" type="number" min="0" max="80" step="0.25" /></label>
-        <label>אחוז משרה<input name="employment_percent" type="number" min="0" max="200" step="1" /></label>
-        <label>שעת התחלה ברירת מחדל<input name="default_start" type="time" value="07:30" /></label>
-        <label>שעת סיום ברירת מחדל<input name="default_end" type="time" value="15:30" /></label>
+      <section id="employeeAssignmentSection" class="form-section employee-form-section"><div class="form-section-heading"><div><span class="section-number">2</span><div><h4>שיוך לכיתות</h4><p>בחרו את צורת העבודה הרגילה של העובד.</p></div></div></div><div class="form-grid">
+        <label id="assignmentModeField"><span class="field-title">אופן שיוך</span><select name="assignment_mode"><option value="fixed">כיתה קבועה</option><option value="rotation">רוטציה בין כיתות</option><option value="substitute">משלימ/ת מקום</option></select><small id="assignmentModeHelp">בחרו כיצד העובד משויך לכיתות.</small></label>
+        <label id="primaryClassField"><span class="field-title">בחירת כיתה</span><select name="primary_class_id"><option value="">בחירת כיתה</option></select><small>הכיתה תוצג בכרטיס העובד ובשיבוץ.</small></label>
       </div></section>
-      <fieldset class="weekly-patterns-box"><legend>ימי עבודה וחופשה קבועים</legend><p class="field-help">לכל יום אפשר לבחור יום עבודה עם שעות משלו, יום חופשי קבוע, או להשאיר ללא קביעה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset>
-      <fieldset class="constraints-box"><legend>העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset>
-      <label class="full-field">הערה ניהולית<textarea name="admin_notes" rows="3" placeholder="גלוי רק ללינור ולאילנית"></textarea></label>
+      <section id="employeeWorkSection" class="form-section employee-form-section"><div class="form-section-heading"><div><span class="section-number">3</span><div><h4>משרה ושעות</h4><p>היקף המשרה וברירות המחדל לשיבוץ.</p></div></div></div><div class="form-grid">
+        <label><span class="field-title">שעות שבועיות מתוכננות</span><input name="weekly_hours" type="number" inputmode="decimal" min="0" max="60" step="0.25" placeholder="לדוגמה 32" /></label>
+        <label><span class="field-title">מקסימום שעות שבועיות</span><input name="max_weekly_hours" type="number" inputmode="decimal" min="0" max="80" step="0.25" placeholder="לדוגמה 40" /></label>
+        <label><span class="field-title">אחוז משרה</span><input name="employment_percent" type="number" inputmode="numeric" min="0" max="200" step="1" placeholder="100" /></label>
+        <label><span class="field-title">שעת התחלה רגילה</span><input name="default_start" type="time" value="07:30" /></label>
+        <label><span class="field-title">שעת סיום רגילה</span><input name="default_end" type="time" value="15:30" /></label>
+      </div></section>
+      <details id="employeeScheduleSection" class="employee-form-details" open><summary><span class="section-number">4</span><span><strong>ימי עבודה ושעות</strong><small>אפשר לקבוע לכל יום שעות שונות או יום חופשי.</small></span><i>⌄</i></summary><fieldset class="weekly-patterns-box"><legend class="sr-only">ימי עבודה וחופשה קבועים</legend><p class="field-help">לכל יום אפשר לבחור יום עבודה עם שעות משלו, יום חופשי קבוע, או להשאיר ללא קביעה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset></details>
+      <details id="employeeConstraintsSection" class="employee-form-details"><summary><span class="section-number">5</span><span><strong>העדפות והגבלות כיתה</strong><small>מגדירים רק כאשר קיימת העדפה או מגבלה.</small></span><i>⌄</i></summary><fieldset class="constraints-box"><legend class="sr-only">העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset></details>
+      <details id="employeeNotesSection" class="employee-form-details"><summary><span class="section-number">6</span><span><strong>הערה ניהולית</strong><small>מידע פרטי שרק לינור ואילנית רואות.</small></span><i>⌄</i></summary><label class="full-field employee-admin-note"><span class="field-title">הערה ניהולית</span><textarea name="admin_notes" rows="3" placeholder="מידע פרטי ורלוונטי לניהול השיבוץ"></textarea></label></details>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת העובד</button></div>
     </form>
   </dialog>

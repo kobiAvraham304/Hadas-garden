@@ -27,5 +27,5 @@ module.exports = async function handler(req, res) {
     }
   }
   const ready = checks.environment.ok && checks.database.ok && checks.schema.ok && checks.initialAccounts.ok;
-  return send(res, ready ? 200 : 503, { ok:ready, version:'0.13.0', databaseVersion:'0.12.0', checks });
+  return send(res, ready ? 200 : 503, { ok:ready, version:'0.14.0', databaseVersion:'0.12.0', checks });
 };

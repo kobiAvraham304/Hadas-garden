@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.13.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.14.0 */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -134,10 +134,12 @@ function setBusy(button, busy, text = 'שומר…') {
     button.disabled = true;
     button.textContent = text;
     button.setAttribute('aria-busy', 'true');
+    button.classList.add('is-busy');
   } else {
     button.disabled = false;
     if (button.dataset.originalHtml) button.innerHTML = button.dataset.originalHtml;
     button.removeAttribute('aria-busy');
+    button.classList.remove('is-busy');
   }
 }
 function formObject(form) { return Object.fromEntries(new FormData(form).entries()); }
@@ -184,7 +186,7 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.13.0';
+    const version = state.config.version || '0.14.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -240,6 +242,7 @@ function bindEvents() {
   $('#employeeSearch').addEventListener('input', debounce((event) => { state.employeeSearch = event.target.value; renderEmployees(); }));
   $('#employeeForm [name="job_title"]').addEventListener('change', syncEmployeeAssignmentFields);
   $('#employeeForm [name="assignment_mode"]').addEventListener('change', syncEmployeeAssignmentFields);
+  $('.employee-form-nav', $('#employeeForm')).addEventListener('click', handleEmployeeFormNav);
 
   $('#newRequestBtn').addEventListener('click', openRequestDialog);
   $('#requestStatusFilter').addEventListener('change', (event) => { state.requestStatusFilter = event.target.value; syncFilterChips('#requestStatusChips', event.target.value); renderRequests(); });
@@ -1120,7 +1123,7 @@ function employeeAssignmentLabel(employee) {
   if (employee.is_schedulable === false || employee.assignment_mode === 'no_schedule') return 'ללא שיבוץ';
   if (employee.assignment_mode === 'substitute') return 'משלימ/ת מקום';
   if (employee.assignment_mode === 'rotation') return 'רוטציה בין כיתות';
-  return `כיתה קבועה · ${classById(employee.primary_class_id)?.name || 'טרם נבחרה'}`;
+  return classById(employee.primary_class_id)?.name || 'טרם נבחרה כיתה';
 }
 function employeeDaysOffLabel(employee) {
   const days = (employee.weekly_patterns || []).filter((row) => row.day_type === 'day_off').map((row) => DAY_NAMES[Number(row.weekday)]).filter(Boolean);
@@ -1133,9 +1136,9 @@ function employeeWorkPatternLabel(employee) {
   return visible.map((row) => row.day_type === 'day_off' ? `${DAY_NAMES[Number(row.weekday)]} חופשי` : row.day_type === 'as_needed' ? `${DAY_NAMES[Number(row.weekday)]} לפי צורך` : `${DAY_NAMES[Number(row.weekday)]} ${trimTime(row.start_time)}–${trimTime(row.end_time)}`).join(' · ');
 }
 function employeeRegistrationState(employee) {
-  if (employee.last_login_at && !employee.must_change_password) return { className:'registered', label:'נרשם/ה למערכת', detail:`כניסה אחרונה ${formatDate(employee.last_login_at,{day:'2-digit',month:'2-digit'})}` };
-  if (employee.last_login_at) return { className:'started', label:'התחיל/ה הרשמה', detail:'נדרשת החלפת סיסמה' };
-  return { className:'not-registered', label:'טרם נכנס/ה', detail:'הסיסמה הראשונית היא hadas' };
+  if (employee.last_login_at && !employee.must_change_password) return { className:'registered', label:'נרשם/ה', detail:`כניסה אחרונה ${formatDate(employee.last_login_at,{day:'2-digit',month:'2-digit'})}` };
+  if (employee.last_login_at) return { className:'started', label:'בהרשמה', detail:'נדרשת החלפת סיסמה' };
+  return { className:'not-registered', label:'טרם נרשם/ה', detail:'הסיסמה הראשונית היא hadas' };
 }
 function renderEmployees() {
   syncFilterChips('#employeeStatusChips', state.employeeStatusFilter); syncFilterChips('#employeeTypeChips', state.employeeTypeFilter);
@@ -1158,7 +1161,7 @@ function renderEmployees() {
   $('#employeesList').innerHTML = filtered.length ? filtered.map((employee) => {
     const type = employeeType(employee); const registration=employeeRegistrationState(employee);
     const titleBadge = type === 'teacher' ? '✿ גננת' : type === 'lead' ? '★ סייעת מובילה' : type === 'assistant' ? '☀ סייעת/ סייע' : type === 'flexible' ? '↻ צוות גמיש' : employee.job_title === 'אחות' ? '✚ אחות' : employee.job_title === 'מזכירה' ? '▤ מזכירה' : '♙ ניהול';
-    return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)} · ${escapeHtml(employeeAssignmentLabel(employee))}</p></div></div><div class="employee-login-state ${registration.className}"><span>${registration.className==='registered'?'✓':registration.className==='started'?'◷':'○'}</span><div><strong>${registration.label}</strong><small>${registration.detail}</small></div></div><div class="employee-role-strip"><span>${titleBadge}</span>${employee.can_lead ? '<span>תפקיד הובלה</span>' : ''}${employee.is_schedulable === false ? '<span>ללא שיבוץ</span>' : ''}</div><div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות מתוכננות / מקסימום</small><strong>${employee.weekly_hours ?? '—'} / ${employee.max_weekly_hours ?? '—'}</strong></div><div><small>ימי חופשה קבועים</small><strong>${escapeHtml(employeeDaysOffLabel(employee))}</strong></div></div><div class="employee-pattern-preview"><small>ימים קבועים</small><span>${escapeHtml(employeeWorkPatternLabel(employee))}</span></div><div class="card-actions"><button class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`;
+    return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><div class="employee-card-badges"><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><span class="employee-registration-badge ${registration.className}" title="${escapeHtml(registration.detail)}" aria-label="${escapeHtml(registration.label)}: ${escapeHtml(registration.detail)}"><i>${registration.className==='registered'?'✓':registration.className==='started'?'◷':'○'}</i>${registration.label}</span></div><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)}${employeeAssignmentLabel(employee) ? ` · ${escapeHtml(employeeAssignmentLabel(employee))}` : ''}</p></div></div><div class="employee-role-strip"><span>${titleBadge}</span>${employee.can_lead ? '<span>תפקיד הובלה</span>' : ''}${employee.is_schedulable === false ? '<span>ללא שיבוץ</span>' : ''}</div><div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות מתוכננות / מקסימום</small><strong>${employee.weekly_hours ?? '—'} / ${employee.max_weekly_hours ?? '—'}</strong></div><div><small>ימי חופשה קבועים</small><strong>${escapeHtml(employeeDaysOffLabel(employee))}</strong></div></div><div class="employee-pattern-preview"><small>ימים קבועים</small><span>${escapeHtml(employeeWorkPatternLabel(employee))}</span></div><div class="card-actions"><button type="button" class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button type="button" class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button type="button" class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`;
   }).join('') : '<div class="empty-state">לא נמצאו עובדים לפי הסינון.</div>';
 }
 function renderConstraintFields(employee = {}) {
@@ -1207,12 +1210,16 @@ function syncEmployeeAssignmentFields() {
   else if (assignment.value === 'no_schedule') assignment.value = 'fixed';
   assignment.disabled = noSchedule;
   $('#assignmentModeField').classList.toggle('hidden', noSchedule);
+  $('#employeeAssignmentSection').classList.toggle('hidden', noSchedule);
+  $('.employee-form-nav [data-employee-section="employeeAssignmentSection"]',form).classList.toggle('hidden',noSchedule);
   const schedulingDisabled = noSchedule || assignment.value === 'no_schedule';
   const fixed = assignment.value === 'fixed' && !schedulingDisabled;
   $('#primaryClassField').classList.toggle('hidden', !fixed);
   form.elements.primary_class_id.required = fixed;
   $('.weekly-patterns-box', form).classList.toggle('hidden', schedulingDisabled);
-  $('#constraintsFields')?.closest('.form-section')?.classList.toggle('hidden', schedulingDisabled || managerTitle);
+  $('#employeeScheduleSection').classList.toggle('hidden',schedulingDisabled);
+  $('.employee-form-nav [data-employee-section="employeeScheduleSection"]',form).classList.toggle('hidden',schedulingDisabled);
+  $('#employeeConstraintsSection')?.classList.toggle('hidden', schedulingDisabled || managerTitle);
   const help=$('#assignmentModeHelp');
   if(help) help.textContent=assignment.value==='fixed'?'כיתה קבועה ולאחר מכן בחירת הכיתה.':assignment.value==='rotation'?'עובר/ת בין כיתות לפי הרוטציה והעדפות הכיתה.':'משלימ/ת מקום ללא כיתה קבועה; ניתן לסמן ימים לפי צורך.';
   if (!schedulingDisabled) renderWeeklyPatternFields({ assignment_mode: assignment.value, default_start: form.elements.default_start.value, default_end: form.elements.default_end.value, weekly_patterns: patternsBefore });
@@ -1240,7 +1247,18 @@ function openEmployeeDialog(employee = {}) {
   form.elements.default_end.value = trimTime(employee.default_end) || '15:30';
   form.elements.admin_notes.value = employee.admin_notes || '';
   renderWeeklyPatternFields(employee); renderConstraintFields(employee); syncEmployeeAssignmentFields();
-  $('#employeeDialog').showModal();
+  const dialog=$('#employeeDialog');
+  $('#employeeScheduleSection').open=true; $('#employeeConstraintsSection').open=false; $('#employeeNotesSection').open=false;
+  $$('.employee-form-nav button',form).forEach((button,index)=>button.classList.toggle('active',index===0));
+  dialog.showModal();
+  requestAnimationFrame(()=>{ $('.modal-card',dialog).scrollTop=0; form.elements.full_name.focus({preventScroll:true}); });
+}
+function handleEmployeeFormNav(event) {
+  const button=event.target.closest('[data-employee-section]'); if(!button)return;
+  const target=$(`#${button.dataset.employeeSection}`); if(!target)return;
+  if(target.tagName==='DETAILS')target.open=true;
+  $$('.employee-form-nav button',$('#employeeForm')).forEach((item)=>item.classList.toggle('active',item===button));
+  target.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
 }
 async function saveEmployee(event) {
   event.preventDefault();
@@ -1257,11 +1275,19 @@ async function saveEmployee(event) {
   finally { setBusy(button, false); }
 }
 async function handleEmployeeClick(event) {
-  const button = event.target.closest('[data-action]'); if (!button) return; const employee = employeeById(button.dataset.id); if (!employee) return;
+  const button = event.target.closest('[data-action]'); if (!button || button.disabled) return; const employee = employeeById(button.dataset.id); if (!employee) return;
   if (button.dataset.action === 'edit') return openEmployeeDialog(employee);
-  if (button.dataset.action === 'reset' && !confirm(`לאפס את הסיסמה של ${employee.full_name} ל-hadas?`)) return;
+  const isReset=button.dataset.action==='reset';
+  if (isReset && !confirm(`לאפס את הסיסמה של ${employee.full_name} ל-hadas?`)) return;
   if (button.dataset.action === 'toggle' && !confirm(`${employee.active ? 'להשבית' : 'להפעיל'} את ${employee.full_name}?`)) return;
-  try { await apiFetch('/api/employees', { method: 'PATCH', body: { id: employee.id, ...(button.dataset.action === 'reset' ? { reset_password: true } : { active: !employee.active }) } }); await refreshAll(); showToast('העובד עודכן', 'success'); } catch (error) { showToast(error.message, 'error'); }
+  setBusy(button,true,isReset?'מאפס סיסמה…':employee.active?'משבית…':'מפעיל…');
+  try {
+    await apiFetch('/api/employees', { method: 'PATCH', body: { id: employee.id, ...(isReset ? { reset_password: true } : { active: !employee.active }) } });
+    if(isReset){ employee.must_change_password=true; showToast(`הסיסמה של ${employee.full_name} אופסה ל-hadas`,'success'); }
+    else { employee.active=!employee.active; showToast(employee.active?'העובד הופעל':'העובד הושבת','success'); }
+    renderEmployees();
+  } catch (error) { showToast(error.message, 'error'); }
+  finally { setBusy(button,false); }
 }
 
 function notificationIcon(type) {

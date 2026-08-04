@@ -1,0 +1,71 @@
+[
+  {
+    "name": "employees-desktop",
+    "viewport": 1440,
+    "scrollWidth": 1440,
+    "smallButtons": 0,
+    "dialogBounds": [],
+    "errors": []
+  },
+  {
+    "name": "employees-mobile390",
+    "viewport": 390,
+    "scrollWidth": 390,
+    "smallButtons": 0,
+    "dialogBounds": [],
+    "errors": []
+  },
+  {
+    "name": "employees-mobile360",
+    "viewport": 360,
+    "scrollWidth": 360,
+    "smallButtons": 0,
+    "dialogBounds": [],
+    "errors": []
+  },
+  {
+    "name": "form-desktop",
+    "viewport": 1440,
+    "scrollWidth": 1440,
+    "smallButtons": 0,
+    "dialogBounds": [
+      {
+        "left": 330,
+        "right": 1110,
+        "top": 0,
+        "bottom": 972
+      }
+    ],
+    "errors": []
+  },
+  {
+    "name": "form-mobile390",
+    "viewport": 390,
+    "scrollWidth": 390,
+    "smallButtons": 0,
+    "dialogBounds": [
+      {
+        "left": 8,
+        "right": 382,
+        "top": 8,
+        "bottom": 836
+      }
+    ],
+    "errors": []
+  },
+  {
+    "name": "form-mobile360",
+    "viewport": 360,
+    "scrollWidth": 360,
+    "smallButtons": 0,
+    "dialogBounds": [
+      {
+        "left": 8,
+        "right": 352,
+        "top": 8,
+        "bottom": 792
+      }
+    ],
+    "errors": []
+  }
+]
