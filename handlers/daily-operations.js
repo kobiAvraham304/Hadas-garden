@@ -12,6 +12,7 @@ function sunday(dateString) { const d=new Date(`${dateString}T12:00:00Z`); d.set
 function addDays(dateString,days){ const d=new Date(`${dateString}T12:00:00Z`); d.setUTCDate(d.getUTCDate()+days); return d.toISOString().slice(0,10); }
 function dayOf(dateString){ return new Date(`${dateString}T12:00:00Z`).getUTCDay(); }
 function shortTime(value){ return value ? String(value).slice(0,5) : null; }
+function normalizeScore(raw){ return Math.max(1,Math.min(100,Math.round(((Number(raw)||0)+30)*100/190))); }
 
 function affectedRange(operation, shift) {
   if (['sick','absent'].includes(operation.operation_type)) return { start:shortTime(shift.start_time), end:shortTime(shift.end_time) };
@@ -126,7 +127,7 @@ function buildSuggestions(context, operation, shift) {
       const avoid=(context.constraints||[]).some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='avoid');
       if(preferred){score+=16;reasons.push('עדיפות מפורשת לכיתה');}
       if(avoid){score-=18;reasons.push('עדיף להימנע מהכיתה — אפשרות אחרונה');}
-      suggestions.push({ employee_id:employee.id, full_name:employee.full_name, job_title:employee.job_title, replacement_type:'replacement', from_class_id:null, start_time:range.start, end_time:range.end, score, reasons });
+      suggestions.push({ employee_id:employee.id, full_name:employee.full_name, job_title:employee.job_title, replacement_type:'replacement', from_class_id:null, start_time:range.start, end_time:range.end, raw_score:score, reasons });
       continue;
     }
 
@@ -140,9 +141,9 @@ function buildSuggestions(context, operation, shift) {
     const avoid=(context.constraints||[]).some(c=>c.employee_id===employee.id&&c.class_id===operation.class_id&&c.constraint_type==='avoid');
     if(preferred){score+=14;reasons.push('עדיפות לכיתת היעד');}
     if(avoid){score-=20;reasons.push('עדיף להימנע מכיתת היעד — אפשרות אחרונה');}
-    suggestions.push({ employee_id:employee.id, full_name:employee.full_name, job_title:employee.job_title, replacement_type:'transfer', from_class_id:source.class_id, start_time:range.start, end_time:range.end, score, reasons });
+    suggestions.push({ employee_id:employee.id, full_name:employee.full_name, job_title:employee.job_title, replacement_type:'transfer', from_class_id:source.class_id, start_time:range.start, end_time:range.end, raw_score:score, reasons });
   }
-  return suggestions.sort((a,b)=>b.score-a.score||a.full_name.localeCompare(b.full_name,'he')).slice(0,16);
+  return suggestions.sort((a,b)=>b.raw_score-a.raw_score||a.full_name.localeCompare(b.full_name,'he')).slice(0,16).map(({raw_score,...item})=>({...item,score:normalizeScore(raw_score)}));
 }
 
 function validateReport(type, body, shift) {

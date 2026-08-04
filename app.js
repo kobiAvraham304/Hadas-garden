@@ -1,10 +1,10 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.12.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.13.0 */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 const DAY_NAMES = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 const ROLE_LABELS = { admin: 'מנהלת מעון', scheduler: 'אחראית שיבוץ', employee: 'עובד' };
-const SHIFT_ROLE_LABELS = { teacher: 'גננת/גנן', lead: 'מוביל/ה', staff: 'איש/ת צוות', replacement: 'מחליף/ה' };
+const SHIFT_ROLE_LABELS = { teacher: 'גננת/גנן — אחראי/ת כיתה', lead: 'מוביל/ת כיתה — אחראי/ת כיתה', staff: 'צוות כיתה', replacement: 'מילוי מקום / החלפה' };
 const SHIFT_STATUS_LABELS = { draft: 'ממתין לפרסום', published: 'פורסם' };
 const REQUEST_LABELS = { leave: 'חופשה', day_off: 'יום חופשי', late_start: 'התחלה מאוחרת', early_finish: 'סיום מוקדם', sick: 'מחלה', swap: 'החלפת שיבוץ', other: 'בקשה ישנה' };
 const REQUEST_STATUS_LABELS = { pending: 'ממתין', approved: 'אושר', rejected: 'נדחה', applied: 'הוזרם', cancelled: 'בוטל' };
@@ -71,6 +71,8 @@ const state = {
   weekInflight: new Map(),
   expandedWeekDay: null,
   scheduleIssueMap: new Map(),
+  scheduleIssuesOpen: false,
+  scheduleValidationCache: { key: '', value: null },
   calendarCache: new Map(),
   calendarInflight: new Map(),
   calendarRequestId: 0,
@@ -99,6 +101,8 @@ function formatDate(value, options = { day: '2-digit', month: '2-digit', year: '
 function trimTime(value) { return value ? String(value).slice(0, 5) : ''; }
 function timeHtml(start, end) { return `<bdi class="time-value">${escapeHtml(trimTime(start) || '—')}${end ? `–${escapeHtml(trimTime(end))}` : ''}</bdi>`; }
 function timeToMinutes(value) { if (!value) return 0; const [h, m] = String(value).slice(0, 5).split(':').map(Number); return h * 60 + m; }
+function normalizeDisplayScore(value) { return Math.max(1, Math.min(100, Math.round(Number(value) || 1))); }
+function scoreScaleHtml(value, label = 'התאמה') { const score = normalizeDisplayScore(value); return `<span class="match-score" aria-label="${escapeHtml(label)} ${score} מתוך 100"><span><strong>${score}</strong><small>/100</small></span><i aria-hidden="true"><b style="--score:${score}%"></b></i></span>`; }
 function closingTimeForDate(value) { const date=parseDateValue(value); return date.getDay()===5 ? trimTime(state.settings.friday_closing_time)||'12:00' : trimTime(state.settings.closing_time)||'15:30'; }
 function overlaps(aStart, aEnd, bStart, bEnd) { return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart); }
 function initials(name) { return String(name || '').trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join(''); }
@@ -180,7 +184,7 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.12.0';
+    const version = state.config.version || '0.13.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -219,6 +223,7 @@ function bindEvents() {
   $('#publishSummary').addEventListener('click', handlePublishIssueClick);
   $('#ackScheduleBtn').addEventListener('click', acknowledgeSchedule);
   $('#settingsBtn').addEventListener('click', openSettings);
+  $('#scheduleIssuesToggle').addEventListener('click', toggleScheduleIssues);
   $('#printBtn').addEventListener('click', printWeeklySchedule);
   $('#imageBtn').addEventListener('click', downloadScheduleImage);
   $('#monthImageBtn').addEventListener('click', downloadMonthlyScheduleImage);
@@ -267,9 +272,9 @@ function bindEvents() {
   $('#newCalendarBtn').addEventListener('click', () => openCalendarDialog());
 
   $('#shiftForm').addEventListener('submit', saveShift);
-  $('#shiftForm [name="employee_id"]').addEventListener('change', () => { syncShiftHoursFromPattern(); updateShiftEmployeeHint(); });
+  $('#shiftForm [name="employee_id"]').addEventListener('change', () => { syncShiftHoursFromPattern(); syncShiftRoleFromEmployee(true); updateShiftEmployeeHint(); queueShiftRecommendations(); });
   $('#shiftForm [name="shift_date"]').addEventListener('change', () => { syncShiftHoursFromPattern(); queueShiftRecommendations(); });
-  for (const name of ['class_id','start_time','end_time','shift_role']) $('#shiftForm [name="'+name+'"]').addEventListener(name.includes('time') ? 'input' : 'change', queueShiftRecommendations);
+  for (const name of ['class_id','start_time','end_time','shift_role']) $('#shiftForm [name="'+name+'"]').addEventListener(name.includes('time') ? 'input' : 'change', (event) => { if (name === 'shift_role') $('#shiftForm').dataset.roleTouched = 'true'; queueShiftRecommendations(event); });
   $('#shiftRecommendations').addEventListener('click', handleShiftRecommendationClick);
   $('#publishChangeNowBtn').addEventListener('click', publishPendingChangeNow);
   $('#employeeForm').addEventListener('submit', saveEmployee);
@@ -279,6 +284,7 @@ function bindEvents() {
   $('#calendarForm').addEventListener('submit', saveCalendarEvent);
   $('#settingsForm').addEventListener('submit', saveSettings);
   $('#settingsForm').addEventListener('input', renderSettingsPreview);
+  $('#settingsForm').addEventListener('click', handleSettingsStepper);
   $('#settingsPresetBtn').addEventListener('click', () => applyStandardsPreset(4, 3, 30));
   $('#settingsPresetFullBtn').addEventListener('click', () => applyStandardsPreset(4, 4, 0));
   $('#settingsPresetLeanBtn').addEventListener('click', () => applyStandardsPreset(3, 3, 0));
@@ -635,7 +641,15 @@ function compactProblemRanges(rows, includeCounts = false) {
     return `${range.start}–${range.end}${minimum}`;
   }).join(', ');
 }
+function scheduleValidationKey() {
+  const settingsKey = ['opening_time','closing_time','friday_closing_time','required_staff','closing_required_staff','closing_window_minutes','validation_slot_minutes','require_leader'].map((key) => `${key}:${state.settings[key] ?? ''}`).join('|');
+  const shiftKey = state.shifts.map((shift) => `${shift.id}:${shift.shift_date}:${shift.class_id}:${shift.employee_id}:${trimTime(shift.start_time)}:${trimTime(shift.end_time)}:${shift.shift_role}:${shift.status}`).sort().join(';');
+  const employeeKey = state.employees.filter((item) => item.active).map((employee) => `${employee.id}:${employee.weekly_hours ?? ''}:${employee.max_weekly_hours ?? ''}`).sort().join(';');
+  return `${dateISO(state.weekStart)}|${settingsKey}|${shiftKey}|${employeeKey}`;
+}
 function validateScheduleClient() {
+  const validationKey = scheduleValidationKey();
+  if (state.scheduleValidationCache.key === validationKey && state.scheduleValidationCache.value) return state.scheduleValidationCache.value;
   const issues = []; const warnings = [];
   const open = timeToMinutes(state.settings.opening_time || '07:30');
   const slot = Math.max(15, Number(state.settings.validation_slot_minutes || 30));
@@ -670,23 +684,43 @@ function validateScheduleClient() {
       warnings.push({ id: `hours-${employee.id}`, kind: 'hours', employeeId: employee.id, title: employee.full_name, text: `שובץ ${hours.toFixed(1)} שעות מתוך ${Number(employee.weekly_hours).toFixed(1)}` });
     }
   }
-  return { errors: issues, warnings };
+  const result = { errors: issues, warnings };
+  state.scheduleValidationCache = { key: validationKey, value: result };
+  return result;
 }
 function minutesLabel(value) { return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`; }
+function toggleScheduleIssues() {
+  if (!isManager()) return;
+  state.scheduleIssuesOpen = !state.scheduleIssuesOpen;
+  const toggle = $('#scheduleIssuesToggle'); const panel = $('#scheduleWarnings');
+  toggle.setAttribute('aria-expanded', String(state.scheduleIssuesOpen));
+  panel.classList.toggle('hidden', !state.scheduleIssuesOpen);
+  if (state.scheduleIssuesOpen) requestAnimationFrame(() => panel.scrollIntoView({ behavior:'smooth', block:'nearest' }));
+}
 function renderWarnings() {
-  if (!isManager()) { $('#scheduleWarnings').innerHTML = ''; return; }
+  const panel = $('#scheduleWarnings'); const toggle = $('#scheduleIssuesToggle'); const count = $('#scheduleIssuesCount');
+  if (!isManager()) { panel.innerHTML = ''; panel.classList.add('hidden'); return; }
   const validation = validateScheduleClient();
   state.scheduleIssueMap = new Map([...validation.errors, ...validation.warnings].map((item) => [item.id, item]));
-  if (!validation.errors.length && !validation.warnings.length) {
-    $('#scheduleWarnings').innerHTML = '<div class="schedule-health-card is-ok"><span>✓</span><div><strong>השיבוץ עומד בבדיקות התקינה</strong><small>לא נמצאו חוסרים, חריגות שעות או התראות המחייבות טיפול.</small></div></div>';
+  const total = validation.errors.length + validation.warnings.length;
+  toggle.classList.toggle('has-errors', validation.errors.length > 0);
+  toggle.classList.toggle('has-warnings', validation.errors.length === 0 && validation.warnings.length > 0);
+  toggle.classList.toggle('is-ok', total === 0);
+  toggle.querySelector('i').textContent = validation.errors.length ? '!' : validation.warnings.length ? 'i' : '✓';
+  count.textContent = validation.errors.length ? `${validation.errors.length} שגיאות · ${validation.warnings.length} התראות` : validation.warnings.length ? `${validation.warnings.length} התראות` : 'הכול תקין';
+  toggle.setAttribute('aria-expanded', String(state.scheduleIssuesOpen));
+  panel.classList.toggle('hidden', !state.scheduleIssuesOpen);
+  if (!total) {
+    panel.innerHTML = '<div class="schedule-health-card is-ok"><span>✓</span><div><strong>השיבוץ עומד בבדיקות התקינה</strong><small>לא נמצאו חוסרים או חריגות שעות בשבוע המוצג.</small></div></div>';
     return;
   }
-  const errorCards=validation.errors.map((item)=>{
-    const isCoverage=item.kind==='coverage';
-    return `<article class="schedule-issue-card is-error" data-issue-card="${escapeHtml(item.id)}"><div class="issue-icon">!</div><div class="issue-copy"><span class="issue-level">שגיאה שחוסמת פרסום</span><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p><small>${isCoverage?'דרך תיקון: הוסיפו עובד מתאים או הפעילו הצעה אוטומטית לשעות החסרות.':'דרך תיקון: פתחו את כרטיס העובד ובדקו שעות, מקסימום שבועי או שיבוצים כפולים.'}</small></div><div class="issue-actions">${isCoverage?`<button type="button" class="primary-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="suggest">הצעת עובד מתאים</button><button type="button" class="ghost-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="add">הוספת שיבוץ ידנית</button>`:`<button type="button" class="primary-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="employee">פתיחת כרטיס העובד</button>`}</div></article>`;
+  const errorCards = validation.errors.map((item) => {
+    const isCoverage = item.kind === 'coverage';
+    const fixText = isCoverage ? 'הדרך המהירה: הצגת עובדים מתאימים לשעות החסרות.' : 'הדרך המהירה: פתיחת כרטיס העובד ובדיקת היקף השעות.';
+    return `<article class="schedule-issue-card is-error" data-issue-card="${escapeHtml(item.id)}"><div class="issue-icon">!</div><div class="issue-copy"><span class="issue-level">חוסם פרסום</span><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p><small>${fixText}</small></div><div class="issue-actions">${isCoverage ? `<button type="button" class="primary-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="suggest">הצגת עובדים מתאימים</button><button type="button" class="ghost-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="add">הוספה ידנית</button>` : `<button type="button" class="primary-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="employee">פתיחת כרטיס עובד</button>`}</div></article>`;
   }).join('');
-  const warningCards=validation.warnings.map((item)=>`<article class="schedule-issue-card is-warning" data-issue-card="${escapeHtml(item.id)}"><div class="issue-icon">i</div><div class="issue-copy"><span class="issue-level">התראה לבדיקה</span><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p><small>ההתראה אינה חוסמת פרסום, אך מומלץ לבדוק לפני שליחה לצוות.</small></div><div class="issue-actions"><button type="button" class="ghost-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="employee">בדיקת העובד</button></div></article>`).join('');
-  $('#scheduleWarnings').innerHTML = `<details class="warning-details upgraded-warning-details" open><summary><span><b>${validation.errors.length}</b> שגיאות · <b>${validation.warnings.length}</b> התראות</span><small>לכל שגיאה מוצגת דרך תיקון ישירה</small></summary><div class="schedule-issue-toolbar"><span>תקנו את השגיאות האדומות לפני פרסום השיבוץ.</span><button type="button" class="ghost-btn" data-fix-action="settings">פתיחת הגדרות תקינה</button></div><div class="warning-details-list">${errorCards}${warningCards}</div></details>`;
+  const warningCards = validation.warnings.map((item) => `<article class="schedule-issue-card is-warning" data-issue-card="${escapeHtml(item.id)}"><div class="issue-icon">i</div><div class="issue-copy"><span class="issue-level">מומלץ לבדוק</span><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.text)}</p><small>ההתראה אינה חוסמת את הפרסום.</small></div><div class="issue-actions"><button type="button" class="ghost-btn" data-issue-id="${escapeHtml(item.id)}" data-fix-action="employee">בדיקת העובד</button></div></article>`).join('');
+  panel.innerHTML = `<section class="schedule-issues-panel"><header><div><strong>בדיקות התקינה של השבוע</strong><small>השגיאות האדומות דורשות תיקון לפני פרסום.</small></div><button type="button" class="ghost-btn" data-fix-action="settings">שינוי הגדרות תקינה</button></header><div class="warning-details-list">${errorCards}${warningCards}</div></section>`;
 }
 function focusScheduleIssue(issue) {
   const index = currentWeekDates().findIndex((date) => dateISO(date) === issue.date);
@@ -797,7 +831,7 @@ function setShiftEmployeeOptions(candidates = [], selectedId = "") {
   const select = $("#shiftForm [name=\"employee_id\"]");
   const active = state.employees.filter((item) => item.active && item.is_schedulable !== false);
   const candidateIds = new Set(candidates.map((item) => item.employee_id));
-  const recommended = candidates.map((candidate) => `<option value="${candidate.employee_id}" ${candidate.employee_id === selectedId ? "selected" : ""}>★ ${escapeHtml(candidate.full_name)} — התאמה ${candidate.score}</option>`).join("");
+  const recommended = candidates.map((candidate) => `<option value="${candidate.employee_id}" ${candidate.employee_id === selectedId ? "selected" : ""}>★ ${escapeHtml(candidate.full_name)} — ${normalizeDisplayScore(candidate.score)}/100</option>`).join("");
   const other = active.filter((item) => !candidateIds.has(item.id)).sort((a,b) => a.full_name.localeCompare(b.full_name,"he")).map((item) => `<option value="${item.id}" ${item.id === selectedId ? "selected" : ""}>${escapeHtml(item.full_name)} — ${escapeHtml(item.job_title)}</option>`).join("");
   select.innerHTML = `${recommended ? `<optgroup label="מומלצים לפי התאמה">${recommended}</optgroup>` : ""}<optgroup label="כל שאר העובדים">${other}</optgroup>`;
   if (selectedId && active.some((item) => item.id === selectedId)) select.value = selectedId;
@@ -809,13 +843,13 @@ function updateShiftEmployeeHint() {
   const key = shiftRecommendationKey(form); const cached = state.shiftSuggestionCache.get(key);
   const candidate = cached?.candidates?.find((item) => item.employee_id === employeeId);
   const employee = employeeById(employeeId); const hint = $("#shiftEmployeeHint"); if (!hint) return;
-  hint.textContent = candidate ? `התאמה ${candidate.score}: ${candidate.reasons.slice(0,2).join(" · ")}` : employee ? `${employee.job_title} · ניתן לבחור גם עובד שאינו ברשימת המומלצים.` : "בחרו עובד לשיבוץ.";
+  hint.textContent = candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,2).join(" · ")}` : employee ? `${employee.job_title} · ניתן לבחור גם עובד שאינו ברשימת המומלצים.` : "בחרו עובד לשיבוץ.";
 }
 function renderShiftRecommendations(candidates = []) {
   const target = $("#shiftRecommendations"); const status = $("#shiftRecommendationStatus");
   if (!candidates.length) { target.innerHTML = '<div class="empty-state compact">לא נמצאו עובדים זמינים שמתאימים לטווח שנבחר. אפשר לבחור עובד אחר ולבדוק את החריגה.</div>'; status.textContent = "אין התאמה מלאה"; status.className = "status-chip warn"; return; }
   const top = candidates.slice(0,5);
-  target.innerHTML = top.map((candidate,index) => `<button type="button" class="shift-recommendation-card level-${candidate.recommendation_level || "possible"}" data-recommended-employee="${candidate.employee_id}" data-recommended-role="${candidate.suggested_role}"><span class="recommendation-rank">${index+1}</span><div><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidate.job_title)} · ${candidate.reasons.slice(0,2).map(escapeHtml).join(" · ")}</small></div><span class="recommendation-score">${candidate.score}</span></button>`).join("");
+  target.innerHTML = top.map((candidate,index) => `<button type="button" class="shift-recommendation-card level-${candidate.recommendation_level || "possible"}" data-recommended-employee="${candidate.employee_id}" data-recommended-role="${candidate.suggested_role}"><span class="recommendation-rank">${index+1}</span><div><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidate.job_title)} · ${candidate.reasons.slice(0,2).map(escapeHtml).join(" · ")}</small></div>${scoreScaleHtml(candidate.score)}</button>`).join("");
   status.textContent = `${candidates.length} התאמות`; status.className = "status-chip ok";
 }
 async function updateShiftRecommendations({ force = false } = {}) {
@@ -846,6 +880,18 @@ function handleShiftRecommendationClick(event) {
   $$(".shift-recommendation-card").forEach((item) => item.classList.toggle("selected", item === button)); updateShiftEmployeeHint();
 }
 
+function suggestedShiftRoleForEmployee(employee) {
+  const title = String(employee?.job_title || '');
+  if (/(גננת|גנן)/.test(title)) return 'teacher';
+  if (title === 'סייעת מובילה' || employee?.can_lead) return 'lead';
+  return 'staff';
+}
+function syncShiftRoleFromEmployee(force = false) {
+  const form = $('#shiftForm'); const employee = employeeById(form.elements.employee_id.value);
+  if (!employee || (!force && form.dataset.roleTouched === 'true')) return;
+  form.elements.shift_role.value = suggestedShiftRoleForEmployee(employee);
+  form.dataset.roleTouched = 'false';
+}
 function syncShiftHoursFromPattern() {
   const form = $('#shiftForm');
   const employee = employeeById(form.elements.employee_id.value);
@@ -875,7 +921,8 @@ function openShiftDialog(shift = {}) {
     form.elements.end_time.value = trimTime(shift.end_time) || closingTimeForDate(form.elements.shift_date.value);
     form.elements.end_time.max = closingTimeForDate(form.elements.shift_date.value);
   } else syncShiftHoursFromPattern();
-  form.elements.shift_role.value = shift.shift_role || "staff";
+  form.dataset.roleTouched = shift.id ? "true" : "false";
+  form.elements.shift_role.value = shift.shift_role || suggestedShiftRoleForEmployee(employeeById(initialEmployee));
   form.elements.public_note.value = shift.public_note || "";
   form.elements.override_day_off.value = "false";
   $("#shiftRecommendations").innerHTML = '<div class="recommendation-loading"><span></span><span>מחשב התאמות…</span></div>';
@@ -1085,6 +1132,11 @@ function employeeWorkPatternLabel(employee) {
   const visible = patterns.filter((row) => row.day_type);
   return visible.map((row) => row.day_type === 'day_off' ? `${DAY_NAMES[Number(row.weekday)]} חופשי` : row.day_type === 'as_needed' ? `${DAY_NAMES[Number(row.weekday)]} לפי צורך` : `${DAY_NAMES[Number(row.weekday)]} ${trimTime(row.start_time)}–${trimTime(row.end_time)}`).join(' · ');
 }
+function employeeRegistrationState(employee) {
+  if (employee.last_login_at && !employee.must_change_password) return { className:'registered', label:'נרשם/ה למערכת', detail:`כניסה אחרונה ${formatDate(employee.last_login_at,{day:'2-digit',month:'2-digit'})}` };
+  if (employee.last_login_at) return { className:'started', label:'התחיל/ה הרשמה', detail:'נדרשת החלפת סיסמה' };
+  return { className:'not-registered', label:'טרם נכנס/ה', detail:'הסיסמה הראשונית היא hadas' };
+}
 function renderEmployees() {
   syncFilterChips('#employeeStatusChips', state.employeeStatusFilter); syncFilterChips('#employeeTypeChips', state.employeeTypeFilter);
   const term = state.employeeSearch.trim().toLowerCase();
@@ -1096,13 +1148,17 @@ function renderEmployees() {
     return statusOk && classOk && typeOk && (!term || haystack.includes(term));
   });
   const activeRows=state.employees.filter((employee)=>employee.active);
+  const registeredRows=activeRows.filter((employee)=>employee.last_login_at && !employee.must_change_password);
+  const startedRows=activeRows.filter((employee)=>employee.last_login_at && employee.must_change_password);
+  const notRegistered=Math.max(0,activeRows.length-registeredRows.length-startedRows.length);
+  $('#employeeRegistrationSummary').innerHTML = `<span class="registration-summary-icon">✓</span><div><strong>${registeredRows.length} מתוך ${activeRows.length} עובדים השלימו הרשמה</strong><small>${notRegistered} טרם נכנסו${startedRows.length ? ` · ${startedRows.length} התחילו וטרם החליפו סיסמה` : ''}</small></div>`;
   const counts={ all:activeRows.length, assistant:activeRows.filter((e)=>employeeType(e)==='assistant').length, lead:activeRows.filter((e)=>employeeType(e)==='lead').length, teacher:activeRows.filter((e)=>employeeType(e)==='teacher').length, flexible:activeRows.filter((e)=>employeeType(e)==='flexible').length };
   const summaryItems=[['all','כל העובדים','♙'],['assistant','סייעות','☀'],['lead','סייעות מובילות','★'],['teacher','גננות','✿'],['flexible','רוטציה / השלמה','↻']];
   $('#employeeSummary').innerHTML = summaryItems.map(([key,label,icon])=>`<button type="button" class="mini-stat employee-summary-button ${state.employeeTypeFilter===key?'active':''}" data-employee-summary-filter="${key}"><span>${icon}</span><strong>${counts[key]}</strong><small>${label}</small></button>`).join('');
   $('#employeesList').innerHTML = filtered.length ? filtered.map((employee) => {
-    const type = employeeType(employee);
+    const type = employeeType(employee); const registration=employeeRegistrationState(employee);
     const titleBadge = type === 'teacher' ? '✿ גננת' : type === 'lead' ? '★ סייעת מובילה' : type === 'assistant' ? '☀ סייעת/ סייע' : type === 'flexible' ? '↻ צוות גמיש' : employee.job_title === 'אחות' ? '✚ אחות' : employee.job_title === 'מזכירה' ? '▤ מזכירה' : '♙ ניהול';
-    return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)} · ${escapeHtml(employeeAssignmentLabel(employee))}</p></div></div><div class="employee-role-strip"><span>${titleBadge}</span>${employee.can_lead ? '<span>תפקיד הובלה</span>' : ''}${employee.is_schedulable === false ? '<span>ללא שיבוץ</span>' : ''}</div><div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות מתוכננות / מקסימום</small><strong>${employee.weekly_hours ?? '—'} / ${employee.max_weekly_hours ?? '—'}</strong></div><div><small>ימי חופשה קבועים</small><strong>${escapeHtml(employeeDaysOffLabel(employee))}</strong></div></div><div class="employee-pattern-preview"><small>ימים קבועים</small><span>${escapeHtml(employeeWorkPatternLabel(employee))}</span></div><div class="card-actions"><button class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`;
+    return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)} · ${escapeHtml(employeeAssignmentLabel(employee))}</p></div></div><div class="employee-login-state ${registration.className}"><span>${registration.className==='registered'?'✓':registration.className==='started'?'◷':'○'}</span><div><strong>${registration.label}</strong><small>${registration.detail}</small></div></div><div class="employee-role-strip"><span>${titleBadge}</span>${employee.can_lead ? '<span>תפקיד הובלה</span>' : ''}${employee.is_schedulable === false ? '<span>ללא שיבוץ</span>' : ''}</div><div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות מתוכננות / מקסימום</small><strong>${employee.weekly_hours ?? '—'} / ${employee.max_weekly_hours ?? '—'}</strong></div><div><small>ימי חופשה קבועים</small><strong>${escapeHtml(employeeDaysOffLabel(employee))}</strong></div></div><div class="employee-pattern-preview"><small>ימים קבועים</small><span>${escapeHtml(employeeWorkPatternLabel(employee))}</span></div><div class="card-actions"><button class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`;
   }).join('') : '<div class="empty-state">לא נמצאו עובדים לפי הסינון.</div>';
 }
 function renderConstraintFields(employee = {}) {
@@ -1450,7 +1506,7 @@ async function saveDailyReport(event){
 function dailyRecommendationLabel(item){if(item.score>=80)return 'התאמה מצוינת';if(item.score>=60)return 'התאמה טובה';return 'אפשרות נוספת';}
 async function loadDailySuggestions(id){
   state.dailySuggestionsContext={id};$('#dailySuggestionsList').innerHTML='<div class="schedule-loading"><span></span><span></span><span></span><p>בודק זמינות, העדפות ותקינה…</p></div>';$('#dailySuggestionsDialog').showModal();
-  try{const data=await apiFetch('/api/daily-operations',{method:'POST',body:{action:'suggestions',id}});$('#dailySuggestionsList').innerHTML=data.suggestions?.length?data.suggestions.map((item,index)=>`<article class="daily-suggestion-card ${item.replacement_type}"><div class="suggestion-rank">${index+1}</div><div class="card-heading"><div><h3>${escapeHtml(item.full_name)}</h3><p>${escapeHtml(item.job_title)} · ${timeHtml(item.start_time,item.end_time)}</p></div><span class="score-chip">${dailyRecommendationLabel(item)} · ${item.score}</span></div><ul class="reason-list">${item.reasons.map((reason)=>`<li>${escapeHtml(reason)}</li>`).join('')}</ul>${item.from_class_id?`<div class="notice">העברת חירום מכיתת <strong>${escapeHtml(classById(item.from_class_id)?.name||'')}</strong> בלי לפגוע בתקן המקור.</div>`:''}<button class="primary-btn full-width" data-daily-suggestion="assign" data-employee-id="${item.employee_id}" data-replacement-type="${item.replacement_type}">${item.replacement_type==='transfer'?'ביצוע מעבר חירום':'שיבוץ ככיסוי'}</button></article>`).join(''):'<div class="empty-state">לא נמצאה כרגע אפשרות כיסוי בטוחה. אפשר לשנות את טווח השעות, לבדוק מחדש או לסגור ללא כיסוי.</div>';}catch(error){$('#dailySuggestionsList').innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;}
+  try{const data=await apiFetch('/api/daily-operations',{method:'POST',body:{action:'suggestions',id}});$('#dailySuggestionsList').innerHTML=data.suggestions?.length?data.suggestions.map((item,index)=>`<article class="daily-suggestion-card ${item.replacement_type}"><div class="suggestion-rank">${index+1}</div><div class="card-heading"><div><h3>${escapeHtml(item.full_name)}</h3><p>${escapeHtml(item.job_title)} · ${timeHtml(item.start_time,item.end_time)}</p></div>${scoreScaleHtml(item.score, dailyRecommendationLabel(item))}</div><ul class="reason-list">${item.reasons.map((reason)=>`<li>${escapeHtml(reason)}</li>`).join('')}</ul>${item.from_class_id?`<div class="notice">העברת חירום מכיתת <strong>${escapeHtml(classById(item.from_class_id)?.name||'')}</strong> בלי לפגוע בתקן המקור.</div>`:''}<button class="primary-btn full-width" data-daily-suggestion="assign" data-employee-id="${item.employee_id}" data-replacement-type="${item.replacement_type}">${item.replacement_type==='transfer'?'ביצוע מעבר חירום':'שיבוץ ככיסוי'}</button></article>`).join(''):'<div class="empty-state">לא נמצאה כרגע אפשרות כיסוי בטוחה. אפשר לשנות את טווח השעות, לבדוק מחדש או לסגור ללא כיסוי.</div>';}catch(error){$('#dailySuggestionsList').innerHTML=`<div class="empty-state">${escapeHtml(error.message)}</div>`;}
 }
 function openDailyAttendanceDialog(shift){
   const form=$('#dailyAttendanceForm'),row=dailyAttendanceForShift(shift.id);form.reset();form.elements.shift_id.value=shift.id;form.dataset.shiftStart=trimTime(shift.start_time);form.dataset.shiftEnd=trimTime(shift.end_time);
@@ -1609,7 +1665,7 @@ async function showSuggestions(date, classId, shift = null) {
   const start = trimTime(shift?.start_time) || trimTime(state.settings.opening_time) || '07:30'; const end = trimTime(shift?.end_time) || trimTime(state.settings.closing_time) || '15:30'; const dayRows = state.shifts.filter((row) => row.shift_date === date && row.class_id === classId); const role = shift?.shift_role || (!dayRows.some((row) => ['teacher', 'lead'].includes(row.shift_role)) ? 'teacher' : 'staff'); const original = shift ? employeeById(shift.employee_id) : null;
   state.suggestionsContext = { date, classId, start, end, role, shiftId: shift?.id || null, originalName: original?.full_name || '', originalNote: shift?.public_note || '' };
   $('#suggestionsList').innerHTML = `<div class="empty-state">מחפש עובדים פנויים ל-${start}–${end}…</div>`; $('#suggestionsDialog').showModal();
-  try { const params = new URLSearchParams({ date, class_id: classId, start_time: start, end_time: end, shift_role: role }); if(shift?.id)params.set('exclude_shift_id',shift.id); const result = await apiFetch(`/api/suggestions?${params}`); $('#suggestionsList').innerHTML = result.candidates.length ? result.candidates.map((candidate) => `<article class="suggestion-card"><div class="card-heading"><div><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${timeHtml(start, end)}</p></div><span class="score-chip">התאמה ${candidate.score}</span></div><ul class="reason-list">${candidate.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul><button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role}">${shift ? 'החלפת העובד בשיבוץ' : 'שיבוץ העובד'}</button></article>`).join('') : '<div class="empty-state">לא נמצא מחליף זמין בשעות אלה.</div>'; }
+  try { const params = new URLSearchParams({ date, class_id: classId, start_time: start, end_time: end, shift_role: role }); if(shift?.id)params.set('exclude_shift_id',shift.id); const result = await apiFetch(`/api/suggestions?${params}`); $('#suggestionsList').innerHTML = result.candidates.length ? result.candidates.map((candidate) => `<article class="suggestion-card"><div class="card-heading"><div><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${timeHtml(start, end)}</p></div>${scoreScaleHtml(candidate.score)}</div><ul class="reason-list">${candidate.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul><button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role}">${shift ? 'החלפת העובד בשיבוץ' : 'שיבוץ העובד'}</button></article>`).join('') : '<div class="empty-state">לא נמצא מחליף זמין בשעות אלה.</div>'; }
   catch (error) { $('#suggestionsList').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; }
 }
 async function handleSuggestionClick(event) { const button = event.target.closest('[data-action="use-suggestion"]'); if (!button) return; const context = state.suggestionsContext; const wasPublished=isPublishedWeekDate(context.date); try { if (context.shiftId) { const replacementNote = [context.originalNote, context.originalName ? `מחליף/ה במקום ${context.originalName}` : 'שובץ כמחליף/ה'].filter(Boolean).join(' · '); await apiFetch('/api/shifts', { method: 'PATCH', body: { id: context.shiftId, employee_id: button.dataset.id, shift_role: button.dataset.role, public_note: replacementNote } }); } else { await apiFetch('/api/shifts', { method: 'POST', body: { shift_date: context.date, class_id: context.classId, employee_id: button.dataset.id, start_time: context.start, end_time: context.end, shift_role: button.dataset.role, public_note: 'שובץ כהחלפה' } }); } $('#suggestionsDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({ force: true }); showToast(context.shiftId ? 'העובד הוחלף בטיוטה' : 'המחליף/ה שובץ בטיוטה', 'success'); if(wasPublished)showPostPublishChangePrompt({title:'החלפה בוצעה בשבוע שכבר פורסם',message:'ההחלפה נשמרה בטיוטה. יש לפרסם אותה כדי שהצוות יראה את השינוי.'}); } catch (error) { showToast(error.message, 'error'); } }
@@ -1628,23 +1684,30 @@ function renderSettingsPreview() {
   const requireLeader = form.elements.require_leader.checked;
   const closingStart = minuteText(timeToMinutes(closing) - windowMinutes); const fridayClosingStart=minuteText(timeToMinutes(fridayClosing)-windowMinutes);
   const invalid = timeToMinutes(closing) <= timeToMinutes(opening) || timeToMinutes(fridayClosing)<=timeToMinutes(opening) || timeToMinutes(fridayClosing)>720 || required < 1 || closingRequired < 1 || closingRequired > required || windowMinutes < 0 || windowMinutes > 180;
-  if (invalid) { $('#settingsPreview').innerHTML = '<div class="notice error">יש לתקן את הערכים: שישי חייב להסתיים עד 12:00, תקן הסגירה אינו יכול להיות גבוה מהתקן הרגיל.</div>'; return; }
+  if (invalid) { $('#settingsPreview').innerHTML = '<div class="notice error"><strong>לא ניתן לשמור עדיין.</strong><br />בדקו ששעת הסיום מאוחרת משעת הפתיחה, שיום שישי מסתיים עד 12:00 ושתקן הסגירה אינו גבוה מהתקן הרגיל.</div>'; return; }
   const previous = state.settings;
   state.settings = { ...state.settings, opening_time: opening, closing_time: closing, friday_closing_time:fridayClosing, required_staff: required, closing_required_staff: closingRequired, closing_window_minutes: windowMinutes, validation_slot_minutes: slot, require_leader:requireLeader };
   const impact = validateScheduleClient(); state.settings = previous;
-  $('#settingsPreview').innerHTML = `<div class="standards-preview-title"><span>תצוגה מקדימה</span><strong>א׳–ה׳ ${opening}–${closing} · שישי ${opening}–${fridayClosing}</strong></div><div class="standards-timeline"><div class="timeline-rule regular"><span>${opening}</span><strong>${required} אנשי צוות בכל כיתה</strong><small>בדיקה כל ${slot} דקות${requireLeader?' · חובה אחראי/ת כיתה':''}</small></div><div class="timeline-arrow">←</div><div class="timeline-rule closing"><span>${closingStart}</span><strong>${closingRequired} אנשי צוות בסגירה א׳–ה׳</strong><small>עד ${closing}</small></div><div class="timeline-rule friday"><span>${fridayClosingStart}</span><strong>${closingRequired} אנשי צוות בסגירת שישי</strong><small>עד ${fridayClosing}</small></div></div><div class="standards-impact ${impact.errors.length ? 'has-errors' : 'is-ok'}"><strong>${impact.errors.length}</strong><span>מוקדי תקינה בשבוע המוצג</span><small>${impact.warnings.length} התראות שעות אישיות</small></div>`;
+  $('#settingsPreview').innerHTML = `<div class="standards-preview-title"><span>סיכום לפני שמירה</span><strong>${required} ביום · ${closingRequired} בסגירה${requireLeader?' · אחראי/ת כיתה חובה':''}</strong></div><div class="standards-live-summary"><article><small>א׳–ה׳</small><strong>${opening}–${closing}</strong><span>תקן סגירה מ־${closingStart}</span></article><article><small>יום שישי</small><strong>${opening}–${fridayClosing}</strong><span>תקן סגירה מ־${fridayClosingStart}</span></article><article><small>תדירות בדיקה</small><strong>כל ${slot} דקות</strong><span>${requireLeader?'כולל בדיקת אחראי/ת':'ללא בדיקת אחראי/ת'}</span></article></div><div class="standards-impact ${impact.errors.length ? 'has-errors' : 'is-ok'}"><strong>${impact.errors.length}</strong><span>${impact.errors.length===1?'שגיאה בשבוע המוצג':'שגיאות בשבוע המוצג'}</span><small>${impact.warnings.length} התראות נוספות · השינוי יחול לאחר לחיצה על שמירה</small></div>`;
+}
+function handleSettingsStepper(event) {
+  const button = event.target.closest('[data-step-field]'); if (!button) return;
+  event.preventDefault(); const input = $('#settingsForm').elements[button.dataset.stepField]; if (!input) return;
+  const min = Number(input.min || 1); const max = Number(input.max || 10); const next = Math.max(min, Math.min(max, Number(input.value || min) + Number(button.dataset.step || 0)));
+  input.value = String(next); input.dispatchEvent(new Event('input', { bubbles:true }));
 }
 function applyStandardsPreset(required, closingRequired, windowMinutes) {
   const form = $('#settingsForm');
   form.elements.opening_time.value = '07:30'; form.elements.closing_time.value = '15:30'; form.elements.friday_closing_time.value='12:00';
   form.elements.required_staff.value = String(required); form.elements.closing_required_staff.value = String(closingRequired);
-  form.elements.closing_window_minutes.value = String(windowMinutes || 15); form.elements.validation_slot_minutes.value = '30'; form.elements.require_leader.checked=true;
+  form.elements.closing_window_minutes.value = String(windowMinutes ?? 30); form.elements.validation_slot_minutes.value = '30'; form.elements.require_leader.checked=true;
   renderSettingsPreview();
 }
 function applyDefaultStandards() { applyStandardsPreset(4, 3, 30); }
 function openSettings() {
   const form = $('#settingsForm');
   for (const name of ['opening_time', 'closing_time','friday_closing_time']) form.elements[name].value = trimTime(state.settings[name]) || (name==='friday_closing_time'?'12:00':'');
+  form.elements.friday_closing_time.value = '12:00';
   for (const name of ['required_staff', 'closing_required_staff', 'closing_window_minutes', 'validation_slot_minutes']) form.elements[name].value = state.settings[name];
   form.elements.require_leader.checked=state.settings.require_leader!==false;
   renderSettingsPreview(); $('#settingsDialog').showModal();

@@ -15,7 +15,8 @@ function operationRange(operation, shift) {
   if (operation.operation_type === 'early_release') return { start:short(operation.end_time||shift.start_time),end:short(shift.end_time) };
   return { start:short(operation.start_time||shift.start_time),end:short(operation.end_time||shift.end_time) };
 }
-function level(score){ return score >= 85 ? 'high' : score >= 55 ? 'good' : 'possible'; }
+function normalizeScore(raw){ return Math.max(1,Math.min(100,Math.round(((Number(raw)||0)+60)*100/260))); }
+function level(score){ return score >= 80 ? 'high' : score >= 55 ? 'good' : 'possible'; }
 
 module.exports = async function handler(req,res) {
   try {
@@ -108,12 +109,13 @@ module.exports = async function handler(req,res) {
       if (neededRole === 'lead' && !(employee.can_lead || /(גננת|גנן)/.test(title))) suggestedRole='staff';
       candidates.push({
         employee_id:employee.id, full_name:employee.full_name, job_title:employee.job_title,
-        score, recommendation_level:level(score), reasons, suggested_role:suggestedRole,
+        raw_score:score, reasons, suggested_role:suggestedRole,
         weekly_hours:Number((weeklyMinutes/60).toFixed(1)), max_weekly_hours:employee.max_weekly_hours,
         current_day_shifts:dayShifts.map((shift) => ({ start_time:shift.start_time,end_time:shift.end_time,class_id:shift.class_id })),
       });
     }
-    candidates.sort((a,b) => b.score-a.score || a.full_name.localeCompare(b.full_name,'he'));
-    send(res,200,{ ok:true,candidates:candidates.slice(0,16) });
+    candidates.sort((a,b) => b.raw_score-a.raw_score || a.full_name.localeCompare(b.full_name,'he'));
+    const ranked = candidates.slice(0,16).map(({ raw_score, ...candidate }) => { const score=normalizeScore(raw_score); return { ...candidate, score, recommendation_level:level(score) }; });
+    send(res,200,{ ok:true,candidates:ranked });
   } catch (error) { handleError(res,error); }
 };

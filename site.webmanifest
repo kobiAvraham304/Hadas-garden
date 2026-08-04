@@ -1,0 +1,12 @@
+{
+  "name": "מערכת ניהול שיבוצים מעון הדס",
+  "short_name": "מעון הדס",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f8fd",
+  "theme_color": "#6f72d9",
+  "icons": [
+    {"src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ]
+}

@@ -51,6 +51,7 @@ function sanitizeEmployee(employee, manager, usersByEmployee, privateByEmployee,
     role: user?.role || 'employee',
     user_active: user?.active ?? false,
     must_change_password: user?.must_change_password ?? true,
+    last_login_at: user?.last_login_at || null,
     admin_notes: privateByEmployee.get(employee.id)?.admin_notes || '',
     weekly_patterns: patternsByEmployee.get(employee.id) || [],
   };
@@ -86,7 +87,7 @@ module.exports = async function handler(req, res) {
     const results = await Promise.all([
       db().from('hadas_classes').select('*').order('sort_order'),
       db().from('hadas_employees').select('*').order('full_name'),
-      db().from('hadas_users').select('employee_id,phone,role,active,must_change_password'),
+      db().from('hadas_users').select('employee_id,phone,role,active,must_change_password,last_login_at'),
       db().from('hadas_employee_private').select('*'),
       db().from('hadas_employee_class_constraints').select('*'),
       db().from('hadas_employee_weekly_patterns').select('*').order('weekday'),

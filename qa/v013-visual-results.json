@@ -1,0 +1,37 @@
+{
+  "desktop": {
+    "overflow": 0,
+    "tooSmall": [],
+    "clipped": 0,
+    "buttons": 20,
+    "pageErrors": []
+  },
+  "mobile390": {
+    "overflow": 0,
+    "tooSmall": [],
+    "clipped": 0,
+    "buttons": 21,
+    "pageErrors": []
+  },
+  "mobile360": {
+    "overflow": 0,
+    "tooSmall": [],
+    "clipped": 0,
+    "buttons": 21,
+    "pageErrors": []
+  },
+  "login-desktop": {
+    "overflow": 0,
+    "connectionText": false,
+    "resetNote": true,
+    "credit": true,
+    "iconVisible": true
+  },
+  "login-mobile": {
+    "overflow": 0,
+    "connectionText": false,
+    "resetNote": true,
+    "credit": true,
+    "iconVisible": true
+  }
+}
