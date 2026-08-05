@@ -1,34 +1,23 @@
-# דוח בדיקות — גרסה 0.17.1
+# QA Report - v0.18.0
 
-## בדיקות אוטומטיות
+## Result
+- 139 of 139 automated tests passed.
+- `npm run check` passed.
+- JavaScript syntax checks passed.
+- No Supabase secret key is bundled.
+- Only one Vercel serverless function exists: `api/index.js`.
 
-- `133 מתוך 133` בדיקות Node עברו.
-- בדיקת תחביר, הרשאות, שיבוצים, התאמת עובדים, תפעול יומי, יצוא, API ואבטחה עברו.
-- סריקת המפתחות הסודיים עברה.
-- נשארה פונקציית Vercel אחת בלבד.
+## Covered areas
+- Login and permissions.
+- Request creation, approval, rejection, and schedule application.
+- Leave, day off, sickness, shift-time changes, and swaps.
+- Date ranges, fixed-day selection, and private sick certificates.
+- Pinned announcements/tasks, read tracking, and task completion tracking.
+- Correct task notification state after completion/reopen.
+- Daily-operations date navigation and adjacent-date prefetch.
+- Calendar month navigation, event types, legend, and agenda.
+- Schedule validation, API routing, and database migration consistency.
+- Safe DOM selector helpers accepting DOM roots, selector strings, and missing roots.
 
-## בדיקות תצוגה ב־Chromium
-
-נבדקו רוחבים `360`, `390`, `414` ו־`1440` פיקסלים.
-
-- רוחב המסמך היה זהה בדיוק לרוחב המסך בכל הבדיקות.
-- לא נמצא אף כפתור מחוץ לגבולות המסך.
-- גובה הכותרת בטלפון: `58px`.
-- גובה סרגל הניווט בטלפון: `62px`; כל כפתור ניווט בגובה `51px`.
-- חלונית השיבוץ נבדקה ברוחב `390px`.
-- כפתור הסגירה נשאר באותו מיקום לפני ואחרי גלילה לתחתית החלונית.
-- תוצאות המדידה נשמרו ב־`qa/v0171-layout-results.json`.
-
-## קובצי בדיקה חזותיים
-
-- `qa/mobile-schedule-v0171.png`
-- `qa/mobile-dialog-v0171.png`
-- `qa/mobile-dialog-v0171-bottom.png`
-- `qa/desktop-schedule-v0171.png`
-
-## סמל iOS
-
-- נבדק שקובץ `apple-touch-icon-v0171.png` הוא RGB ללא ערוץ שקיפות.
-- נבדק שהעמוד מפנה לקובץ החדש ולא לסמל הישן שנשמר במטמון.
-
-Safari אמיתי של iPhone אינו זמין בסביבת הבדיקות, ולכן יש לבצע לאחר הפריסה בדיקה סופית במכשיר ולמחוק את קיצור מסך הבית הישן לפני הוספה מחדש.
+## Environment limitation
+A real iPhone Safari engine is unavailable in the build environment. After deployment, perform a short device check of the new dialogs and native iOS date inputs.

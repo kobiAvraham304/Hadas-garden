@@ -17,7 +17,7 @@ fetch('/api/health', { cache:'no-store' })
       </div>`).join('');
     box.insertAdjacentHTML('beforeend', response.ok
       ? '<div class="notice success">המערכת מוכנה לעבודה.</div>'
-      : '<div class="notice error">בגרסה קיימת יש להריץ פעם אחת את supabase/update-v0.12.0.sql, ולאחר מכן לרענן את הדף.</div>');
+      : '<div class="notice error">בגרסה קיימת יש להריץ פעם אחת את supabase/update-v0.18.0.sql, ולאחר מכן לרענן את הדף.</div>');
   })
   .catch(() => {
     box.innerHTML = '<div class="notice error">לא ניתן להריץ את בדיקת המערכת. בדוק שהפריסה ב־Vercel הסתיימה ב־Ready.</div>';

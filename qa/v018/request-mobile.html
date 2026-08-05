@@ -1,0 +1,49 @@
+<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="stylesheet" href="/styles.css?v=0180"><style>body{margin:0;background:#f5f5fb}#qaResult{display:none}</style></head><body><dialog class="modal" id="requestDialog">
+<form class="modal-card large-modal request-modal-v18" id="requestForm" method="dialog">
+<div class="modal-heading"><div><p class="eyebrow">בקשה חדשה</p><h3>מה תרצו לבקש?</h3><p class="muted" id="requestTypeHelp">חופשה מתוכננת מראש למספר ימים.</p></div><button aria-label="סגירה" class="icon-btn close-dialog" type="button">×</button></div>
+<div class="request-step"><span>1</span><div><strong>בחירת סוג הבקשה</strong><small>כל סוג מציג רק את השדות שנחוצים לו.</small></div></div>
+<fieldset class="request-type-picker"><legend class="sr-only">סוג בקשה</legend><div class="request-type-grid">
+<label class="request-type-card"><input checked="" name="request_type" type="radio" value="leave"/><span class="request-icon">☀</span><strong>חופשה</strong><small>יום אחד או טווח ימים מתוכנן מראש</small><b>מתאריך עד תאריך</b></label>
+<label class="request-type-card"><input name="request_type" type="radio" value="day_off"/><span class="request-icon">⌂</span><strong>יום חופשי חד־פעמי</strong><small>בקשה שלא לעבוד ביום עבודה מסוים</small><b>תאריך אחד</b></label>
+<label class="request-type-card"><input name="request_type" type="radio" value="late_start"/><span class="request-icon">◷</span><strong>התחלה מאוחרת</strong><small>כניסה מאוחרת בשיבוץ קיים</small></label>
+<label class="request-type-card"><input name="request_type" type="radio" value="early_finish"/><span class="request-icon">◴</span><strong>סיום מוקדם</strong><small>יציאה מוקדמת משיבוץ קיים</small></label>
+<label class="request-type-card"><input name="request_type" type="radio" value="sick"/><span class="request-icon">✚</span><strong>מחלה</strong><small>יום אחד או כמה ימים, כולל אישור</small></label>
+<label class="request-type-card"><input name="request_type" type="radio" value="swap"/><span class="request-icon">↔</span><strong>החלפה</strong><small>בחירת עובד שנמצא ביום חופשי</small></label>
+</div></fieldset>
+<div class="request-step"><span>2</span><div><strong>מועד ופרטים</strong><small>בחרו תאריך והשלימו רק את המידע הרלוונטי.</small></div></div>
+<div class="request-date-panel">
+<label class="request-date-start"><span>תאריך</span><input name="request_date" required="" type="date"/></label>
+<span aria-hidden="true" class="request-date-arrow request-range-end hidden">←</span>
+<label class="request-range-end hidden"><span>עד תאריך</span><input name="request_end_date" type="date"/></label>
+<div class="request-duration" id="requestDuration">יום אחד</div>
+</div>
+<div class="form-grid request-details">
+<div class="notice warn full-field hidden" id="leaveManualReminder"><strong>תזכורת:</strong> בחופשה של יותר מיומיים רצופים יש למלא גם טופס בקשת חופשה ידני.</div>
+<fieldset class="day-off-exchange-box full-field hidden" id="leaveDayOffField"><legend>אפשרות עבודה ביום חופשי קבוע</legend><p>אם יהיה צורך בכוח אדם, האם ניתן לשבץ אותך באחד מימי החופש הקבועים במקום?</p><div class="compact-radio-row"><label><input checked="" name="allow_schedule_on_day_off" type="radio" value="false"/><span>לא, להשאיר את ימי החופש</span></label><label><input name="allow_schedule_on_day_off" type="radio" value="true"/><span>כן, לפי צורך</span></label></div><div class="fixed-day-off-choice hidden" id="fixedDayOffChoice"><strong>איזה יום חופשי קבוע ניתן לנצל?</strong><div class="weekday-choice-grid" id="fixedDayOffOptions"></div><input name="available_fixed_day_weekday" type="hidden"/></div></fieldset>
+<label class="request-start hidden">שעת התחלה מבוקשת<input name="requested_start" type="time"/></label>
+<label class="request-end hidden">שעת סיום מבוקשת<input name="requested_end" type="time"/></label>
+<label class="shift-choice-field hidden full-field">השיבוץ הרלוונטי<select name="shift_id"></select></label>
+<section class="swap-field hidden full-field swap-picker-box"><div class="swap-picker-heading"><div><strong>מי יכול להחליף?</strong><small id="swapCandidatesHint">יוצגו רק עובדים שנמצאים ביום חופשי ואינם משובצים.</small></div><label class="swap-search"><span>⌕</span><input id="swapCandidateSearch" placeholder="חיפוש עובד" type="search"/></label></div><div class="swap-candidate-cards" id="swapCandidateCards"></div><select aria-hidden="true" class="sr-only" name="target_employee_id" tabindex="-1"><option value="">לא נבחר עובד</option></select></section>
+<label class="sick-attachment hidden full-field upload-field"><span>אישור מחלה</span><input accept="application/pdf,image/jpeg,image/png,image/webp" name="sick_certificate" type="file"/><small>PDF או תמונה עד 3MB. הקובץ גלוי רק למגיש הבקשה ולהנהלה.</small></label>
+<label class="full-field"><span>פירוט או הערה</span><textarea name="reason" placeholder="אפשר להוסיף מידע שיעזור לטפל בבקשה" rows="3"></textarea></label>
+</div>
+<div class="modal-actions"><button class="ghost-btn close-dialog" type="button">ביטול</button><button class="primary-btn" value="default">שליחת הבקשה</button></div>
+</form>
+</dialog><pre id="qaResult"></pre><script>
+window.addEventListener('DOMContentLoaded',()=>{
+ const d=document.getElementById('requestDialog');
+ d.querySelector('input[value="leave"]').checked=true;
+ const sd=d.querySelector('[name="request_date"]'); const ed=d.querySelector('[name="request_end_date"]');
+ sd.value='2026-08-10'; ed.value='2026-08-13';
+ d.querySelector('#requestDuration').textContent='4 ימים';
+ d.querySelector('#leaveManualReminder').classList.remove('hidden');
+ d.querySelector('#fixedDayOffOptions').innerHTML='<button type="button" class="weekday-choice selected"><strong>ראשון</strong><small>יום חופשי קבוע</small></button><button type="button" class="weekday-choice"><strong>חמישי</strong><small>יום חופשי קבוע</small></button>';
+ d.querySelector('#fixedDayOffChoice').classList.remove('hidden');
+ d.showModal();
+ setTimeout(()=>{
+  const vw=document.documentElement.clientWidth; const rect=d.getBoundingClientRect();
+  const outs=[...d.querySelectorAll('button,input,select,textarea')].filter(el=>{const r=el.getBoundingClientRect();return r.left<0||r.right>vw+0.5}).map(el=>el.outerHTML.slice(0,100));
+  document.getElementById('qaResult').textContent=JSON.stringify({vw,scrollWidth:document.documentElement.scrollWidth,dialog:{left:rect.left,right:rect.right,width:rect.width},outOfBounds:outs.length},null,2);
+ },300);
+});
+</script></body></html>

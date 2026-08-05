@@ -68,6 +68,8 @@ module.exports = async function handler(req, res) {
         published_at: body.published_at || new Date().toISOString(),
         expires_at: body.expires_at || null,
         active: true,
+        is_pinned: Boolean(body.is_pinned),
+        requires_acknowledgement: body.requires_acknowledgement !== false && String(body.requires_acknowledgement) !== 'false',
         created_by: caller.employee.id,
       };
       const item = assertDb(await db().from('hadas_announcements').insert(row).select('*').single(), 'לא ניתן לפרסם הודעה');
@@ -92,7 +94,7 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'PATCH') {
       const row = {};
-      for (const key of ['title', 'body', 'announcement_type', 'published_at', 'expires_at', 'active']) {
+      for (const key of ['title', 'body', 'announcement_type', 'published_at', 'expires_at', 'active', 'is_pinned', 'requires_acknowledgement']) {
         if (body[key] !== undefined) row[key] = body[key] === '' ? null : body[key];
       }
       if (body.audience_type !== undefined) {

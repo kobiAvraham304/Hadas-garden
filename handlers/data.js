@@ -244,6 +244,8 @@ module.exports = async function handler(req, res) {
         schedule_scope: scope,
         can_view_class_schedule: classScheduleViewer,
         can_view_full_schedule: fullScheduleViewer,
+        fixed_day_off: caller.employee.fixed_day_off,
+        weekly_patterns: patternsByEmployee.get(caller.employee.id) || [],
       },
       classes,
       employees,

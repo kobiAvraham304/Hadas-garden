@@ -106,9 +106,12 @@ module.exports = async function handler(req,res) {
         target_employee_id:body.target_employee_id || null,
         target_shift_id:null,
         reason:String(body.reason || '').trim() || null,
-        allow_schedule_on_day_off:type === 'leave' ? (body.allow_schedule_on_day_off === true || String(body.allow_schedule_on_day_off) === 'true') : false,
+        allow_schedule_on_day_off:['leave','day_off'].includes(type) ? (body.allow_schedule_on_day_off === true || String(body.allow_schedule_on_day_off) === 'true') : false,
+        available_fixed_day_weekday: body.available_fixed_day_weekday !== undefined && body.available_fixed_day_weekday !== '' ? Number(body.available_fixed_day_weekday) : null,
         status:'pending',
       };
+      if (payload.available_fixed_day_weekday !== null && (!Number.isInteger(payload.available_fixed_day_weekday) || payload.available_fixed_day_weekday < 0 || payload.available_fixed_day_weekday > 5)) throw httpError(400,'יום החופשי הקבוע אינו תקין');
+      if (!payload.allow_schedule_on_day_off) payload.available_fixed_day_weekday = null;
       let own = null;
       if (['late_start','early_finish'].includes(type)) {
         if (!payload.shift_id) throw httpError(400,'יש לבחור את השיבוץ הרלוונטי');

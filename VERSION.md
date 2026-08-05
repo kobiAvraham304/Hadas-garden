@@ -1,21 +1,35 @@
-# מערכת ניהול שיבוצים מעון הדס — גרסה 0.17.1
+# מערכת ניהול שיבוצים מעון הדס — גרסה 0.18.0
 
-## תיקון תצוגת סלולר
+Hadas Scheduling Management System v0.18.0
 
-- הכותרת העליונה נבנתה כרשת קשיחה: אזור שם המערכת מתכווץ, וכפתורי ההתראות, הרענון והיציאה אינם נחתכים.
-- סרגל הניווט העליון קיבל גובה מספק לאייקון ולכיתוב, ללא חיתוך מלמטה.
-- כל עמודי המערכת מוגבלים לרוחב המכשיר, ללא תנועה אופקית.
-- כותרות מסכים וכפתור הפעולה הראשי מוצגים בשורות נפרדות בטלפון.
-- אזור השיבוצים מתחיל מיד אחרי הניווט; טווח השבוע נשאר קבוע בזמן גלילה.
-- חלוניות נפתחות כמשטח עבודה מלא, עם כותרת וכפתור סגירה קבועים.
+## Requests
+- Redesigned request workflow and request cards.
+- Clear distinction between planned leave and a one-time day-off request.
+- Leave and sick requests support start/end dates.
+- More than two continuous leave days show a manual-form reminder.
+- Leave and day-off requests can specify whether scheduling on a fixed day off is allowed.
+- When multiple fixed days off exist, the relevant day can be selected.
+- Swap candidates are shown as searchable employee cards.
 
-## סמל מסך הבית
+## Announcements and tasks
+- Announcements and tasks can be pinned.
+- Announcements can require read acknowledgement or act as information-only notices.
+- Creators can track who read an announcement.
+- Tasks show completion counts, percentage, and employee-level tracking.
+- Fixed the open-task notification remaining after a task was completed.
+- Added All, Pinned, Unread, Open, and Completed filters.
 
-- `apple-touch-icon-v0171.png` הוא קובץ RGB מלא ללא שקיפות בפינות.
-- נוסף שם קובץ חדש כדי לעקוף את מטמון הסמל של iOS.
-- גם אייקוני `192×192` ו־`512×512` הומרו לרקע מלא.
-- Open Graph עודכן לדומיין הפעיל של המערכת.
+## Daily operations
+- Fixed `root.querySelectorAll is not a function`.
+- Added previous day, today, and next day controls.
+- Adjacent days are prefetched.
+- Load failures appear inline with a retry action instead of repeated error toasts.
 
-## בסיס נתונים
+## Calendar
+- Different event types use different colors and icons.
+- New-event form uses clear event-type cards.
+- Added a legend and monthly agenda beneath the calendar.
 
-אין שינוי בבסיס הנתונים ואין צורך להריץ SQL.
+## Database
+- Adds pinned-content, acknowledgement, and selected-fixed-day fields.
+- Migration is non-destructive.

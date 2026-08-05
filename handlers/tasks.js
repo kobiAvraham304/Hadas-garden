@@ -56,7 +56,10 @@ module.exports = async function handler(req, res) {
       const status = body.action === 'complete' ? 'done' : 'pending';
       const assignment = assertDb(await db().from('hadas_task_assignees').select('*').eq('task_id', body.id).eq('employee_id', caller.employee.id).maybeSingle(), 'המשימה לא נמצאה');
       if (!assignment) throw httpError(404, 'המשימה אינה משויכת אליך');
-      assertDb(await db().from('hadas_task_assignees').update({ status, completed_at: status === 'done' ? new Date().toISOString() : null }).eq('task_id', body.id).eq('employee_id', caller.employee.id), 'לא ניתן לעדכן משימה');
+      const completedAt = status === 'done' ? new Date().toISOString() : null;
+      assertDb(await db().from('hadas_task_assignees').update({ status, completed_at: completedAt }).eq('task_id', body.id).eq('employee_id', caller.employee.id), 'לא ניתן לעדכן משימה');
+      const notificationPatch = status === 'done' ? { action_required:false, read_at:completedAt } : { action_required:true, read_at:null };
+      await db().from('hadas_notifications').update(notificationPatch).eq('employee_id', caller.employee.id).eq('entity_type','task').eq('entity_id', String(body.id));
       await emitEvent('tasks');
       return send(res, 200, { ok: true });
     }
@@ -78,6 +81,7 @@ module.exports = async function handler(req, res) {
         target_type: targetType,
         target_id: ['class', 'employee'].includes(targetType) ? body.target_id : null,
         active: true,
+        is_pinned: Boolean(body.is_pinned),
         created_by: caller.employee.id,
       };
       const task = assertDb(await db().from('hadas_tasks').insert(row).select('*').single(), 'לא ניתן ליצור משימה');
@@ -102,7 +106,7 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'PATCH') {
       const row = {};
-      for (const key of ['title', 'description', 'due_at', 'valid_from', 'valid_to', 'priority', 'active']) {
+      for (const key of ['title', 'description', 'due_at', 'valid_from', 'valid_to', 'priority', 'active', 'is_pinned']) {
         if (body[key] !== undefined) row[key] = body[key] === '' ? null : body[key];
       }
       if (body.target_type !== undefined) {

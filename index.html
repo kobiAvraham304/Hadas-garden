@@ -27,11 +27,11 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon-v0171.png" sizes="180x180" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon-v0180.png" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=0171" />
+  <link rel="stylesheet" href="/styles.css?v=0180" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0171" defer></script>
+  <script src="/app.js?v=0180" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -150,7 +150,8 @@
           <div><p class="eyebrow">חופשות, מחלה והחלפות</p><h2>בקשות</h2><p class="muted">ניהול ברור ומהיר של כל בקשה עד להזרמה בשיבוץ.</p></div>
           <button id="newRequestBtn" class="primary-btn"><span>＋</span> בקשה חדשה</button>
         </div>
-        <div id="requestSummary" class="request-summary"></div>
+        <div id="requestSummary" class="request-summary request-summary-actions"></div>
+        <div id="requestWorkflow" class="request-workflow"></div>
         <div class="filter-toolbar polished-filter request-filter-toolbar">
           <div class="filter-block"><span class="filter-label">מצב בקשה</span><div id="requestStatusChips" class="filter-chips" role="group" aria-label="סינון מצב בקשה">
             <button type="button" class="filter-chip active" data-value="open">פתוחות</button><button type="button" class="filter-chip" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="pending">ממתינים</button><button type="button" class="filter-chip" data-value="approved">אושרו</button><button type="button" class="filter-chip" data-value="applied">הוזרמו</button><button type="button" class="filter-chip" data-value="closed">סגורות</button>
@@ -161,7 +162,7 @@
       </section>
 
       <section id="dailyPanel" class="panel manager-only">
-        <div class="section-heading daily-heading"><div><p class="eyebrow">ניהול היום בזמן אמת</p><h2>תפעול יומי</h2><p class="muted">דיווח היעדרות, איחור או שחרור מוקדם וקבלת הצעות להחלפה או מעבר חירום בין כיתות.</p></div><label class="date-control">תאריך<input id="dailyDate" type="date" /></label></div>
+        <div class="section-heading daily-heading"><div><p class="eyebrow">ניהול היום בזמן אמת</p><h2>תפעול יומי</h2><p class="muted">מרכז עבודה לנוכחות, חוסרים, כיסויים והעברות בין כיתות.</p></div><div class="daily-date-navigator"><button id="prevDailyBtn" type="button" class="icon-round-btn" aria-label="יום קודם">‹</button><label class="date-control"><span>תאריך</span><input id="dailyDate" type="date" /></label><button id="nextDailyBtn" type="button" class="icon-round-btn" aria-label="יום הבא">›</button><button id="todayDailyBtn" type="button" class="ghost-btn">היום</button></div></div>
         <div id="dailySummary" class="daily-summary"></div>
         <div class="daily-command-center">
           <div class="daily-filter-row" id="dailyStatusChips" role="group" aria-label="סינון תפעול יומי">
@@ -185,12 +186,12 @@
 
       <section id="announcementsPanel" class="panel">
         <div class="section-heading"><div><p class="eyebrow">עדכוני צוות</p><h2>הודעות</h2><p class="muted">הודעות לכל המעון, לכיתה או לעובדים נבחרים.</p></div><button id="newAnnouncementBtn" class="primary-btn content-creator-only"><span>＋</span> הודעה חדשה</button></div>
-        <div id="announcementsList" class="cards-list announcement-grid"></div>
+        <div class="content-toolbar"><div class="content-view-chips" id="announcementViewChips"><button type="button" class="filter-chip active" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="pinned">נעוצות</button><button type="button" class="filter-chip" data-value="unread">טרם נקראו</button></div><p class="muted">הודעות נעוצות מופיעות תמיד בראש הרשימה.</p></div><div id="announcementsList" class="cards-list announcement-grid"></div>
       </section>
 
       <section id="tasksPanel" class="panel">
         <div class="section-heading"><div><p class="eyebrow">מעקב ביצוע</p><h2>משימות</h2><p class="muted">משימות לכל המעון, לכיתה או לעובדים נבחרים.</p></div><button id="newTaskBtn" class="primary-btn content-creator-only"><span>＋</span> משימה חדשה</button></div>
-        <div id="tasksList" class="cards-list task-grid"></div>
+        <div class="content-toolbar"><div class="content-view-chips" id="taskViewChips"><button type="button" class="filter-chip active" data-value="open">פתוחות</button><button type="button" class="filter-chip" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="pinned">נעוצות</button><button type="button" class="filter-chip" data-value="done">בוצעו</button></div><p class="muted">ניתן לפתוח מעקב ביצוע ולראות מי השלים כל משימה.</p></div><div id="tasksList" class="cards-list task-grid"></div>
       </section>
 
       <section id="calendarPanel" class="panel">
@@ -198,6 +199,7 @@
           <div><p class="eyebrow">ישיבות, הדרכות ואירועים</p><h2>לוח שנה</h2><p class="muted">לחץ על יום כדי ליצור אירוע חדש, או על אירוע קיים כדי לראות פרטים.</p></div>
           <button id="newCalendarBtn" class="primary-btn content-creator-only"><span>＋</span> אירוע חדש</button>
         </div>
+        <div class="calendar-legend" aria-label="מקרא סוגי אירועים"><span class="meeting">◉ ישיבה</span><span class="training">✦ הדרכה</span><span class="holiday">☀ חופשה/חג</span><span class="birthday">🎈 יום הולדת</span><span class="activity">★ פעילות</span><span class="other">● אחר</span></div>
         <div class="calendar-toolbar">
           <button id="prevMonthBtn" class="icon-round-btn" title="חודש קודם">‹</button>
           <button id="todayMonthBtn" class="ghost-btn">החודש הנוכחי</button>
@@ -337,53 +339,66 @@
   </dialog>
 
   <dialog id="requestDialog" class="modal">
-    <form id="requestForm" method="dialog" class="modal-card large-modal">
-      <div class="modal-heading"><div><p class="eyebrow">פנייה ללינור ולאילנית</p><h3>בקשה חדשה</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <fieldset class="request-type-picker"><legend>מה מבקשים?</legend><div class="request-type-grid">
-        <label class="request-type-card"><input type="radio" name="request_type" value="leave" checked /><span class="request-icon">☀</span><strong>חופשה</strong><small>בקשת חופשה מראש</small></label>
-        <label class="request-type-card"><input type="radio" name="request_type" value="day_off" /><span class="request-icon">⌂</span><strong>יום חופשי</strong><small>בקשה חד־פעמית</small></label>
-        <label class="request-type-card"><input type="radio" name="request_type" value="late_start" /><span class="request-icon">◷</span><strong>התחלה מאוחרת</strong><small>שינוי שעת התחלה</small></label>
-        <label class="request-type-card"><input type="radio" name="request_type" value="early_finish" /><span class="request-icon">◴</span><strong>סיום מוקדם</strong><small>יציאה לפני הזמן</small></label>
-        <label class="request-type-card"><input type="radio" name="request_type" value="sick" /><span class="request-icon">✚</span><strong>מחלה</strong><small>דיווח היעדרות</small></label>
-        <label class="request-type-card"><input type="radio" name="request_type" value="swap" /><span class="request-icon">↔</span><strong>החלפה</strong><small>החלפת שיבוץ עם עובד</small></label>
+    <form id="requestForm" method="dialog" class="modal-card large-modal request-modal-v18">
+      <div class="modal-heading"><div><p class="eyebrow">בקשה חדשה</p><h3>מה תרצו לבקש?</h3><p id="requestTypeHelp" class="muted">חופשה מתוכננת מראש למספר ימים.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <div class="request-step"><span>1</span><div><strong>בחירת סוג הבקשה</strong><small>כל סוג מציג רק את השדות שנחוצים לו.</small></div></div>
+      <fieldset class="request-type-picker"><legend class="sr-only">סוג בקשה</legend><div class="request-type-grid">
+        <label class="request-type-card"><input type="radio" name="request_type" value="leave" checked /><span class="request-icon">☀</span><strong>חופשה</strong><small>יום אחד או טווח ימים מתוכנן מראש</small><b>מתאריך עד תאריך</b></label>
+        <label class="request-type-card"><input type="radio" name="request_type" value="day_off" /><span class="request-icon">⌂</span><strong>יום חופשי חד־פעמי</strong><small>בקשה שלא לעבוד ביום עבודה מסוים</small><b>תאריך אחד</b></label>
+        <label class="request-type-card"><input type="radio" name="request_type" value="late_start" /><span class="request-icon">◷</span><strong>התחלה מאוחרת</strong><small>כניסה מאוחרת בשיבוץ קיים</small></label>
+        <label class="request-type-card"><input type="radio" name="request_type" value="early_finish" /><span class="request-icon">◴</span><strong>סיום מוקדם</strong><small>יציאה מוקדמת משיבוץ קיים</small></label>
+        <label class="request-type-card"><input type="radio" name="request_type" value="sick" /><span class="request-icon">✚</span><strong>מחלה</strong><small>יום אחד או כמה ימים, כולל אישור</small></label>
+        <label class="request-type-card"><input type="radio" name="request_type" value="swap" /><span class="request-icon">↔</span><strong>החלפה</strong><small>בחירת עובד שנמצא ביום חופשי</small></label>
       </div></fieldset>
+      <div class="request-step"><span>2</span><div><strong>מועד ופרטים</strong><small>בחרו תאריך והשלימו רק את המידע הרלוונטי.</small></div></div>
+      <div class="request-date-panel">
+        <label class="request-date-start"><span>תאריך</span><input name="request_date" type="date" required /></label>
+        <span class="request-date-arrow request-range-end hidden" aria-hidden="true">←</span>
+        <label class="request-range-end hidden"><span>עד תאריך</span><input name="request_end_date" type="date" /></label>
+        <div id="requestDuration" class="request-duration">יום אחד</div>
+      </div>
       <div class="form-grid request-details">
-        <label class="request-date-start">תאריך<input name="request_date" type="date" required /></label>
-        <label class="request-range-end hidden">עד תאריך<input name="request_end_date" type="date" /></label>
         <div id="leaveManualReminder" class="notice warn full-field hidden"><strong>תזכורת:</strong> בחופשה של יותר מיומיים רצופים יש למלא גם טופס בקשת חופשה ידני.</div>
-        <fieldset id="leaveDayOffField" class="inline-choice full-field hidden"><legend>במידת הצורך, האם ניתן לשבץ אותך ביום החופשי הקבוע באותו שבוע?</legend><label><input type="radio" name="allow_schedule_on_day_off" value="false" checked /> לא</label><label><input type="radio" name="allow_schedule_on_day_off" value="true" /> כן</label></fieldset>
+        <fieldset id="leaveDayOffField" class="day-off-exchange-box full-field hidden"><legend>אפשרות עבודה ביום חופשי קבוע</legend><p>אם יהיה צורך בכוח אדם, האם ניתן לשבץ אותך באחד מימי החופש הקבועים במקום?</p><div class="compact-radio-row"><label><input type="radio" name="allow_schedule_on_day_off" value="false" checked /><span>לא, להשאיר את ימי החופש</span></label><label><input type="radio" name="allow_schedule_on_day_off" value="true" /><span>כן, לפי צורך</span></label></div><div id="fixedDayOffChoice" class="fixed-day-off-choice hidden"><strong>איזה יום חופשי קבוע ניתן לנצל?</strong><div id="fixedDayOffOptions" class="weekday-choice-grid"></div><input type="hidden" name="available_fixed_day_weekday" /></div></fieldset>
         <label class="request-start hidden">שעת התחלה מבוקשת<input name="requested_start" type="time" /></label>
         <label class="request-end hidden">שעת סיום מבוקשת<input name="requested_end" type="time" /></label>
-        <label class="shift-choice-field hidden">השיבוץ הרלוונטי<select name="shift_id"></select></label>
-        <label class="swap-field hidden full-field">עובד שנמצא ביום חופשי<select name="target_employee_id"><option value="">בחרו תאריך כדי לראות עובדים זמינים</option></select><small id="swapCandidatesHint">יוצגו רק עובדים שנמצאים ביום חופשי ואינם משובצים.</small></label>
-        <label class="sick-attachment hidden full-field">אישור מחלה (PDF או תמונה, עד 3MB)<input name="sick_certificate" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" /></label>
-        <label class="full-field">פירוט<textarea name="reason" rows="3" placeholder="אפשר להוסיף הסבר או מידע חשוב"></textarea></label>
+        <label class="shift-choice-field hidden full-field">השיבוץ הרלוונטי<select name="shift_id"></select></label>
+        <section class="swap-field hidden full-field swap-picker-box"><div class="swap-picker-heading"><div><strong>מי יכול להחליף?</strong><small id="swapCandidatesHint">יוצגו רק עובדים שנמצאים ביום חופשי ואינם משובצים.</small></div><label class="swap-search"><span>⌕</span><input id="swapCandidateSearch" type="search" placeholder="חיפוש עובד" /></label></div><div id="swapCandidateCards" class="swap-candidate-cards"></div><select name="target_employee_id" class="sr-only" aria-hidden="true" tabindex="-1"><option value="">לא נבחר עובד</option></select></section>
+        <label class="sick-attachment hidden full-field upload-field"><span>אישור מחלה</span><input name="sick_certificate" type="file" accept="application/pdf,image/jpeg,image/png,image/webp" /><small>PDF או תמונה עד 3MB. הקובץ גלוי רק למגיש הבקשה ולהנהלה.</small></label>
+        <label class="full-field"><span>פירוט או הערה</span><textarea name="reason" rows="3" placeholder="אפשר להוסיף מידע שיעזור לטפל בבקשה"></textarea></label>
       </div>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שליחת הבקשה</button></div>
     </form>
   </dialog>
 
   <dialog id="announcementDialog" class="modal">
-    <form id="announcementForm" method="dialog" class="modal-card large-modal">
-      <div class="modal-heading"><div><p class="eyebrow">עדכון לצוות</p><h3>הודעה חדשה</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <div class="form-grid"><label>כותרת<input name="title" required /></label><label>סוג<select name="announcement_type"><option value="info">מידע</option><option value="important">חשוב</option><option value="urgent">דחוף</option></select></label><label>תוקף עד<input name="expires_at" type="datetime-local" /></label><label class="full-field">תוכן<textarea name="body" rows="5" required></textarea></label></div>
+    <form id="announcementForm" method="dialog" class="modal-card large-modal content-compose-modal announcement-compose">
+      <div class="modal-heading"><div><p class="eyebrow">עדכון לצוות</p><h3>הודעה חדשה</h3><p class="muted">בחרו סגנון, קהל ותוקף. הודעה נעוצה תופיע ראשונה.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <fieldset class="compose-style-picker"><legend>סוג ההודעה</legend><div class="compose-style-grid"><label class="info"><input type="radio" name="announcement_type" value="info" checked /><span>◉</span><strong>מידע</strong><small>עדכון שוטף</small></label><label class="important"><input type="radio" name="announcement_type" value="important" /><span>!</span><strong>חשוב</strong><small>דורש תשומת לב</small></label><label class="urgent"><input type="radio" name="announcement_type" value="urgent" /><span>⚠</span><strong>דחוף</strong><small>עדכון מיידי</small></label></div></fieldset>
+      <div class="form-grid"><label class="full-field">כותרת<input name="title" required placeholder="כותרת קצרה וברורה" /></label><label>פרסום<input name="published_at" type="datetime-local" /></label><label>תוקף עד<input name="expires_at" type="datetime-local" /></label><label class="full-field">תוכן<textarea name="body" rows="5" required placeholder="כתבו את ההודעה לצוות"></textarea></label></div>
+      <div class="compose-options"><label class="toggle-field"><input name="is_pinned" type="checkbox" /><span><strong>נעיצה בראש ההודעות</strong><small>מתאים להודעה חשובה שצריכה להישאר בולטת.</small></span></label><label class="toggle-field"><input name="requires_acknowledgement" type="checkbox" checked /><span><strong>דרוש אישור קריאה</strong><small>העובדים יתבקשו ללחוץ „קראתי”.</small></span></label></div>
       <fieldset class="audience-box"><legend>למי לשלוח?</legend><div class="audience-tabs" data-audience-group="announcement"><label><input type="radio" name="audience_type" value="all" checked />כל המעון</label><label><input type="radio" name="audience_type" value="class" />כיתה</label><label><input type="radio" name="audience_type" value="employees" />עובדים נבחרים</label></div><label id="announcementClassField" class="hidden">בחירת כיתה<select name="class_id"></select></label><div id="announcementEmployeesField" class="employee-picker hidden"></div></fieldset>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">פרסום ההודעה</button></div>
     </form>
   </dialog>
 
   <dialog id="taskDialog" class="modal">
-    <form id="taskForm" method="dialog" class="modal-card large-modal">
-      <div class="modal-heading"><div><p class="eyebrow">מעקב ביצוע</p><h3>משימה חדשה</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <div class="form-grid"><label>כותרת<input name="title" required /></label><label>עדיפות<select name="priority"><option value="normal">רגילה</option><option value="important">חשובה</option><option value="urgent">דחופה</option></select></label><label>תאריך יעד<input name="due_at" type="datetime-local" /></label><label class="full-field">פירוט<textarea name="description" rows="4"></textarea></label></div>
+    <form id="taskForm" method="dialog" class="modal-card large-modal content-compose-modal task-compose">
+      <div class="modal-heading"><div><p class="eyebrow">מעקב ביצוע</p><h3>משימה חדשה</h3><p class="muted">הגדירו יעד, עדיפות, קהל ומועד לביצוע.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <fieldset class="compose-style-picker"><legend>עדיפות</legend><div class="compose-style-grid"><label class="info"><input type="radio" name="priority" value="normal" checked /><span>☑</span><strong>רגילה</strong><small>משימה שוטפת</small></label><label class="important"><input type="radio" name="priority" value="important" /><span>!</span><strong>חשובה</strong><small>עדיפות גבוהה</small></label><label class="urgent"><input type="radio" name="priority" value="urgent" /><span>⚠</span><strong>דחופה</strong><small>לטיפול מיידי</small></label></div></fieldset>
+      <div class="form-grid"><label class="full-field">כותרת<input name="title" required placeholder="מה צריך לבצע?" /></label><label>זמין מתאריך<input name="valid_from" type="date" /></label><label>תאריך יעד<input name="due_at" type="datetime-local" /></label><label class="full-field">פירוט<textarea name="description" rows="4" placeholder="הנחיות, ציוד נדרש או מידע חשוב"></textarea></label></div>
+      <div class="compose-options"><label class="toggle-field"><input name="is_pinned" type="checkbox" /><span><strong>נעיצה בראש המשימות</strong><small>המשימה תישאר בולטת עד לסיום.</small></span></label></div>
       <fieldset class="audience-box"><legend>למי להקצות?</legend><div class="audience-tabs" data-audience-group="task"><label><input type="radio" name="target_type" value="all" checked />כל העובדים</label><label><input type="radio" name="target_type" value="class" />כיתה</label><label><input type="radio" name="target_type" value="employees" />עובדים נבחרים</label></div><label id="taskClassField" class="hidden">בחירת כיתה<select name="target_id"></select></label><div id="taskEmployeesField" class="employee-picker hidden"></div></fieldset>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">יצירת המשימה</button></div>
     </form>
   </dialog>
 
-  <dialog id="calendarDialog" class="modal"><form id="calendarForm" method="dialog" class="modal-card">
-    <div class="modal-heading"><div><p class="eyebrow">לוח המעון</p><h3>אירוע חדש</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-    <div class="form-grid"><label>כותרת<input name="title" required /></label><label>סוג<select name="event_type"><option value="meeting">ישיבה</option><option value="training">הדרכה</option><option value="holiday">חופשה/חג</option><option value="birthday">יום הולדת</option><option value="activity">פעילות</option><option value="other">אחר</option></select></label><label>תאריך<input name="event_date" type="date" required /></label><label>נראות<select name="visibility"><option value="all">כל העובדים</option><option value="class">כיתה</option><option value="managers">לינור ואילנית בלבד</option></select></label><label>כיתה<select name="class_id"><option value="">ללא</option></select></label><label>התחלה<input name="start_time" type="time" /></label><label>סיום<input name="end_time" type="time" /></label><label class="full-field">פירוט<textarea name="description" rows="3"></textarea></label></div>
+  <dialog id="taskTrackingDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">מעקב ביצוע</p><h3 id="taskTrackingTitle">מצב המשימה</h3><p id="taskTrackingSummary" class="muted"></p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="taskTrackingList" class="task-tracking-list"></div></div></dialog>
+
+  <dialog id="calendarDialog" class="modal"><form id="calendarForm" method="dialog" class="modal-card large-modal calendar-compose">
+    <div class="modal-heading"><div><p class="eyebrow">לוח המעון</p><h3>אירוע חדש</h3><p class="muted">בחרו סוג אירוע — כל סוג מקבל צבע וסמל שונים בלוח.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+    <fieldset class="calendar-type-picker"><legend>סוג האירוע</legend><div class="calendar-type-grid"><label class="meeting"><input type="radio" name="event_type" value="meeting" checked /><span>◉</span><strong>ישיבה</strong></label><label class="training"><input type="radio" name="event_type" value="training" /><span>✦</span><strong>הדרכה</strong></label><label class="holiday"><input type="radio" name="event_type" value="holiday" /><span>☀</span><strong>חופשה/חג</strong></label><label class="birthday"><input type="radio" name="event_type" value="birthday" /><span>🎈</span><strong>יום הולדת</strong></label><label class="activity"><input type="radio" name="event_type" value="activity" /><span>★</span><strong>פעילות</strong></label><label class="other"><input type="radio" name="event_type" value="other" /><span>●</span><strong>אחר</strong></label></div></fieldset>
+    <div class="form-grid"><label class="full-field">כותרת<input name="title" required placeholder="שם האירוע" /></label><label>תאריך<input name="event_date" type="date" required /></label><label>נראות<select name="visibility"><option value="all">כל העובדים</option><option value="class">כיתה</option><option value="managers">לינור ואילנית בלבד</option></select></label><label id="calendarClassField">כיתה<select name="class_id"><option value="">ללא</option></select></label><label>התחלה<input name="start_time" type="time" /></label><label>סיום<input name="end_time" type="time" /></label><label class="full-field">פירוט<textarea name="description" rows="4" placeholder="מה חשוב לדעת על האירוע?"></textarea></label></div>
     <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת האירוע</button></div>
   </form></dialog>
 

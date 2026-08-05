@@ -1,10 +1,10 @@
-# העלאת גרסה 0.17.1 ל־Vercel
+# Deploy v0.18.0
 
-1. אין להריץ SQL.
-2. החליפו את קובצי `0.17.0` בקובצי `0.17.1`.
-3. ודאו שבתיקיית `api` נמצא רק `index.js`.
-4. Commit ו־Push.
-5. המתינו ל־`Ready`.
-6. בדקו `/health`: אתר `0.17.1`, מסד `0.12.0`.
-7. באייפון פתחו `/?v=0171`.
-8. להסרת הרקע הלבן מהסמל: מחקו את הקיצור הישן ממסך הבית והוסיפו אותו מחדש.
+1. Run `supabase/update-v0.18.0.sql` once in Supabase SQL Editor.
+2. Do not rerun `schema.sql`.
+3. Replace v0.17.1 files with v0.18.0 files.
+4. Keep only `api/index.js` in the `api` folder.
+5. Commit and push.
+6. Wait for Vercel `Ready`.
+7. Verify `/health`: site `0.18.0`, database `0.18.0`.
+8. On iPhone, close and reopen the site. If needed, open once with `/?v=0180`.

@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.12.0 (סכמת נתונים 0.12.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.18.0 (סכמת נתונים 0.18.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -64,7 +64,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.12.0', '0.12.0')
+values (1, '0.18.0', '0.18.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -282,6 +282,7 @@ create table if not exists public.hadas_requests (
   attachment_path text,
   attachment_name text,
   allow_schedule_on_day_off boolean not null default false,
+  available_fixed_day_weekday smallint check (available_fixed_day_weekday is null or available_fixed_day_weekday between 0 and 5),
   attachment_type text,
   attachment_size integer,
   status text not null default 'pending' check (status in ('pending','approved','rejected','applied','cancelled')),
@@ -345,10 +346,13 @@ create table if not exists public.hadas_announcements (
   published_at timestamptz not null default now(),
   expires_at timestamptz,
   active boolean not null default true,
+  is_pinned boolean not null default false,
+  requires_acknowledgement boolean not null default true,
   created_by uuid references public.hadas_employees(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create index if not exists hadas_announcements_pinned_idx on public.hadas_announcements(is_pinned desc, published_at desc) where active = true;
 create table if not exists public.hadas_announcement_recipients (
   announcement_id uuid not null references public.hadas_announcements(id) on delete cascade,
   employee_id uuid not null references public.hadas_employees(id) on delete cascade,
@@ -374,11 +378,13 @@ create table if not exists public.hadas_tasks (
   target_type text not null default 'all' check (target_type in ('all','class','employee','employees')),
   target_id uuid,
   active boolean not null default true,
+  is_pinned boolean not null default false,
   created_by uuid references public.hadas_employees(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (valid_to is null or valid_from is null or valid_to >= valid_from)
 );
+create index if not exists hadas_tasks_pinned_idx on public.hadas_tasks(is_pinned desc, created_at desc) where active = true;
 create table if not exists public.hadas_task_assignees (
   task_id uuid not null references public.hadas_tasks(id) on delete cascade,
   employee_id uuid not null references public.hadas_employees(id) on delete cascade,
