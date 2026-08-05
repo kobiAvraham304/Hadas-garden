@@ -4,6 +4,8 @@ const {
 } = require('../lib/server');
 const { validateWeek, timeToMinutes, closingTimeForDate } = require('../lib/schedule');
 const { generateAutomaticSchedule } = require('../lib/auto-schedule');
+const dailyOperations = require('./daily-operations');
+const { employeeCanLead, sourceClassCanRelease, loadContext: loadDailyContext } = dailyOperations;
 
 function addDays(dateString, days) {
   const d = new Date(`${dateString}T12:00:00Z`);
@@ -51,6 +53,7 @@ async function validateShift(payload, id, overrideDayOff = false) {
   const weeklyPatterns = assertDb(patternR, 'לא ניתן לבדוק את ימי העבודה הקבועים') || [];
   if (!employee?.active) throw httpError(409, 'העובד אינו פעיל');
   if (employee.is_schedulable === false) throw httpError(409, 'העובד אינו מוגדר כחלק ממערך השיבוצים');
+  if (['teacher', 'lead'].includes(payload.shift_role) && !employeeCanLead(employee)) throw httpError(409, 'העובד אינו מורשה לשמש גננת/גנן או מוביל/ת כיתה');
   if (!classItem?.active) throw httpError(409, 'הכיתה אינה פעילה');
   const dayClosing = closingTimeForDate(settings, payload.shift_date);
   if (timeToMinutes(payload.start_time) < timeToMinutes(settings.opening_time) || timeToMinutes(payload.end_time) > timeToMinutes(dayClosing)) {
@@ -332,6 +335,94 @@ module.exports = async function handler(req, res) {
       });
       await emitEvent('shifts');
       return send(res, 201, { ok: true, count: inserted.length, mode, metrics: plan.metrics, validation: plan.validation });
+    }
+
+
+    if (req.method === 'POST' && body.action === 'apply_suggestion') {
+      const candidateId = String(body.candidate_id || '');
+      const candidateType = body.candidate_type === 'transfer' ? 'transfer' : 'direct';
+      const targetShiftId = String(body.target_shift_id || '');
+      const sourceShiftId = String(body.source_shift_id || '');
+      if (!candidateId) throw httpError(400, 'לא נבחר עובד');
+
+      const targetShift = targetShiftId
+        ? assertDb(await db().from('hadas_shifts').select('*').eq('id', targetShiftId).maybeSingle(), 'השיבוץ להחלפה לא נמצא')
+        : null;
+      if (targetShiftId && !targetShift) throw httpError(404, 'השיבוץ להחלפה לא נמצא');
+
+      const payload = {
+        shift_date: targetShift?.shift_date || String(body.shift_date || ''),
+        class_id: targetShift?.class_id || String(body.class_id || ''),
+        employee_id: candidateId,
+        start_time: targetShift?.start_time || String(body.start_time || ''),
+        end_time: targetShift?.end_time || String(body.end_time || ''),
+        shift_role: ['teacher', 'lead', 'staff', 'replacement'].includes(body.shift_role)
+          ? body.shift_role
+          : (targetShift?.shift_role || 'staff'),
+        status: 'draft',
+        public_note: String(body.public_note || targetShift?.public_note || '').trim() || null,
+        created_by: caller.employee.id,
+      };
+
+      if (candidateType === 'direct') {
+        await validateShift(payload, targetShift?.id || null, false);
+        if (targetShift) {
+          const updated = assertDb(await db().from('hadas_shifts').update(payload).eq('id', targetShift.id).select('*').single(), 'לא ניתן להחליף את העובד');
+          await recordChange(caller, 'update', targetShift, updated);
+          await audit(caller.employee.id, 'apply_direct_suggestion', 'shift', targetShift.id, { candidate_id:candidateId });
+          await emitEvent('shifts');
+          return send(res, 200, { ok:true, shift:updated, candidateType:'direct' });
+        }
+        const inserted = assertDb(await db().from('hadas_shifts').insert(payload).select('*').single(), 'לא ניתן לשמור את השיבוץ');
+        await recordChange(caller, 'create', null, inserted);
+        await audit(caller.employee.id, 'apply_direct_suggestion', 'shift', inserted.id, { candidate_id:candidateId });
+        await emitEvent('shifts');
+        return send(res, 201, { ok:true, shift:inserted, candidateType:'direct' });
+      }
+
+      if (!sourceShiftId) throw httpError(400, 'חסר שיבוץ המקור להעברה');
+      const sourceShift = assertDb(await db().from('hadas_shifts').select('*').eq('id', sourceShiftId).maybeSingle(), 'שיבוץ המקור לא נמצא');
+      if (!sourceShift || sourceShift.employee_id !== candidateId) throw httpError(409, 'אפשרות ההעברה כבר אינה זמינה');
+      if (sourceShift.shift_date !== payload.shift_date || String(sourceShift.start_time).slice(0,5) !== String(payload.start_time).slice(0,5) || String(sourceShift.end_time).slice(0,5) !== String(payload.end_time).slice(0,5)) {
+        throw httpError(409, 'ניתן לבצע העברה אוטומטית רק כאשר טווח השעות זהה. יש לערוך ידנית במקרה של שעות שונות.');
+      }
+      if (sourceShift.class_id === payload.class_id) throw httpError(409, 'העובד כבר משובץ בכיתה זו');
+      const dailyContext = await loadDailyContext(payload.shift_date);
+      if (!sourceClassCanRelease(dailyContext, sourceShift.class_id, candidateId, payload.shift_date, payload.start_time, payload.end_time)) {
+        throw httpError(409, 'לא ניתן להעביר את העובד: ההעברה תפגע בתקינת כיתת המקור');
+      }
+
+      if (!targetShift) {
+        await validateShift(payload, sourceShift.id, false);
+        const updatedSource = assertDb(await db().from('hadas_shifts').update({
+          class_id: payload.class_id,
+          shift_role: payload.shift_role,
+          status: 'draft',
+          public_note: payload.public_note || `הועבר/ה מכיתה אחרת`,
+        }).eq('id', sourceShift.id).select('*').single(), 'לא ניתן להעביר את העובד לכיתה');
+        await recordChange(caller, 'update', sourceShift, updatedSource);
+        await audit(caller.employee.id, 'apply_transfer_suggestion', 'shift', sourceShift.id, { from_class_id:sourceShift.class_id, to_class_id:payload.class_id });
+        await emitEvent('shifts');
+        return send(res, 200, { ok:true, shift:updatedSource, candidateType:'transfer' });
+      }
+
+      let updatedTarget = null;
+      let sourceDeleted = false;
+      try {
+        assertDb(await db().from('hadas_shifts').delete().eq('id', sourceShift.id), 'לא ניתן לפנות את שיבוץ המקור');
+        sourceDeleted = true;
+        await validateShift(payload, targetShift.id, false);
+        updatedTarget = assertDb(await db().from('hadas_shifts').update(payload).eq('id', targetShift.id).select('*').single(), 'לא ניתן להחיל את ההחלפה');
+        await recordChange(caller, 'delete', sourceShift, null);
+        await recordChange(caller, 'update', targetShift, updatedTarget);
+      } catch (error) {
+        if (updatedTarget) await db().from('hadas_shifts').update({ shift_date:targetShift.shift_date, class_id:targetShift.class_id, employee_id:targetShift.employee_id, start_time:targetShift.start_time, end_time:targetShift.end_time, shift_role:targetShift.shift_role, status:targetShift.status, public_note:targetShift.public_note }).eq('id', targetShift.id);
+        if (sourceDeleted) await db().from('hadas_shifts').insert(autoShiftRestoreRow(sourceShift));
+        throw error;
+      }
+      await audit(caller.employee.id, 'apply_transfer_suggestion', 'shift', targetShift.id, { source_shift_id:sourceShift.id, from_class_id:sourceShift.class_id, to_class_id:payload.class_id });
+      await emitEvent('shifts');
+      return send(res, 200, { ok:true, shift:updatedTarget, candidateType:'transfer' });
     }
 
     if (req.method === 'POST' && ['validate', 'publish_preview'].includes(body.action)) {

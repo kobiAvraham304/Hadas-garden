@@ -236,20 +236,20 @@
       <div class="form-grid">
         <label>תאריך<input name="shift_date" type="date" required /></label>
         <label>כיתה<select name="class_id" required></select></label>
+        <label>שעת התחלה<input name="start_time" type="time" value="07:30" required /></label>
+        <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
+        <label class="full-field">תפקיד בשיבוץ הזה<select name="shift_role"><option value="teacher">גננת/גנן — אחראי/ת כיתה</option><option value="lead">מוביל/ת כיתה — אחראי/ת כיתה</option><option value="staff" selected>צוות כיתה</option><option value="replacement">מילוי מקום / החלפה</option></select><small>הבחירה משפיעה על מנוע ההתאמה. זהו התפקיד באותו יום בלבד.</small></label>
         <section class="shift-recommendation-section full-field" aria-live="polite">
-          <div class="shift-recommendation-heading"><div><strong>עובדים מומלצים לשיבוץ</strong><small>לפי כיתה, שעות, תפקיד, רוטציה, העדפות והיקף משרה</small></div><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span></div>
+          <div class="shift-recommendation-heading"><div><strong>העובדים המתאימים ביותר</strong><small>אותו מנוע משמש בהוספת שיבוץ ובמציאת מחליף: זמינות, תקינה, כיתה, שעות, תפקיד ואילוצים</small></div><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span></div>
           <div id="shiftRecommendations" class="shift-recommendations"><div class="empty-state compact">בחרו תאריך, כיתה ושעות כדי לקבל המלצות.</div></div>
         </section>
         <section class="full-field shift-employee-picker" aria-labelledby="shiftEmployeePickerTitle">
-          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד</strong><small>חיפוש לפי שם ותצוגת מידת התאמה לשיבוץ שנבחר</small></div><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div>
+          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד</strong><small>מומלצים, עובדים פנויים והעברות בטוחות בין כיתות</small></div><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div>
           <input name="employee_id" type="hidden" required />
-          <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש עובד לפי שם או תפקיד" autocomplete="off" /></label>
+          <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש לפי שם או תפקיד" autocomplete="off" /></label>
           <div id="shiftEmployeeOptionsList" class="shift-employee-options" role="listbox" aria-label="עובדים זמינים"></div>
-          <small id="shiftEmployeeHint">המערכת מציגה רק עובדים שעברו בדיקות זמינות בסיסיות.</small>
+          <small id="shiftEmployeeHint">מוצגים רק עובדים שעברו בדיקות זמינות ותקינה. העברה מכיתה אחרת תוצע רק אם כיתת המקור נשארת תקינה.</small>
         </section>
-        <label>שעת התחלה<input name="start_time" type="time" value="07:30" required /></label>
-        <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
-        <label>תפקיד בשיבוץ הזה<select name="shift_role"><option value="teacher">גננת/גנן — אחראי/ת כיתה</option><option value="lead">מוביל/ת כיתה — אחראי/ת כיתה</option><option value="staff" selected>צוות כיתה</option><option value="replacement">מילוי מקום / החלפה</option></select><small>זהו התפקיד באותו יום בלבד; התפקיד הקבוע נשאר בכרטיס העובד.</small></label>
         <label class="full-field">הערה גלויה<input name="public_note" placeholder="לדוגמה: עד 12:30 או ישיבה מקצועית" /></label>
       </div>
       <div class="notice soft-notice">כל שינוי נשמר כטיוטה ומופיע לצוות רק לאחר פרסום השיבוץ.</div>
@@ -445,7 +445,7 @@
     </div>
   </dialog>
 
-<dialog id="suggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">סיוע אוטומטי</p><h3>מחליפים אפשריים</h3><p class="muted">ציון ההתאמה נע בין 1 ל־100 ומשקלל זמינות, כיתה, שעות, תפקיד והיקף משרה.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="suggestionsList" class="cards-list"></div></div></dialog>
+<dialog id="suggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">סיוע אוטומטי</p><h3>עובדים מתאימים</h3><p class="muted">המנוע מציג עובדים פנויים והעברות בטוחות בלבד, עם ציון והסבר ברור.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="suggestionsList" class="cards-list"></div></div></dialog>
 <div id="printExportRoot" class="print-export-root" aria-hidden="true"></div>
 </body>
 </html>

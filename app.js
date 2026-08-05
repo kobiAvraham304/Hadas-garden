@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.15.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.16.0 */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -189,7 +189,7 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.15.0';
+    const version = state.config.version || '0.16.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -834,14 +834,31 @@ function employeePatternForDate(employeeId, dateValue) {
   const weekday = parseDateValue(dateValue).getDay();
   return (employee.weekly_patterns || []).find((row) => Number(row.weekday) === weekday) || null;
 }
+function matchingCacheKey({ date, classId, start, end, role, shiftId = null }) {
+  return [date, classId, start, end, role, shiftId || "new"].join("|");
+}
 function shiftRecommendationKey(form = $("#shiftForm")) {
   const data = formObject(form);
-  return [data.shift_date, data.class_id, data.start_time, data.end_time, data.shift_role, data.id || "new"].join("|");
+  return matchingCacheKey({ date:data.shift_date, classId:data.class_id, start:data.start_time, end:data.end_time, role:data.shift_role, shiftId:data.id || null });
+}
+async function fetchMatchingCandidates(context, { force = false, timeout = 8000 } = {}) {
+  const key = matchingCacheKey(context);
+  const cached = state.shiftSuggestionCache.get(key);
+  if (!force && cached && Date.now() - cached.fetchedAt < 120000) return cached.result;
+  const params = new URLSearchParams({
+    date:context.date, class_id:context.classId, start_time:context.start, end_time:context.end,
+    shift_role:context.role || 'staff', mode:context.shiftId ? 'replace' : 'add',
+  });
+  if (context.shiftId) params.set('exclude_shift_id', context.shiftId);
+  const result = await apiFetch(`/api/suggestions?${params}`, { timeout });
+  state.shiftSuggestionCache.set(key, { result, candidates:result.candidates || [], fetchedAt:Date.now() });
+  return result;
 }
 function setShiftEmployeeOptions(candidates = [], selectedId = "") {
   const form = $("#shiftForm");
   state.shiftPickerCandidates = candidates;
-  form.elements.employee_id.value = selectedId || form.elements.employee_id.value || candidates[0]?.employee_id || "";
+  const current = selectedId || form.elements.employee_id.value || "";
+  form.elements.employee_id.value = candidates.some((item) => item.employee_id === current) || employeeById(current) ? current : "";
   renderShiftEmployeePicker();
   updateShiftEmployeeHint();
 }
@@ -849,6 +866,19 @@ function selectedShiftCandidate() {
   const employeeId = $("#shiftForm").elements.employee_id.value;
   return state.shiftPickerCandidates.find((item) => item.employee_id === employeeId) || null;
 }
+function candidateTypeText(candidate) {
+  return candidate?.candidate_type === 'transfer'
+    ? `העברה בטוחה מ${candidate.from_class_name ? `כיתת ${candidate.from_class_name}` : 'כיתה אחרת'}`
+    : 'פנוי/ה לשיבוץ';
+}
+function candidateMetaText(candidate) {
+  const reasons = (candidate?.reasons || []).slice(0, 2);
+  return [candidate?.job_title, candidateTypeText(candidate), ...reasons].filter(Boolean).join(' · ');
+}
+function suggestionCandidateCard(candidate, { actionLabel = 'בחירת העובד', shift = false } = {}) {
+  return `<article class="suggestion-card level-${candidate.recommendation_level || 'possible'}"><div class="card-heading"><div><span class="candidate-type-badge ${candidate.candidate_type === 'transfer' ? 'transfer' : 'direct'}">${escapeHtml(candidateTypeText(candidate))}</span><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${escapeHtml(candidate.availability?.start_time || '')}–${escapeHtml(candidate.availability?.end_time || '')}</p></div>${scoreScaleHtml(candidate.score)}</div><ul class="reason-list">${(candidate.reasons || []).map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul><button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role || 'staff'}" data-candidate-type="${candidate.candidate_type || 'direct'}" data-source-shift="${candidate.source_shift_id || ''}">${shift ? 'החלת ההחלפה' : actionLabel}</button></article>`;
+}
+
 function renderShiftEmployeePicker() {
   const form = $("#shiftForm"); const target = $("#shiftEmployeeOptionsList"); if (!form || !target) return;
   const selectedId = form.elements.employee_id.value;
@@ -856,7 +886,7 @@ function renderShiftEmployeePicker() {
   const rows = state.shiftPickerCandidates.filter((candidate) => !query || `${candidate.full_name} ${candidate.job_title}`.toLowerCase().includes(query));
   const recommended = rows.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 55);
   const possible = rows.filter((item) => !recommended.includes(item));
-  const card = (candidate) => `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidate.job_title)} · ${candidate.reasons.slice(0,2).map(escapeHtml).join(' · ')}</small></span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
+  const card = (candidate) => `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''} ${candidate.candidate_type === 'transfer' ? 'is-transfer' : ''}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small></span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
   const selectedEmployee = employeeById(selectedId);
   let selectedFallback = '';
   if (selectedEmployee && !state.shiftPickerCandidates.some((item) => item.employee_id === selectedId)) {
@@ -885,22 +915,19 @@ function renderShiftRecommendations(candidates = []) {
   const recommended = candidates.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 55);
   if (!recommended.length) { target.innerHTML = '<div class="empty-state compact">לא נמצאה התאמה בטוחה. בדקו את התאריך, השעות, החופשות והעדפות הכיתה.</div>'; status.textContent = "אין התאמה בטוחה"; status.className = "status-chip warn"; return; }
   const top = recommended.slice(0,5);
-  target.innerHTML = top.map((candidate,index) => `<button type="button" class="shift-recommendation-card level-${candidate.recommendation_level || "possible"}" data-recommended-employee="${candidate.employee_id}" data-recommended-role="${candidate.suggested_role}"><span class="recommendation-rank">${index+1}</span><div><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidate.job_title)} · ${candidate.reasons.slice(0,2).map(escapeHtml).join(" · ")}</small></div>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`).join("");
+  target.innerHTML = top.map((candidate,index) => `<button type="button" class="shift-recommendation-card level-${candidate.recommendation_level || "possible"} ${candidate.candidate_type === 'transfer' ? 'is-transfer' : ''}" data-recommended-employee="${candidate.employee_id}" data-recommended-role="${candidate.suggested_role}"><span class="recommendation-rank">${index+1}</span><div><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small></div>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`).join("");
   status.textContent = `${recommended.length} התאמות בטוחות`; status.className = "status-chip ok";
 }
 async function updateShiftRecommendations({ force = false } = {}) {
   const form = $("#shiftForm"); const data = formObject(form); const selected = form.elements.employee_id.value;
   if (!data.shift_date || !data.class_id || !data.start_time || !data.end_time || timeToMinutes(data.end_time) <= timeToMinutes(data.start_time)) { $("#shiftRecommendations").innerHTML = '<div class="empty-state compact">השלימו תאריך, כיתה וטווח שעות תקין.</div>'; state.shiftPickerCandidates=[]; renderShiftEmployeePicker(); return; }
-  const key = shiftRecommendationKey(form); const requestId = ++state.shiftSuggestionRequestId; const cached = state.shiftSuggestionCache.get(key);
-  if (!force && cached && Date.now() - cached.fetchedAt < 90000) { renderShiftRecommendations(cached.candidates); setShiftEmployeeOptions(cached.candidates, selected); return; }
+  const requestId = ++state.shiftSuggestionRequestId;
   $("#shiftRecommendationStatus").textContent = "מחשב…"; $("#shiftRecommendationStatus").className = "status-chip";
   $("#shiftRecommendations").innerHTML = '<div class="recommendation-loading"><span></span><span>בודק העדפות, שעות, חופשות וזמינות…</span></div>';
   try {
-    const params = new URLSearchParams({ date:data.shift_date, class_id:data.class_id, start_time:data.start_time, end_time:data.end_time, shift_role:data.shift_role || "staff" });
-    if (data.id) params.set("exclude_shift_id", data.id);
-    const result = await apiFetch(`/api/suggestions?${params}`, { timeout:8000 });
+    const result = await fetchMatchingCandidates({ date:data.shift_date, classId:data.class_id, start:data.start_time, end:data.end_time, role:data.shift_role || 'staff', shiftId:data.id || null }, { force, timeout:8000 });
     if (requestId !== state.shiftSuggestionRequestId) return;
-    const candidates = result.candidates || []; state.shiftSuggestionCache.set(key, { candidates, fetchedAt:Date.now() });
+    const candidates = result.candidates || [];
     renderShiftRecommendations(candidates); setShiftEmployeeOptions(candidates, selected);
   } catch (error) {
     if (requestId !== state.shiftSuggestionRequestId) return;
@@ -986,9 +1013,14 @@ async function publishPendingChangeNow() {
 async function saveShift(event) {
   event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button[value="default"]'); const data = formObject(form); data.override_day_off = data.override_day_off === 'true'; const wasPublished=isPublishedWeekDate(data.shift_date); const employeeName=employeeById(data.employee_id)?.full_name || 'העובד'; setBusy(button, true);
   try {
-    try { await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); }
-    catch (error) { if (error.status === 409 && /יום החופשי/.test(error.message) && confirm(`${error.message}\nלשמור בכל זאת?`)) { data.override_day_off = true; await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); } else throw error; }
-    $('#shiftDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({ force: true }); showToast('השיבוץ נשמר בטיוטה', 'success');
+    const candidate = selectedShiftCandidate();
+    if (candidate && candidate.employee_id === data.employee_id) {
+      await apiFetch('/api/shifts', { method:'POST', body:{ action:'apply_suggestion', target_shift_id:data.id || null, candidate_id:data.employee_id, candidate_type:candidate.candidate_type || 'direct', source_shift_id:candidate.source_shift_id || null, shift_date:data.shift_date, class_id:data.class_id, start_time:data.start_time, end_time:data.end_time, shift_role:data.shift_role, public_note:data.public_note } });
+    } else {
+      try { await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); }
+      catch (error) { if (error.status === 409 && /יום החופשי/.test(error.message) && confirm(`${error.message}\nלשמור בכל זאת?`)) { data.override_day_off = true; await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); } else throw error; }
+    }
+    $('#shiftDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({ force: true }); showToast(candidate?.candidate_type === 'transfer' ? 'העובד הועבר בבטחה והשיבוץ נשמר בטיוטה' : 'השיבוץ נשמר בטיוטה', 'success');
     if(wasPublished)showPostPublishChangePrompt({title:data.id?'שיבוץ פורסם עודכן':'נוסף שיבוץ לשבוע שכבר פורסם',message:`השינוי עבור ${employeeName} עדיין אינו גלוי לצוות. לפרסם אותו עכשיו?`});
   } catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); }
 }
@@ -1788,13 +1820,34 @@ function handleCalendarKeydown(event) {
 async function handleCalendarEventAction(event) { const button = event.target.closest('[data-action],.close-dialog-inline'); if (!button) return; if (button.classList.contains('close-dialog-inline')) return $('#calendarEventDialog').close(); if (button.dataset.action === 'delete-event') { if (!confirm('למחוק את האירוע?')) return; try { await apiFetch('/api/calendar', { method: 'DELETE', body: { id: button.dataset.id } }); $('#calendarEventDialog').close(); await setCalendarMonth(state.calendarMonth); showToast('האירוע נמחק', 'success'); } catch (error) { showToast(error.message, 'error'); } } }
 
 async function showSuggestions(date, classId, shift = null) {
-  const start = trimTime(shift?.start_time) || trimTime(state.settings.opening_time) || '07:30'; const end = trimTime(shift?.end_time) || trimTime(state.settings.closing_time) || '15:30'; const dayRows = state.shifts.filter((row) => row.shift_date === date && row.class_id === classId); const role = shift?.shift_role || (!dayRows.some((row) => ['teacher', 'lead'].includes(row.shift_role)) ? 'teacher' : 'staff'); const original = shift ? employeeById(shift.employee_id) : null;
+  const start = trimTime(shift?.start_time) || trimTime(state.settings.opening_time) || '07:30';
+  const end = trimTime(shift?.end_time) || closingTimeForDate(date);
+  const dayRows = state.shifts.filter((row) => row.shift_date === date && row.class_id === classId);
+  const role = shift?.shift_role || (!dayRows.some((row) => ['teacher', 'lead'].includes(row.shift_role)) ? 'teacher' : 'staff');
+  const original = shift ? employeeById(shift.employee_id) : null;
   state.suggestionsContext = { date, classId, start, end, role, shiftId: shift?.id || null, originalName: original?.full_name || '', originalNote: shift?.public_note || '' };
-  $('#suggestionsList').innerHTML = `<div class="empty-state">מחפש עובדים פנויים ל-${start}–${end}…</div>`; $('#suggestionsDialog').showModal();
-  try { const params = new URLSearchParams({ date, class_id: classId, start_time: start, end_time: end, shift_role: role }); if(shift?.id)params.set('exclude_shift_id',shift.id); const result = await apiFetch(`/api/suggestions?${params}`); $('#suggestionsList').innerHTML = result.candidates.length ? result.candidates.map((candidate) => `<article class="suggestion-card"><div class="card-heading"><div><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${timeHtml(start, end)}</p></div>${scoreScaleHtml(candidate.score)}</div><ul class="reason-list">${candidate.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul><button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role}">${shift ? 'החלפת העובד בשיבוץ' : 'שיבוץ העובד'}</button></article>`).join('') : '<div class="empty-state">לא נמצא מחליף זמין בשעות אלה.</div>'; }
-  catch (error) { $('#suggestionsList').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; }
+  $('#suggestionsList').innerHTML = `<div class="empty-state">בודק זמינות, כיתות, שעות, תקינה והעברות בטוחות ל-${start}–${end}…</div>`;
+  $('#suggestionsDialog').showModal();
+  try {
+    const result = await fetchMatchingCandidates({ date, classId, start, end, role, shiftId:shift?.id || null }, { timeout:10000 });
+    const contextHtml = `<section class="suggestions-context"><div><strong>${escapeHtml(classById(classId)?.name || 'כיתה')} · ${escapeHtml(formatDate(date))}</strong><small>${timeHtml(result.context?.start_time || start, result.context?.end_time || end)} · ${escapeHtml(SHIFT_ROLE_LABELS[result.context?.shift_role || role] || '')}</small></div><div><b>${result.summary?.recommended || 0}</b><span>מומלצים</span></div><div><b>${result.summary?.transfers || 0}</b><span>העברות בטוחות</span></div></section>`;
+    $('#suggestionsList').innerHTML = result.candidates.length
+      ? `${contextHtml}<div class="suggestions-grid">${result.candidates.map((candidate) => suggestionCandidateCard(candidate, { shift:Boolean(shift), actionLabel:'שיבוץ העובד' })).join('')}</div>`
+      : `${contextHtml}<div class="empty-state">לא נמצא עובד שעובר את בדיקות הזמינות והתקינה לטווח הזה. נסו לשנות שעות או לבדוק את כרטיסי העובדים.</div>`;
+  } catch (error) { $('#suggestionsList').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; }
 }
-async function handleSuggestionClick(event) { const button = event.target.closest('[data-action="use-suggestion"]'); if (!button) return; const context = state.suggestionsContext; const wasPublished=isPublishedWeekDate(context.date); try { if (context.shiftId) { const replacementNote = [context.originalNote, context.originalName ? `מחליף/ה במקום ${context.originalName}` : 'שובץ כמחליף/ה'].filter(Boolean).join(' · '); await apiFetch('/api/shifts', { method: 'PATCH', body: { id: context.shiftId, employee_id: button.dataset.id, shift_role: button.dataset.role, public_note: replacementNote } }); } else { await apiFetch('/api/shifts', { method: 'POST', body: { shift_date: context.date, class_id: context.classId, employee_id: button.dataset.id, start_time: context.start, end_time: context.end, shift_role: button.dataset.role, public_note: 'שובץ כהחלפה' } }); } $('#suggestionsDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({ force: true }); showToast(context.shiftId ? 'העובד הוחלף בטיוטה' : 'המחליף/ה שובץ בטיוטה', 'success'); if(wasPublished)showPostPublishChangePrompt({title:'החלפה בוצעה בשבוע שכבר פורסם',message:'ההחלפה נשמרה בטיוטה. יש לפרסם אותה כדי שהצוות יראה את השינוי.'}); } catch (error) { showToast(error.message, 'error'); } }
+async function handleSuggestionClick(event) {
+  const button = event.target.closest('[data-action="use-suggestion"]'); if (!button) return;
+  const context = state.suggestionsContext; const wasPublished = isPublishedWeekDate(context.date);
+  setBusy(button, true, 'שומר…');
+  try {
+    const replacementNote = [context.originalNote, context.originalName ? `מחליף/ה במקום ${context.originalName}` : 'שובץ כמחליף/ה'].filter(Boolean).join(' · ');
+    await apiFetch('/api/shifts', { method:'POST', body:{ action:'apply_suggestion', target_shift_id:context.shiftId || null, candidate_id:button.dataset.id, candidate_type:button.dataset.candidateType || 'direct', source_shift_id:button.dataset.sourceShift || null, shift_date:context.date, class_id:context.classId, start_time:context.start, end_time:context.end, shift_role:button.dataset.role, public_note:context.shiftId ? replacementNote : 'שובץ כהחלפה' } });
+    $('#suggestionsDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({ force:true });
+    showToast(button.dataset.candidateType === 'transfer' ? 'בוצעה העברה בטוחה בין הכיתות' : (context.shiftId ? 'העובד הוחלף בטיוטה' : 'העובד שובץ בטיוטה'), 'success');
+    if (wasPublished) showPostPublishChangePrompt({ title:'שינוי בוצע בשבוע שכבר פורסם', message:'השינוי נשמר בטיוטה. יש לפרסם אותו כדי שהצוות יראה את השינוי.' });
+  } catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); }
+}
 
 function minuteText(total) {
   const safe = Math.max(0, Number(total) || 0);

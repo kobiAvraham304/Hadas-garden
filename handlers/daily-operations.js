@@ -46,7 +46,7 @@ function isForbidden(context, employeeId, classId, date) {
   return (context.constraints||[]).some(c=>c.employee_id===employeeId&&c.class_id===classId&&c.constraint_type==='forbidden'&&(!c.valid_from||c.valid_from<=date)&&(!c.valid_to||c.valid_to>=date));
 }
 function requestUnavailable(context, employeeId, date) {
-  return (context.requests||[]).some(r=>r.requester_id===employeeId&&r.request_date<=date&&date<=String(r.request_end_date||r.request_date));
+  return (context.requests||[]).some(r=>(r.requester_id===employeeId||r.employee_id===employeeId)&&r.request_date<=date&&date<=String(r.request_end_date||r.request_date));
 }
 function operationRange(context, operation) {
   const shift=(context.shifts||[]).find((row)=>row.id===operation.shift_id);
@@ -231,3 +231,5 @@ module.exports.affectedRange = affectedRange;
 module.exports.unavailableInRange = unavailableInRange;
 module.exports.targetNeedsLeader = targetNeedsLeader;
 module.exports.employeeCanLead = employeeCanLead;
+
+module.exports.loadContext = loadContext;
