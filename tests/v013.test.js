@@ -31,8 +31,10 @@ test('worker suitability scores are normalized to 1-100 and visualized',()=>{
   assert.match(app,/normalizeDisplayScore/);
   assert.match(app,/scoreScaleHtml/);
   assert.match(app,/\/100/);
-  assert.match(suggestions,/function normalizeScore/);
-  assert.match(daily,/function normalizeScore/);
+  const matching=read('lib/matching.js');
+  assert.match(matching,/function normalizeScore/);
+  assert.match(suggestions,/normalizeScore/);
+  assert.match(daily,/rankCandidates/);
   assert.match(css,/\.match-score/);
 });
 

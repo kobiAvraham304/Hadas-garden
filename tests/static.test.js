@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.16.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.17.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
@@ -253,15 +253,16 @@ test('0.8 keeps the week selector sticky without breaking mobile overflow', () =
   assert.match(css,/html,body\{overflow-x:clip\}/);
 });
 
-test('0.8 weekly and monthly image exports are device-safe and PDF is landscape', () => {
-  const html=read('index.html'); const app=read('app.js'); const css=read('styles.css');
+test('0.17 weekly and monthly exports use legible landscape canvases and safe sharing', () => {
+  const html=read('index.html'); const app=read('app.js');
   assert.match(html,/id="monthImageBtn"/);
+  assert.match(app,/function drawWeeklyScheduleCanvas/);
+  assert.match(app,/const width = 1920/);
   assert.match(app,/downloadMonthlyScheduleImage/);
   assert.match(app,/navigator\.canShare/);
-  assert.match(app,/maxCanvasSide = monthly \? 3800 : 7000/);
-  assert.match(app,/catch \(error\) \{[\s\S]*?AbortError[\s\S]*?Fall back/);
-  assert.match(css,/@page\{size:A4 landscape/);
-  assert.match(app,/setTimeout\(cleanup, 60000\)/);
+  assert.match(app,/files\.push\(new File/);
+  assert.match(app,/@page\{size:A4 landscape/);
+  assert.match(app,/setTimeout\(\(\) => URL\.revokeObjectURL\(printUrl\), 60000\)/);
 });
 
 test('0.8 calendar navigation uses cache, latest-request protection and direct day creation', () => {

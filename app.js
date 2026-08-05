@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.16.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.17.0 */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -63,6 +63,7 @@ const state = {
   shiftSuggestionCache: new Map(),
   shiftSuggestionRequestId: 0,
   shiftPickerCandidates: [],
+  shiftPickerRejected: [],
   shiftPickerQuery: '',
   autoSchedulePreview: null,
   postPublishContext: null,
@@ -183,13 +184,20 @@ async function apiFetch(url, options = {}) {
   throw lastError || new Error('לא ניתן להתחבר לשרת');
 }
 
+function syncScheduleToolsForViewport() {
+  const tools = document.querySelector('.schedule-tools-menu');
+  if (!tools) return;
+  tools.open = !window.matchMedia('(max-width: 820px)').matches;
+}
 async function init() {
   bindEvents();
+  syncScheduleToolsForViewport();
+  window.addEventListener('resize', debounce(syncScheduleToolsForViewport, 120));
   try {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.16.0';
+    const version = state.config.version || '0.17.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -875,8 +883,24 @@ function candidateMetaText(candidate) {
   const reasons = (candidate?.reasons || []).slice(0, 2);
   return [candidate?.job_title, candidateTypeText(candidate), ...reasons].filter(Boolean).join(' · ');
 }
+function candidateCautionsHtml(candidate) {
+  const cautions = candidate?.cautions || [];
+  return cautions.length ? `<ul class="candidate-cautions">${cautions.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '';
+}
+function rejectedReasonsHtml(rejected = []) {
+  if (!rejected.length) return '';
+  const grouped = new Map();
+  rejected.forEach((item) => {
+    const reason = item.reason || 'לא עבר/ה את בדיקות ההתאמה';
+    if (!grouped.has(reason)) grouped.set(reason, []);
+    grouped.get(reason).push(item.full_name || 'עובד');
+  });
+  const rows = [...grouped.entries()].slice(0, 8).map(([reason, names]) => `<li><strong>${escapeHtml(reason)}</strong><span>${escapeHtml(names.slice(0, 4).join(', '))}${names.length > 4 ? ` ועוד ${names.length - 4}` : ''}</span></li>`).join('');
+  return `<details class="matching-rejected-details"><summary>למה עובדים אחרים לא הופיעו? <b>${rejected.length}</b></summary><ul>${rows}</ul></details>`;
+}
 function suggestionCandidateCard(candidate, { actionLabel = 'בחירת העובד', shift = false } = {}) {
-  return `<article class="suggestion-card level-${candidate.recommendation_level || 'possible'}"><div class="card-heading"><div><span class="candidate-type-badge ${candidate.candidate_type === 'transfer' ? 'transfer' : 'direct'}">${escapeHtml(candidateTypeText(candidate))}</span><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${escapeHtml(candidate.availability?.start_time || '')}–${escapeHtml(candidate.availability?.end_time || '')}</p></div>${scoreScaleHtml(candidate.score)}</div><ul class="reason-list">${(candidate.reasons || []).map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul><button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role || 'staff'}" data-candidate-type="${candidate.candidate_type || 'direct'}" data-source-shift="${candidate.source_shift_id || ''}">${shift ? 'החלת ההחלפה' : actionLabel}</button></article>`;
+  const recommendationText = candidate.recommended ? 'מומלץ' : 'אפשרות נוספת';
+  return `<article class="suggestion-card level-${candidate.recommendation_level || 'possible'} ${candidate.recommended ? 'is-recommended' : 'is-possible'}"><div class="card-heading"><div><span class="candidate-type-badge ${candidate.candidate_type === 'transfer' ? 'transfer' : 'direct'}">${escapeHtml(candidateTypeText(candidate))}</span><span class="recommendation-label">${recommendationText}</span><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${escapeHtml(candidate.availability?.start_time || '')}–${escapeHtml(candidate.availability?.end_time || '')}</p></div>${scoreScaleHtml(candidate.score)}</div><ul class="reason-list">${(candidate.reasons || []).map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>${candidateCautionsHtml(candidate)}<button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role || 'staff'}" data-candidate-type="${candidate.candidate_type || 'direct'}" data-source-shift="${candidate.source_shift_id || ''}">${shift ? 'החלת ההחלפה' : actionLabel}</button></article>`;
 }
 
 function renderShiftEmployeePicker() {
@@ -884,15 +908,16 @@ function renderShiftEmployeePicker() {
   const selectedId = form.elements.employee_id.value;
   const query = String(state.shiftPickerQuery || '').trim().toLowerCase();
   const rows = state.shiftPickerCandidates.filter((candidate) => !query || `${candidate.full_name} ${candidate.job_title}`.toLowerCase().includes(query));
-  const recommended = rows.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 55);
+  const recommended = rows.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 62);
   const possible = rows.filter((item) => !recommended.includes(item));
-  const card = (candidate) => `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''} ${candidate.candidate_type === 'transfer' ? 'is-transfer' : ''}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small></span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
+  const card = (candidate) => `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''} ${candidate.candidate_type === 'transfer' ? 'is-transfer' : ''} ${candidate.recommended ? 'is-recommended' : 'is-possible'}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small>${candidate.cautions?.length ? `<em>${escapeHtml(candidate.cautions[0])}</em>` : ''}</span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
   const selectedEmployee = employeeById(selectedId);
   let selectedFallback = '';
   if (selectedEmployee && !state.shiftPickerCandidates.some((item) => item.employee_id === selectedId)) {
     selectedFallback = `<div class="employee-picker-current"><strong>העובד הנוכחי: ${escapeHtml(selectedEmployee.full_name)}</strong><small>העובד אינו זמין לפי כללי ההמלצה הנוכחיים. שינוי השיבוץ ידרוש בחירת עובד מתאים.</small></div>`;
   }
-  target.innerHTML = `${selectedFallback}${recommended.length ? `<div class="employee-option-group"><span>מומלצים</span>${recommended.map(card).join('')}</div>` : ''}${possible.length ? `<div class="employee-option-group"><span>אפשרויות נוספות</span>${possible.map(card).join('')}</div>` : ''}${!rows.length ? '<div class="empty-state compact">לא נמצאו עובדים זמינים התואמים לחיפוש ולשעות שנבחרו.</div>' : ''}`;
+  const rejectedSummary = rejectedReasonsHtml(state.shiftPickerRejected);
+  target.innerHTML = `${selectedFallback}${recommended.length ? `<div class="employee-option-group"><span>מומלצים (${recommended.length})</span>${recommended.map(card).join('')}</div>` : ''}${possible.length ? `<div class="employee-option-group"><span>אפשרויות נוספות שעברו בדיקות (${possible.length})</span>${possible.map(card).join('')}</div>` : ''}${!rows.length ? '<div class="empty-state compact">לא נמצאו עובדים זמינים. פתחו את ההסבר למטה כדי להבין מה חסם כל עובד.</div>' : ''}${rejectedSummary}`;
   const selected = selectedShiftCandidate();
   const pill = $('#shiftEmployeeSelectedScore');
   if (selected) { pill.textContent = `${normalizeDisplayScore(selected.score)}/100`; pill.classList.remove('hidden'); }
@@ -912,11 +937,11 @@ function updateShiftEmployeeHint() {
 }
 function renderShiftRecommendations(candidates = []) {
   const target = $("#shiftRecommendations"); const status = $("#shiftRecommendationStatus");
-  const recommended = candidates.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 55);
+  const recommended = candidates.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 62);
   if (!recommended.length) { target.innerHTML = '<div class="empty-state compact">לא נמצאה התאמה בטוחה. בדקו את התאריך, השעות, החופשות והעדפות הכיתה.</div>'; status.textContent = "אין התאמה בטוחה"; status.className = "status-chip warn"; return; }
-  const top = recommended.slice(0,5);
+  const top = recommended.slice(0,6);
   target.innerHTML = top.map((candidate,index) => `<button type="button" class="shift-recommendation-card level-${candidate.recommendation_level || "possible"} ${candidate.candidate_type === 'transfer' ? 'is-transfer' : ''}" data-recommended-employee="${candidate.employee_id}" data-recommended-role="${candidate.suggested_role}"><span class="recommendation-rank">${index+1}</span><div><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small></div>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`).join("");
-  status.textContent = `${recommended.length} התאמות בטוחות`; status.className = "status-chip ok";
+  status.textContent = `${recommended.length} מומלצים · ${candidates.length} זמינים`; status.className = "status-chip ok";
 }
 async function updateShiftRecommendations({ force = false } = {}) {
   const form = $("#shiftForm"); const data = formObject(form); const selected = form.elements.employee_id.value;
@@ -928,10 +953,11 @@ async function updateShiftRecommendations({ force = false } = {}) {
     const result = await fetchMatchingCandidates({ date:data.shift_date, classId:data.class_id, start:data.start_time, end:data.end_time, role:data.shift_role || 'staff', shiftId:data.id || null }, { force, timeout:8000 });
     if (requestId !== state.shiftSuggestionRequestId) return;
     const candidates = result.candidates || [];
+    state.shiftPickerRejected = result.rejected || [];
     renderShiftRecommendations(candidates); setShiftEmployeeOptions(candidates, selected);
   } catch (error) {
     if (requestId !== state.shiftSuggestionRequestId) return;
-    state.shiftPickerCandidates=[]; renderShiftEmployeePicker();
+    state.shiftPickerCandidates=[]; state.shiftPickerRejected=[]; renderShiftEmployeePicker();
     $("#shiftRecommendations").innerHTML = `<div class="empty-state compact">${escapeHtml(error.message)}</div>`;
     $("#shiftRecommendationStatus").textContent = "לא נטען"; $("#shiftRecommendationStatus").className = "status-chip error";
   }
@@ -1135,61 +1161,167 @@ async function copyPreviousWeek(mode) {
   catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); }
 }
 async function acknowledgeSchedule() { try { await apiFetch('/api/shifts', { method: 'POST', body: { action: 'ack', week_start: dateISO(state.weekStart) } }); await refreshScheduleWeek({ force: true }); showToast('אישור הקריאה נשמר', 'success'); } catch (error) { showToast(error.message, 'error'); } }
-function exportShiftHtml(shift) {
-  const employee = employeeById(shift.employee_id);
-  return `<div class="export-shift"><strong>${escapeHtml(employee?.full_name || 'עובד')}</strong><span>${timeHtml(shift.start_time, shift.end_time)}</span><small>${escapeHtml(SHIFT_ROLE_LABELS[shift.shift_role] || '')}${shift.public_note ? ` · ${escapeHtml(shift.public_note)}` : ''}</small></div>`;
+function exportRoleShort(role) {
+  return ({ teacher: 'גננת/גנן', lead: 'מוביל/ה', staff: 'צוות כיתה', replacement: 'מילוי מקום' })[role] || 'צוות';
 }
-function buildWeeklyExportHtml(payload = schedulePayloadFromState(), weekStart = state.weekStart, title = 'שיבוץ שבועי') {
+function roundedRectPath(ctx, x, y, width, height, radius = 14) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+function fillRoundedRect(ctx, x, y, width, height, radius, fill, stroke = null) {
+  roundedRectPath(ctx, x, y, width, height, radius);
+  ctx.fillStyle = fill; ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 1; ctx.stroke(); }
+}
+function fitCanvasText(ctx, text, maxWidth) {
+  const value = String(text || '');
+  if (ctx.measureText(value).width <= maxWidth) return value;
+  let output = value;
+  while (output.length > 1 && ctx.measureText(`${output}…`).width > maxWidth) output = output.slice(0, -1);
+  return `${output}…`;
+}
+function drawCanvasText(ctx, text, x, y, maxWidth, { font = '700 18px Arial', color = '#2f3246', align = 'right' } = {}) {
+  ctx.font = font; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  ctx.fillText(fitCanvasText(ctx, text, maxWidth), x, y, maxWidth);
+}
+function isolateCanvasLtr(value) { return `\u2066${String(value || '')}\u2069`; }
+function exportRolePalette(role) {
+  if (role === 'teacher') return { fill: '#eef1ff', border: '#cfd5ff', accent: '#565ec0' };
+  if (role === 'lead') return { fill: '#eefaf6', border: '#c9e8da', accent: '#2f8066' };
+  if (role === 'replacement') return { fill: '#fff7e8', border: '#efd9aa', accent: '#9a6a13' };
+  return { fill: '#f7f8fb', border: '#e2e4ec', accent: '#61677c' };
+}
+function weeklyExportLayout(payload, weekStart) {
   const dates = Array.from({ length: 6 }, (_, index) => addDays(weekStart, index));
   const shifts = payload.shifts || [];
-  const headers = dates.map((date) => `<th><strong>${DAY_NAMES[date.getDay()]}</strong><small>${formatDate(date, { day: '2-digit', month: '2-digit' })}</small></th>`).join('');
-  const rows = visibleScheduleClasses().map((classItem) => `<tr><th class="export-class">${escapeHtml(classItem.name)}</th>${dates.map((date) => { const iso = dateISO(date); const items = shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id); return `<td>${items.length ? items.map(exportShiftHtml).join('') : '<span class="export-empty">—</span>'}</td>`; }).join('')}</tr>`).join('');
+  const classes = visibleScheduleClasses();
+  const rowHeights = classes.map((classItem) => {
+    const maxItems = Math.max(1, ...dates.map((date) => shifts.filter((shift) => shift.shift_date === dateISO(date) && shift.class_id === classItem.id).length));
+    return Math.max(150, 34 + maxItems * 48);
+  });
   const absences = payload.scheduleAbsences || [];
-  const absenceRow = dates.map((date) => { const iso = dateISO(date); const items = absences.filter((item) => item.absence_date === iso); return `<td>${items.length ? items.map((item) => `<span class="export-absence">${escapeHtml(employeeById(item.employee_id)?.full_name || item.employee_name || 'עובד')} · ${absenceLabel(item.absence_type)}</span>`).join('') : '<span class="export-empty">אין</span>'}</td>`; }).join('');
-  return `<section class="export-sheet"><header><div><p>מערכת ניהול שיבוצים מעון הדס</p><h1>${escapeHtml(title)}</h1></div><strong>${formatDate(weekStart, { day: 'numeric', month: 'long' })} – ${formatDate(addDays(weekStart, 5), { day: 'numeric', month: 'long', year: 'numeric' })}</strong></header><table class="export-table"><thead><tr><th class="export-class">כיתה</th>${headers}</tr></thead><tbody>${rows}<tr class="export-absence-row"><th class="export-class">חופש / היעדרות</th>${absenceRow}</tr></tbody></table><footer>נוצר בתאריך ${formatDate(new Date(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</footer></section>`;
+  const maxAbsences = Math.max(1, ...dates.map((date) => absences.filter((item) => item.absence_date === dateISO(date)).length));
+  const absenceHeight = Math.max(82, 28 + maxAbsences * 26);
+  const width = 1920;
+  const headerHeight = 116;
+  const daysHeaderHeight = 64;
+  const footerHeight = 38;
+  const margin = 34;
+  const height = margin * 2 + headerHeight + daysHeaderHeight + rowHeights.reduce((sum, value) => sum + value, 0) + absenceHeight + footerHeight;
+  return { width, height: Math.max(960, height), dates, shifts, classes, rowHeights, absenceHeight, headerHeight, daysHeaderHeight, footerHeight, margin };
 }
-function createExportHost(html, monthly = false) {
-  const host = document.createElement('div');
-  host.className = `capture-export-host ${monthly ? 'monthly' : ''}`;
-  host.innerHTML = html;
-  document.body.appendChild(host);
-  return host;
+function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStart = state.weekStart, title = 'שיבוץ שבועי') {
+  const layout = weeklyExportLayout(payload, weekStart);
+  const canvas = document.createElement('canvas'); canvas.width = layout.width; canvas.height = layout.height;
+  const ctx = canvas.getContext('2d');
+  ctx.direction = 'rtl';
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const { margin, width, dates, shifts, classes, rowHeights, absenceHeight, headerHeight, daysHeaderHeight } = layout;
+  const contentWidth = width - margin * 2;
+  const classColumnWidth = 150;
+  const dayWidth = (contentWidth - classColumnWidth) / 6;
+
+  fillRoundedRect(ctx, margin, margin, contentWidth, headerHeight - 12, 24, '#f5f4ff', '#dedff0');
+  drawCanvasText(ctx, 'מערכת ניהול שיבוצים מעון הדס', width - margin - 28, margin + 31, 760, { font: '800 22px Arial', color: '#6267bb' });
+  drawCanvasText(ctx, title, width - margin - 28, margin + 72, 760, { font: '900 42px Arial', color: '#2f3246' });
+  drawCanvasText(ctx, `${formatDate(weekStart, { day: 'numeric', month: 'long' })} – ${formatDate(addDays(weekStart, 5), { day: 'numeric', month: 'long', year: 'numeric' })}`, margin + 28, margin + 67, 650, { font: '800 26px Arial', color: '#474b66', align: 'left' });
+
+  let y = margin + headerHeight;
+  fillRoundedRect(ctx, margin, y, contentWidth, daysHeaderHeight, 16, '#eef0ff', '#dcdfee');
+  drawCanvasText(ctx, 'כיתה', width - margin - classColumnWidth / 2, y + daysHeaderHeight / 2, classColumnWidth - 20, { font: '900 22px Arial', align: 'center' });
+  dates.forEach((date, index) => {
+    const xRight = width - margin - classColumnWidth - index * dayWidth;
+    drawCanvasText(ctx, DAY_NAMES[date.getDay()], xRight - dayWidth / 2, y + 23, dayWidth - 20, { font: '900 20px Arial', align: 'center' });
+    drawCanvasText(ctx, formatDate(date, { day: '2-digit', month: '2-digit' }), xRight - dayWidth / 2, y + 46, dayWidth - 20, { font: '700 15px Arial', color: '#777b91', align: 'center' });
+    if (index < 5) { ctx.strokeStyle = '#d9dcea'; ctx.beginPath(); ctx.moveTo(xRight - dayWidth, y); ctx.lineTo(xRight - dayWidth, y + daysHeaderHeight); ctx.stroke(); }
+  });
+  y += daysHeaderHeight;
+
+  classes.forEach((classItem, rowIndex) => {
+    const rowHeight = rowHeights[rowIndex];
+    ctx.fillStyle = rowIndex % 2 ? '#fcfcff' : '#ffffff'; ctx.fillRect(margin, y, contentWidth, rowHeight);
+    ctx.strokeStyle = '#e2e4ed'; ctx.lineWidth = 1; ctx.strokeRect(margin, y, contentWidth, rowHeight);
+    ctx.fillStyle = '#f8f7ff'; ctx.fillRect(width - margin - classColumnWidth, y, classColumnWidth, rowHeight);
+    drawCanvasText(ctx, classItem.name, width - margin - classColumnWidth / 2, y + rowHeight / 2, classColumnWidth - 24, { font: '900 27px Arial', align: 'center' });
+
+    dates.forEach((date, index) => {
+      const iso = dateISO(date);
+      const items = shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id)
+        .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)) || (employeeById(a.employee_id)?.full_name || '').localeCompare(employeeById(b.employee_id)?.full_name || '', 'he'));
+      const cellRight = width - margin - classColumnWidth - index * dayWidth;
+      const cellLeft = cellRight - dayWidth;
+      ctx.strokeStyle = '#e4e6ef'; ctx.beginPath(); ctx.moveTo(cellLeft, y); ctx.lineTo(cellLeft, y + rowHeight); ctx.stroke();
+      if (!items.length) {
+        drawCanvasText(ctx, '—', cellLeft + dayWidth / 2, y + rowHeight / 2, dayWidth - 30, { font: '700 25px Arial', color: '#b2b4c0', align: 'center' });
+        return;
+      }
+      items.forEach((shift, itemIndex) => {
+        const employee = employeeById(shift.employee_id);
+        const cardY = y + 12 + itemIndex * 48;
+        if (cardY + 42 > y + rowHeight) return;
+        const palette = exportRolePalette(shift.shift_role);
+        fillRoundedRect(ctx, cellLeft + 8, cardY, dayWidth - 16, 40, 9, palette.fill, palette.border);
+        drawCanvasText(ctx, employee?.full_name || 'עובד', cellRight - 16, cardY + 14, dayWidth - 102, { font: '800 16px Arial', color: '#303348' });
+        drawCanvasText(ctx, isolateCanvasLtr(`${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`), cellLeft + 16, cardY + 14, 92, { font: '800 14px Arial', color: palette.accent, align: 'left' });
+        const note = [exportRoleShort(shift.shift_role), shift.public_note].filter(Boolean).join(' · ');
+        drawCanvasText(ctx, note, cellRight - 16, cardY + 30, dayWidth - 32, { font: '600 12px Arial', color: '#74788b' });
+      });
+    });
+    y += rowHeight;
+  });
+
+  const absences = payload.scheduleAbsences || [];
+  ctx.fillStyle = '#fffaf0'; ctx.fillRect(margin, y, contentWidth, absenceHeight);
+  ctx.strokeStyle = '#eadfca'; ctx.strokeRect(margin, y, contentWidth, absenceHeight);
+  ctx.fillStyle = '#fff4d8'; ctx.fillRect(width - margin - classColumnWidth, y, classColumnWidth, absenceHeight);
+  drawCanvasText(ctx, 'חופש / היעדרות', width - margin - classColumnWidth / 2, y + absenceHeight / 2, classColumnWidth - 20, { font: '900 20px Arial', color: '#7d5c1f', align: 'center' });
+  dates.forEach((date, index) => {
+    const cellRight = width - margin - classColumnWidth - index * dayWidth; const cellLeft = cellRight - dayWidth;
+    const items = absences.filter((item) => item.absence_date === dateISO(date));
+    ctx.strokeStyle = '#eadfca'; ctx.beginPath(); ctx.moveTo(cellLeft, y); ctx.lineTo(cellLeft, y + absenceHeight); ctx.stroke();
+    if (!items.length) drawCanvasText(ctx, 'אין', cellLeft + dayWidth / 2, y + absenceHeight / 2, dayWidth - 24, { font: '600 14px Arial', color: '#a99b83', align: 'center' });
+    items.forEach((item, itemIndex) => {
+      const employee = employeeById(item.employee_id);
+      drawCanvasText(ctx, `${employee?.full_name || item.employee_name || 'עובד'} · ${absenceLabel(item.absence_type)}`, cellRight - 12, y + 20 + itemIndex * 25, dayWidth - 24, { font: '700 13px Arial', color: '#735723' });
+    });
+  });
+  y += absenceHeight;
+  drawCanvasText(ctx, `נוצר בתאריך ${formatDate(new Date(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, margin, y + 22, 600, { font: '600 12px Arial', color: '#9699a7', align: 'left' });
+  return canvas;
 }
-async function canvasToUserFile(canvas, filename, title) {
+async function canvasBlob(canvas) {
   const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 0.96));
   if (!blob) throw new Error('לא ניתן ליצור קובץ תמונה');
-  const file = new File([blob], filename, { type: 'image/png' });
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ files: [file], title });
-      return 'shared';
-    } catch (error) {
-      if (error?.name === 'AbortError') throw error;
-      // Some mobile browsers expire the user gesture while the image is rendered.
-      // Fall back to a normal download instead of losing the generated file.
-    }
-  }
+  return blob;
+}
+function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob); const link = document.createElement('a');
   link.download = filename; link.href = url; document.body.appendChild(link); link.click(); link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 3000); return 'downloaded';
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
 }
-async function captureExport(html, filename, title, monthly = false) {
-  if (!window.html2canvas) throw new Error('רכיב שמירת התמונה עדיין נטען. נסו שוב.');
-  const host = createExportHost(html, monthly);
-  try {
-    await document.fonts?.ready;
-    const maxCanvasSide = monthly ? 3800 : 7000;
-    const requestedScale = monthly ? 1.05 : 1.6;
-    const safeScale = Math.max(0.72, Math.min(requestedScale, maxCanvasSide / Math.max(host.scrollWidth, host.scrollHeight)));
-    const canvas = await window.html2canvas(host, { scale: safeScale, backgroundColor: '#ffffff', useCORS: true, logging: false, windowWidth: host.scrollWidth, windowHeight: host.scrollHeight });
-    return await canvasToUserFile(canvas, filename, title);
-  } finally { host.remove(); }
+async function shareOrDownloadFiles(files, title) {
+  if (navigator.share && navigator.canShare?.({ files })) {
+    try { await navigator.share({ files, title }); return 'shared'; }
+    catch (error) { if (error?.name === 'AbortError') throw error; }
+  }
+  files.forEach((file, index) => setTimeout(() => downloadBlob(file, file.name), index * 250));
+  return 'downloaded';
 }
 async function downloadScheduleImage() {
-  const button = $('#imageBtn'); setBusy(button, true, 'מכין שבוע…');
+  const button = $('#imageBtn'); setBusy(button, true, 'מכין תמונה…');
   try {
-    const mode = await captureExport(buildWeeklyExportHtml(), `שיבוץ-שבועי-מעון-הדס-${dateISO(state.weekStart)}.png`, 'שיבוץ שבועי מעון הדס');
-    showToast(mode === 'shared' ? 'נפתח תפריט השיתוף — ניתן לבחור שמירה לתמונות' : 'התמונה נשמרה', 'success');
+    await document.fonts?.ready;
+    const canvas = drawWeeklyScheduleCanvas(); const blob = await canvasBlob(canvas);
+    const file = new File([blob], `שיבוץ-שבועי-מעון-הדס-${dateISO(state.weekStart)}.png`, { type: 'image/png' });
+    const mode = await shareOrDownloadFiles([file], 'שיבוץ שבועי מעון הדס');
+    showToast(mode === 'shared' ? 'נפתח שיתוף — אפשר לשלוח ל-WhatsApp או לשמור לתמונות' : 'התמונה הורדה למכשיר', 'success');
   } catch (error) { if (error.name !== 'AbortError') showToast(error.message || 'שמירת התמונה נכשלה', 'error'); }
   finally { setBusy(button, false); }
 }
@@ -1200,20 +1332,37 @@ async function monthSchedulePayloads(monthDate) {
   return Promise.all(weeks.map(async (week) => ({ week, payload: await fetchScheduleWeek(week, { apply: false }) })));
 }
 async function downloadMonthlyScheduleImage() {
-  const button = $('#monthImageBtn'); setBusy(button, true, 'מכין חודש…');
+  const button = $('#monthImageBtn'); setBusy(button, true, 'מכין תמונות…');
   try {
+    await document.fonts?.ready;
     const monthDate = monthStart(state.weekStart); const weeks = await monthSchedulePayloads(monthDate);
-    const html = `<div class="monthly-export-title"><p>מערכת ניהול שיבוצים מעון הדס</p><h1>שיבוץ חודשי · ${formatDate(monthDate, { month: 'long', year: 'numeric' })}</h1></div>${weeks.map(({ week, payload }, index) => buildWeeklyExportHtml(payload, week, `שבוע ${index + 1}`)).join('')}`;
-    const mode = await captureExport(html, `שיבוץ-חודשי-מעון-הדס-${monthParam(monthDate)}.png`, 'שיבוץ חודשי מעון הדס', true);
-    showToast(mode === 'shared' ? 'נפתח תפריט השיתוף — ניתן לבחור שמירה לתמונות' : 'השיבוץ החודשי נשמר', 'success');
+    const monthLabel = formatDate(monthDate, { month: 'long', year: 'numeric' });
+    const files = [];
+    for (let index = 0; index < weeks.length; index += 1) {
+      const { week, payload } = weeks[index];
+      const canvas = drawWeeklyScheduleCanvas(payload, week, `${monthLabel} · שבוע ${index + 1}`);
+      const blob = await canvasBlob(canvas);
+      files.push(new File([blob], `שיבוץ-${monthParam(monthDate)}-שבוע-${index + 1}.png`, { type: 'image/png' }));
+    }
+    const mode = await shareOrDownloadFiles(files, `שיבוץ חודשי מעון הדס · ${monthLabel}`);
+    showToast(mode === 'shared' ? `נפתח שיתוף עם ${files.length} תמונות שבועיות ברורות` : `הורדו ${files.length} תמונות — אחת לכל שבוע`, 'success');
   } catch (error) { if (error.name !== 'AbortError') showToast(error.message || 'שמירת החודש נכשלה', 'error'); }
   finally { setBusy(button, false); }
 }
-function printWeeklySchedule() {
-  const root = $('#printExportRoot'); root.innerHTML = buildWeeklyExportHtml();
-  document.body.classList.add('printing-schedule'); root.setAttribute('aria-hidden', 'false');
-  const cleanup = () => { document.body.classList.remove('printing-schedule'); root.setAttribute('aria-hidden', 'true'); root.innerHTML = ''; window.removeEventListener('afterprint', cleanup); };
-  window.addEventListener('afterprint', cleanup); setTimeout(() => window.print(), 80); setTimeout(cleanup, 60000);
+async function printWeeklySchedule() {
+  const button = $('#printBtn');
+  const printWindow = window.open('about:blank', '_blank');
+  if (!printWindow) return showToast('יש לאפשר חלונות קופצים כדי להדפיס', 'error');
+  setBusy(button, true, 'מכין PDF…');
+  try {
+    await document.fonts?.ready;
+    const canvas = drawWeeklyScheduleCanvas(); const dataUrl = canvas.toDataURL('image/png', 0.98);
+    const printHtml = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>שיבוץ שבועי מעון הדס</title><style>@page{size:A4 landscape;margin:6mm}html,body{margin:0;background:#fff}img{display:block;width:100%;height:auto;object-fit:contain}</style></head><body><img id="scheduleImage" src="${dataUrl}"><script>document.getElementById('scheduleImage').addEventListener('load',()=>setTimeout(()=>window.print(),150));<\/script></body></html>`;
+    const printUrl = URL.createObjectURL(new Blob([printHtml], { type:'text/html;charset=utf-8' }));
+    printWindow.location.replace(printUrl);
+    setTimeout(() => URL.revokeObjectURL(printUrl), 60000);
+  } catch (error) { printWindow.close(); showToast(error.message || 'הכנת ההדפסה נכשלה', 'error'); }
+  finally { setBusy(button, false); }
 }
 async function handleScheduleClick(event) {
   const summary = event.target.closest('.mobile-week-day > summary');
@@ -1831,9 +1980,10 @@ async function showSuggestions(date, classId, shift = null) {
   try {
     const result = await fetchMatchingCandidates({ date, classId, start, end, role, shiftId:shift?.id || null }, { timeout:10000 });
     const contextHtml = `<section class="suggestions-context"><div><strong>${escapeHtml(classById(classId)?.name || 'כיתה')} · ${escapeHtml(formatDate(date))}</strong><small>${timeHtml(result.context?.start_time || start, result.context?.end_time || end)} · ${escapeHtml(SHIFT_ROLE_LABELS[result.context?.shift_role || role] || '')}</small></div><div><b>${result.summary?.recommended || 0}</b><span>מומלצים</span></div><div><b>${result.summary?.transfers || 0}</b><span>העברות בטוחות</span></div></section>`;
+    const rejectedHtml = rejectedReasonsHtml(result.rejected || []);
     $('#suggestionsList').innerHTML = result.candidates.length
-      ? `${contextHtml}<div class="suggestions-grid">${result.candidates.map((candidate) => suggestionCandidateCard(candidate, { shift:Boolean(shift), actionLabel:'שיבוץ העובד' })).join('')}</div>`
-      : `${contextHtml}<div class="empty-state">לא נמצא עובד שעובר את בדיקות הזמינות והתקינה לטווח הזה. נסו לשנות שעות או לבדוק את כרטיסי העובדים.</div>`;
+      ? `${contextHtml}<div class="suggestions-grid">${result.candidates.map((candidate) => suggestionCandidateCard(candidate, { shift:Boolean(shift), actionLabel:'שיבוץ העובד' })).join('')}</div>${rejectedHtml}`
+      : `${contextHtml}<div class="empty-state">לא נמצא עובד שעובר את בדיקות הזמינות והתקינה לטווח הזה. פתחו את ההסבר כדי לראות מה חסם כל עובד.</div>${rejectedHtml}`;
   } catch (error) { $('#suggestionsList').innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`; }
 }
 async function handleSuggestionClick(event) {

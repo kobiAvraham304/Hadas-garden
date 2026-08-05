@@ -41,7 +41,7 @@ function baseContext() {
   };
 }
 
-test('0.16 matching engine returns direct workers and safe cross-class transfers while excluding invalid workers', () => {
+test('0.17 matching engine returns direct workers and safe cross-class transfers while excluding invalid workers', () => {
   const candidates = rankCandidates(baseContext());
   const ids = candidates.map((item) => item.employee_id);
   assert.ok(ids.includes('direct'));
@@ -52,7 +52,7 @@ test('0.16 matching engine returns direct workers and safe cross-class transfers
   assert.ok(candidates.every((item) => item.score >= 1 && item.score <= 100));
 });
 
-test('0.16 add and replacement contexts use the same score model', () => {
+test('0.17 add and replacement contexts use the same score model', () => {
   const context = baseContext();
   const add = rankCandidates(context).find((item) => item.employee_id === 'direct');
   const replace = rankCandidates({ ...context, excludedEmployeeId:'target', excludeShiftId:'target-shift' }).find((item) => item.employee_id === 'direct');
@@ -61,23 +61,24 @@ test('0.16 add and replacement contexts use the same score model', () => {
   assert.deepEqual(add.reasons, replace.reasons);
 });
 
-test('0.16 blocks a transfer when the source class would fall below staffing or lose its leader', () => {
+test('0.17 blocks a transfer when the source class would fall below staffing or lose its leader', () => {
   const context = baseContext();
   context.shifts = context.shifts.filter((shift) => shift.employee_id !== 'b4');
   const ids = rankCandidates(context).map((item) => item.employee_id);
   assert.ok(!ids.includes('transfer'));
 });
 
-test('0.16 interface contains hard mobile containment and sticky modal controls', () => {
+test('0.17 interface contains a top mobile navigation and full-screen sticky dialogs', () => {
   const css = read('styles.css');
-  assert.match(css, /Safari mobile containment/);
-  assert.match(css, /dialog\.modal\{inset:4px!important/);
-  assert.match(css, /\.modal-heading\{position:sticky!important/);
-  assert.match(css, /overflow-x:clip!important/);
-  assert.match(css, /\.main-nav\{inset-inline:8px!important/);
+  assert.match(css, /v0\.17\.0 — Mobile-first rebuild/);
+  assert.match(css, /\.main-nav\{position:sticky!important;top:56px!important/);
+  assert.match(css, /dialog\.modal\{position:fixed!important;inset:0!important/);
+  assert.match(css, /\.modal-heading\{position:sticky!important;top:0!important/);
+  assert.match(css, /html,body\{max-inline-size:100%;overflow-x:hidden!important/);
+  assert.match(css, /\.calendar-grid\{inline-size:100%!important;min-inline-size:0!important/);
 });
 
-test('0.16 applies direct and transfer suggestions through one validated shift action', () => {
+test('0.17 applies direct and transfer suggestions through one validated shift action', () => {
   const shifts = read('handlers/shifts.js');
   const app = read('app.js');
   assert.match(shifts, /body\.action === 'apply_suggestion'/);

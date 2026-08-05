@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" />
   <meta name="theme-color" content="#6f72d9" />
   <meta name="description" content="מערכת ניהול השיבוצים של מעון הדס — שיבוצים, נוכחות, בקשות ועדכונים לצוות." />
   <meta property="og:type" content="website" />
@@ -26,10 +26,9 @@
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=017" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
-  <script src="/app.js" defer></script>
+  <script src="/app.js?v=017" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -116,21 +115,27 @@
             <button type="button" data-mode="mine">השיבוץ שלי</button>
           </div>
           <label id="scheduleDayField" class="inline-field hidden"><span>יום</span><select id="scheduleDaySelect"></select></label>
-          <div class="schedule-actions">
-            <button id="autoScheduleBtn" class="auto-schedule-btn manager-only"><span>✦</span> שיבוץ אוטומטי</button>
-            <button id="copyWeekBtn" class="secondary-btn manager-only"><span>⧉</span> העתקת שבוע קודם</button>
-            <button id="addShiftBtn" class="primary-btn manager-only"><span>＋</span> הוספת שיבוץ</button>
-            <button id="publishScheduleBtn" class="publish-btn manager-only"><span>✓</span> פרסום השיבוץ</button>
+          <div class="schedule-primary-actions">
+            <button id="autoScheduleBtn" class="auto-schedule-btn manager-only"><span>✦</span><span>שיבוץ אוטומטי</span></button>
+            <button id="addShiftBtn" class="primary-btn manager-only"><span>＋</span><span>הוספת שיבוץ</span></button>
+            <button id="publishScheduleBtn" class="publish-btn manager-only"><span>✓</span><span>פרסום</span></button>
           </div>
+          <details class="schedule-tools-menu" open>
+            <summary><span>כלים נוספים</span><i aria-hidden="true">⌄</i></summary>
+            <div class="schedule-secondary-actions">
+              <button id="copyWeekBtn" class="secondary-btn manager-only"><span>⧉</span> העתקת שבוע קודם</button>
+              <button id="settingsBtn" class="ghost-btn manager-only">⚙ הגדרות תקינה</button>
+              <button id="printBtn" class="ghost-btn">PDF שבועי</button>
+              <button id="imageBtn" class="ghost-btn">📷 שבוע כתמונה</button>
+              <button id="monthImageBtn" class="ghost-btn manager-only">🗓️ חודש כתמונות</button>
+            </div>
+          </details>
         </div>
 
         <div id="schedulePublicationState" class="publication-state"></div>
-        <div class="toolbar compact-toolbar">
+        <div class="schedule-health-row">
           <button id="ackScheduleBtn" class="secondary-btn employee-only">קראתי את השיבוץ</button>
-          <button id="settingsBtn" class="ghost-btn manager-only">הגדרות תקינה</button>
           <button id="scheduleIssuesToggle" type="button" class="issues-toggle-btn manager-only" aria-expanded="false"><span><i aria-hidden="true">✓</i> בדיקות תקינות</span><b id="scheduleIssuesCount">טוען…</b></button>
-          <button id="printBtn" class="ghost-btn">הדפסה / PDF</button>
-          <button id="imageBtn" class="ghost-btn">📷 שבוע כתמונה</button><button id="monthImageBtn" class="ghost-btn manager-only">🗓️ חודש כתמונה</button>
         </div>
         <div id="scheduleWarnings" class="warnings-list hidden" aria-live="polite"></div>
         <div id="scheduleExport" class="schedule-wrap"></div>
