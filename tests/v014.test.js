@@ -8,7 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root,file),'utf8');
 test('browser icons and WhatsApp/Open Graph preview assets are bundled',()=>{
   const html=read('index.html'); const manifest=JSON.parse(read('site.webmanifest'));
   for(const file of ['favicon.ico','favicon.svg','favicon-32x32.png','favicon-192x192.png','favicon-512x512.png','apple-touch-icon.png','og-image.png']) assert.ok(fs.existsSync(path.join(root,file)),file);
-  assert.match(html,/property="og:title"/); assert.match(html,/property="og:image" content="https:\/\/hadas-garden-1\.vercel\.app\/og-image\.png"/);
+  assert.match(html,/property="og:title"/); assert.match(html,/property="og:image" content="https:\/\/hadas-garden\.vercel\.app\/og-image\.png"/);
   assert.match(html,/name="twitter:card" content="summary_large_image"/);
   assert.ok(manifest.icons.some((icon)=>icon.sizes==='192x192'));
   assert.ok(manifest.icons.some((icon)=>icon.sizes==='512x512'));
