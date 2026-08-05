@@ -117,6 +117,7 @@
           </div>
           <label id="scheduleDayField" class="inline-field hidden"><span>יום</span><select id="scheduleDaySelect"></select></label>
           <div class="schedule-actions">
+            <button id="autoScheduleBtn" class="auto-schedule-btn manager-only"><span>✦</span> שיבוץ אוטומטי</button>
             <button id="copyWeekBtn" class="secondary-btn manager-only"><span>⧉</span> העתקת שבוע קודם</button>
             <button id="addShiftBtn" class="primary-btn manager-only"><span>＋</span> הוספת שיבוץ</button>
             <button id="publishScheduleBtn" class="publish-btn manager-only"><span>✓</span> פרסום השיבוץ</button>
@@ -239,7 +240,13 @@
           <div class="shift-recommendation-heading"><div><strong>עובדים מומלצים לשיבוץ</strong><small>לפי כיתה, שעות, תפקיד, רוטציה, העדפות והיקף משרה</small></div><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span></div>
           <div id="shiftRecommendations" class="shift-recommendations"><div class="empty-state compact">בחרו תאריך, כיתה ושעות כדי לקבל המלצות.</div></div>
         </section>
-        <label class="full-field">בחירת עובד<select name="employee_id" required></select><small id="shiftEmployeeHint">המומלצים מוצגים ראשונים; ניתן לבחור גם עובד אחר מהרשימה.</small></label>
+        <section class="full-field shift-employee-picker" aria-labelledby="shiftEmployeePickerTitle">
+          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד</strong><small>חיפוש לפי שם ותצוגת מידת התאמה לשיבוץ שנבחר</small></div><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div>
+          <input name="employee_id" type="hidden" required />
+          <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש עובד לפי שם או תפקיד" autocomplete="off" /></label>
+          <div id="shiftEmployeeOptionsList" class="shift-employee-options" role="listbox" aria-label="עובדים זמינים"></div>
+          <small id="shiftEmployeeHint">המערכת מציגה רק עובדים שעברו בדיקות זמינות בסיסיות.</small>
+        </section>
         <label>שעת התחלה<input name="start_time" type="time" value="07:30" required /></label>
         <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
         <label>תפקיד בשיבוץ הזה<select name="shift_role"><option value="teacher">גננת/גנן — אחראי/ת כיתה</option><option value="lead">מוביל/ת כיתה — אחראי/ת כיתה</option><option value="staff" selected>צוות כיתה</option><option value="replacement">מילוי מקום / החלפה</option></select><small>זהו התפקיד באותו יום בלבד; התפקיד הקבוע נשאר בכרטיס העובד.</small></label>
@@ -248,6 +255,22 @@
       <div class="notice soft-notice">כל שינוי נשמר כטיוטה ומופיע לצוות רק לאחר פרסום השיבוץ.</div>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת השיבוץ</button></div>
     </form>
+  </dialog>
+
+  <dialog id="autoScheduleDialog" class="modal auto-schedule-dialog">
+    <div class="modal-card extra-large-modal">
+      <div class="modal-heading"><div><p class="eyebrow">בניית שבוע חכמה</p><h3>שיבוץ אוטומטי</h3><p class="muted">המערכת בודקת ימי עבודה, שעות, חופשות שאושרו, כיתה קבועה, רוטציה, אילוצים, תפקיד, תקינה ומקסימום שעות שבועיות.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <section id="autoScheduleSetup" class="auto-schedule-setup">
+        <div class="auto-explanation"><span>✦</span><div><strong>לפני שנוגעים בשיבוץ</strong><p>תחילה נוצרת תצוגה מקדימה בלבד. שום שינוי לא יישמר עד לאישור מפורש.</p></div></div>
+        <div class="auto-mode-grid" role="radiogroup" aria-label="אופן יצירת השיבוץ">
+          <label class="auto-mode-card selected"><input type="radio" name="auto_schedule_mode" value="rebuild" checked /><span>↻</span><strong>בנייה מחדש</strong><small>מחשב את כל השבוע מחדש ומחליף את הטיוטה הקיימת.</small></label>
+          <label class="auto-mode-card"><input type="radio" name="auto_schedule_mode" value="fill" /><span>＋</span><strong>מילוי חוסרים</strong><small>שומר את השיבוצים הקיימים ומוסיף רק מה שחסר.</small></label>
+        </div>
+        <div class="notice soft-notice"><strong>המלצה:</strong> ודאו שכרטיסי העובדים מעודכנים — ימים ושעות קבועים, כיתה, רוטציה, חופשות ומקסימום שעות.</div>
+        <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button id="calculateAutoScheduleBtn" type="button" class="auto-schedule-btn">חישוב ותצוגה מקדימה</button></div>
+      </section>
+      <section id="autoSchedulePreview" class="auto-schedule-preview hidden" aria-live="polite"></section>
+    </div>
   </dialog>
 
   <dialog id="copyWeekDialog" class="modal">

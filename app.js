@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.14.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.15.0 */
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
@@ -62,6 +62,9 @@ const state = {
   suggestionsContext: null,
   shiftSuggestionCache: new Map(),
   shiftSuggestionRequestId: 0,
+  shiftPickerCandidates: [],
+  shiftPickerQuery: '',
+  autoSchedulePreview: null,
   postPublishContext: null,
   lastRefreshAt: 0,
   refreshing: false,
@@ -102,7 +105,7 @@ function trimTime(value) { return value ? String(value).slice(0, 5) : ''; }
 function timeHtml(start, end) { return `<bdi class="time-value">${escapeHtml(trimTime(start) || '—')}${end ? `–${escapeHtml(trimTime(end))}` : ''}</bdi>`; }
 function timeToMinutes(value) { if (!value) return 0; const [h, m] = String(value).slice(0, 5).split(':').map(Number); return h * 60 + m; }
 function normalizeDisplayScore(value) { return Math.max(1, Math.min(100, Math.round(Number(value) || 1))); }
-function scoreScaleHtml(value, label = 'התאמה') { const score = normalizeDisplayScore(value); return `<span class="match-score" aria-label="${escapeHtml(label)} ${score} מתוך 100"><span><strong>${score}</strong><small>/100</small></span><i aria-hidden="true"><b style="--score:${score}%"></b></i></span>`; }
+function scoreScaleHtml(value, label = 'התאמה', compact = false) { const score = normalizeDisplayScore(value); return `<span class="match-score ${compact ? 'is-compact' : ''}" aria-label="${escapeHtml(label)} ${score} מתוך 100"><span><strong>${score}</strong><small>/100</small></span><i aria-hidden="true"><b style="--score:${score}%"></b></i></span>`; }
 function closingTimeForDate(value) { const date=parseDateValue(value); return date.getDay()===5 ? trimTime(state.settings.friday_closing_time)||'12:00' : trimTime(state.settings.closing_time)||'15:30'; }
 function overlaps(aStart, aEnd, bStart, bEnd) { return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart); }
 function initials(name) { return String(name || '').trim().split(/\s+/).slice(0, 2).map((word) => word[0]).join(''); }
@@ -186,7 +189,7 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.14.0';
+    const version = state.config.version || '0.15.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -216,6 +219,10 @@ function bindEvents() {
   $('#prevWeekBtn').addEventListener('click', () => setWeek(addDays(state.weekStart, -7)));
   $('#nextWeekBtn').addEventListener('click', () => setWeek(addDays(state.weekStart, 7)));
   $('#todayWeekBtn').addEventListener('click', () => setWeek(startOfWeek(new Date())));
+  $('#autoScheduleBtn').addEventListener('click', openAutoScheduleDialog);
+  $('#calculateAutoScheduleBtn').addEventListener('click', calculateAutomaticSchedule);
+  $('#autoSchedulePreview').addEventListener('click', handleAutoSchedulePreviewClick);
+  $$('#autoScheduleDialog input[name="auto_schedule_mode"]').forEach((input) => input.addEventListener('change', syncAutoScheduleModeCards));
   $('#copyWeekBtn').addEventListener('click', openCopyWeekDialog);
   $('#copyReplaceBtn').addEventListener('click', () => copyPreviousWeek('replace'));
   $('#copyMergeBtn').addEventListener('click', () => copyPreviousWeek('merge'));
@@ -275,7 +282,8 @@ function bindEvents() {
   $('#newCalendarBtn').addEventListener('click', () => openCalendarDialog());
 
   $('#shiftForm').addEventListener('submit', saveShift);
-  $('#shiftForm [name="employee_id"]').addEventListener('change', () => { syncShiftHoursFromPattern(); syncShiftRoleFromEmployee(true); updateShiftEmployeeHint(); queueShiftRecommendations(); });
+  $('#shiftEmployeeSearch').addEventListener('input', (event) => { state.shiftPickerQuery = event.target.value; renderShiftEmployeePicker(); });
+  $('#shiftEmployeeOptionsList').addEventListener('click', handleShiftEmployeePickerClick);
   $('#shiftForm [name="shift_date"]').addEventListener('change', () => { syncShiftHoursFromPattern(); queueShiftRecommendations(); });
   for (const name of ['class_id','start_time','end_time','shift_role']) $('#shiftForm [name="'+name+'"]').addEventListener(name.includes('time') ? 'input' : 'change', (event) => { if (name === 'shift_role') $('#shiftForm').dataset.roleTouched = 'true'; queueShiftRecommendations(event); });
   $('#shiftRecommendations').addEventListener('click', handleShiftRecommendationClick);
@@ -831,37 +839,62 @@ function shiftRecommendationKey(form = $("#shiftForm")) {
   return [data.shift_date, data.class_id, data.start_time, data.end_time, data.shift_role, data.id || "new"].join("|");
 }
 function setShiftEmployeeOptions(candidates = [], selectedId = "") {
-  const select = $("#shiftForm [name=\"employee_id\"]");
-  const active = state.employees.filter((item) => item.active && item.is_schedulable !== false);
-  const candidateIds = new Set(candidates.map((item) => item.employee_id));
-  const recommended = candidates.map((candidate) => `<option value="${candidate.employee_id}" ${candidate.employee_id === selectedId ? "selected" : ""}>★ ${escapeHtml(candidate.full_name)} — ${normalizeDisplayScore(candidate.score)}/100</option>`).join("");
-  const other = active.filter((item) => !candidateIds.has(item.id)).sort((a,b) => a.full_name.localeCompare(b.full_name,"he")).map((item) => `<option value="${item.id}" ${item.id === selectedId ? "selected" : ""}>${escapeHtml(item.full_name)} — ${escapeHtml(item.job_title)}</option>`).join("");
-  select.innerHTML = `${recommended ? `<optgroup label="מומלצים לפי התאמה">${recommended}</optgroup>` : ""}<optgroup label="כל שאר העובדים">${other}</optgroup>`;
-  if (selectedId && active.some((item) => item.id === selectedId)) select.value = selectedId;
-  if (!select.value && candidates[0]) select.value = candidates[0].employee_id;
+  const form = $("#shiftForm");
+  state.shiftPickerCandidates = candidates;
+  form.elements.employee_id.value = selectedId || form.elements.employee_id.value || candidates[0]?.employee_id || "";
+  renderShiftEmployeePicker();
   updateShiftEmployeeHint();
+}
+function selectedShiftCandidate() {
+  const employeeId = $("#shiftForm").elements.employee_id.value;
+  return state.shiftPickerCandidates.find((item) => item.employee_id === employeeId) || null;
+}
+function renderShiftEmployeePicker() {
+  const form = $("#shiftForm"); const target = $("#shiftEmployeeOptionsList"); if (!form || !target) return;
+  const selectedId = form.elements.employee_id.value;
+  const query = String(state.shiftPickerQuery || '').trim().toLowerCase();
+  const rows = state.shiftPickerCandidates.filter((candidate) => !query || `${candidate.full_name} ${candidate.job_title}`.toLowerCase().includes(query));
+  const recommended = rows.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 55);
+  const possible = rows.filter((item) => !recommended.includes(item));
+  const card = (candidate) => `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidate.job_title)} · ${candidate.reasons.slice(0,2).map(escapeHtml).join(' · ')}</small></span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
+  const selectedEmployee = employeeById(selectedId);
+  let selectedFallback = '';
+  if (selectedEmployee && !state.shiftPickerCandidates.some((item) => item.employee_id === selectedId)) {
+    selectedFallback = `<div class="employee-picker-current"><strong>העובד הנוכחי: ${escapeHtml(selectedEmployee.full_name)}</strong><small>העובד אינו זמין לפי כללי ההמלצה הנוכחיים. שינוי השיבוץ ידרוש בחירת עובד מתאים.</small></div>`;
+  }
+  target.innerHTML = `${selectedFallback}${recommended.length ? `<div class="employee-option-group"><span>מומלצים</span>${recommended.map(card).join('')}</div>` : ''}${possible.length ? `<div class="employee-option-group"><span>אפשרויות נוספות</span>${possible.map(card).join('')}</div>` : ''}${!rows.length ? '<div class="empty-state compact">לא נמצאו עובדים זמינים התואמים לחיפוש ולשעות שנבחרו.</div>' : ''}`;
+  const selected = selectedShiftCandidate();
+  const pill = $('#shiftEmployeeSelectedScore');
+  if (selected) { pill.textContent = `${normalizeDisplayScore(selected.score)}/100`; pill.classList.remove('hidden'); }
+  else pill.classList.add('hidden');
+}
+function handleShiftEmployeePickerClick(event) {
+  const button = event.target.closest('[data-picker-employee]'); if (!button) return;
+  const form = $('#shiftForm'); form.elements.employee_id.value = button.dataset.pickerEmployee;
+  if (button.dataset.pickerRole && form.dataset.roleTouched !== 'true') form.elements.shift_role.value = button.dataset.pickerRole;
+  renderShiftEmployeePicker(); syncShiftHoursFromPattern(); syncShiftRoleFromEmployee(true); updateShiftEmployeeHint();
 }
 function updateShiftEmployeeHint() {
   const form = $("#shiftForm"); const employeeId = form.elements.employee_id.value;
-  const key = shiftRecommendationKey(form); const cached = state.shiftSuggestionCache.get(key);
-  const candidate = cached?.candidates?.find((item) => item.employee_id === employeeId);
+  const candidate = state.shiftPickerCandidates.find((item) => item.employee_id === employeeId);
   const employee = employeeById(employeeId); const hint = $("#shiftEmployeeHint"); if (!hint) return;
-  hint.textContent = candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,2).join(" · ")}` : employee ? `${employee.job_title} · ניתן לבחור גם עובד שאינו ברשימת המומלצים.` : "בחרו עובד לשיבוץ.";
+  hint.textContent = candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,3).join(" · ")}` : employee ? `${employee.job_title} אינו מופיע כרגע כמועמד זמין לשיבוץ הזה.` : "בחרו עובד מתוך הרשימה.";
 }
 function renderShiftRecommendations(candidates = []) {
   const target = $("#shiftRecommendations"); const status = $("#shiftRecommendationStatus");
-  if (!candidates.length) { target.innerHTML = '<div class="empty-state compact">לא נמצאו עובדים זמינים שמתאימים לטווח שנבחר. אפשר לבחור עובד אחר ולבדוק את החריגה.</div>'; status.textContent = "אין התאמה מלאה"; status.className = "status-chip warn"; return; }
-  const top = candidates.slice(0,5);
-  target.innerHTML = top.map((candidate,index) => `<button type="button" class="shift-recommendation-card level-${candidate.recommendation_level || "possible"}" data-recommended-employee="${candidate.employee_id}" data-recommended-role="${candidate.suggested_role}"><span class="recommendation-rank">${index+1}</span><div><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidate.job_title)} · ${candidate.reasons.slice(0,2).map(escapeHtml).join(" · ")}</small></div>${scoreScaleHtml(candidate.score)}</button>`).join("");
-  status.textContent = `${candidates.length} התאמות`; status.className = "status-chip ok";
+  const recommended = candidates.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 55);
+  if (!recommended.length) { target.innerHTML = '<div class="empty-state compact">לא נמצאה התאמה בטוחה. בדקו את התאריך, השעות, החופשות והעדפות הכיתה.</div>'; status.textContent = "אין התאמה בטוחה"; status.className = "status-chip warn"; return; }
+  const top = recommended.slice(0,5);
+  target.innerHTML = top.map((candidate,index) => `<button type="button" class="shift-recommendation-card level-${candidate.recommendation_level || "possible"}" data-recommended-employee="${candidate.employee_id}" data-recommended-role="${candidate.suggested_role}"><span class="recommendation-rank">${index+1}</span><div><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidate.job_title)} · ${candidate.reasons.slice(0,2).map(escapeHtml).join(" · ")}</small></div>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`).join("");
+  status.textContent = `${recommended.length} התאמות בטוחות`; status.className = "status-chip ok";
 }
 async function updateShiftRecommendations({ force = false } = {}) {
   const form = $("#shiftForm"); const data = formObject(form); const selected = form.elements.employee_id.value;
-  if (!data.shift_date || !data.class_id || !data.start_time || !data.end_time || timeToMinutes(data.end_time) <= timeToMinutes(data.start_time)) { $("#shiftRecommendations").innerHTML = '<div class="empty-state compact">השלימו תאריך, כיתה וטווח שעות תקין.</div>'; return; }
+  if (!data.shift_date || !data.class_id || !data.start_time || !data.end_time || timeToMinutes(data.end_time) <= timeToMinutes(data.start_time)) { $("#shiftRecommendations").innerHTML = '<div class="empty-state compact">השלימו תאריך, כיתה וטווח שעות תקין.</div>'; state.shiftPickerCandidates=[]; renderShiftEmployeePicker(); return; }
   const key = shiftRecommendationKey(form); const requestId = ++state.shiftSuggestionRequestId; const cached = state.shiftSuggestionCache.get(key);
   if (!force && cached && Date.now() - cached.fetchedAt < 90000) { renderShiftRecommendations(cached.candidates); setShiftEmployeeOptions(cached.candidates, selected); return; }
   $("#shiftRecommendationStatus").textContent = "מחשב…"; $("#shiftRecommendationStatus").className = "status-chip";
-  $("#shiftRecommendations").innerHTML = '<div class="recommendation-loading"><span></span><span>בודק העדפות, שעות וזמינות…</span></div>';
+  $("#shiftRecommendations").innerHTML = '<div class="recommendation-loading"><span></span><span>בודק העדפות, שעות, חופשות וזמינות…</span></div>';
   try {
     const params = new URLSearchParams({ date:data.shift_date, class_id:data.class_id, start_time:data.start_time, end_time:data.end_time, shift_role:data.shift_role || "staff" });
     if (data.id) params.set("exclude_shift_id", data.id);
@@ -871,16 +904,17 @@ async function updateShiftRecommendations({ force = false } = {}) {
     renderShiftRecommendations(candidates); setShiftEmployeeOptions(candidates, selected);
   } catch (error) {
     if (requestId !== state.shiftSuggestionRequestId) return;
+    state.shiftPickerCandidates=[]; renderShiftEmployeePicker();
     $("#shiftRecommendations").innerHTML = `<div class="empty-state compact">${escapeHtml(error.message)}</div>`;
     $("#shiftRecommendationStatus").textContent = "לא נטען"; $("#shiftRecommendationStatus").className = "status-chip error";
   }
 }
-function queueShiftRecommendations() { clearTimeout(queueShiftRecommendations.timer); queueShiftRecommendations.timer = setTimeout(() => updateShiftRecommendations(), 220); }
+function queueShiftRecommendations() { clearTimeout(queueShiftRecommendations.timer); queueShiftRecommendations.timer = setTimeout(() => updateShiftRecommendations(), 180); }
 function handleShiftRecommendationClick(event) {
   const button = event.target.closest("[data-recommended-employee]"); if (!button) return;
   const form = $("#shiftForm"); form.elements.employee_id.value = button.dataset.recommendedEmployee;
   if (button.dataset.recommendedRole) form.elements.shift_role.value = button.dataset.recommendedRole;
-  $$(".shift-recommendation-card").forEach((item) => item.classList.toggle("selected", item === button)); updateShiftEmployeeHint();
+  $$(".shift-recommendation-card").forEach((item) => item.classList.toggle("selected", item === button)); renderShiftEmployeePicker(); updateShiftEmployeeHint();
 }
 
 function suggestedShiftRoleForEmployee(employee) {
@@ -917,8 +951,9 @@ function openShiftDialog(shift = {}) {
   form.elements.id.value = shift.id || "";
   form.elements.shift_date.value = shift.shift_date || dateISO(state.weekStart);
   form.elements.class_id.value = shift.class_id || state.classes.find((item) => item.active)?.id || "";
-  const initialEmployee = shift.employee_id || state.employees.find((item) => item.active && item.is_schedulable !== false)?.id || "";
-  setShiftEmployeeOptions([], initialEmployee); form.elements.employee_id.value = initialEmployee;
+  const initialEmployee = shift.employee_id || "";
+  state.shiftPickerCandidates = []; state.shiftPickerQuery = ''; $('#shiftEmployeeSearch').value = '';
+  form.elements.employee_id.value = initialEmployee; renderShiftEmployeePicker();
   if (shift.id) {
     form.elements.start_time.value = trimTime(shift.start_time) || "07:30";
     form.elements.end_time.value = trimTime(shift.end_time) || closingTimeForDate(form.elements.shift_date.value);
@@ -989,6 +1024,71 @@ async function publishWeek() {
   try { await apiFetch('/api/shifts', { method: 'POST', body: { action: 'publish', week_start: dateISO(state.weekStart) } }); $('#publishDialog').close(); await refreshScheduleWeek({ force: true }); showToast('השיבוץ פורסם לכל הצוות', 'success'); }
   catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); }
 }
+function syncAutoScheduleModeCards() {
+  $$('.auto-mode-card').forEach((card) => card.classList.toggle('selected', Boolean(card.querySelector('input:checked'))));
+}
+function openAutoScheduleDialog() {
+  state.autoSchedulePreview = null;
+  $('#autoScheduleSetup').classList.remove('hidden');
+  $('#autoSchedulePreview').classList.add('hidden');
+  $('#autoSchedulePreview').innerHTML = '';
+  const rebuild = $('#autoScheduleDialog input[value="rebuild"]'); if (rebuild) rebuild.checked = true;
+  syncAutoScheduleModeCards();
+  $('#autoScheduleDialog').showModal();
+}
+function autoQualityLabel(value) { return value >= 92 ? 'מצוין' : value >= 80 ? 'טוב מאוד' : value >= 65 ? 'טוב עם תיקונים' : 'טיוטה חלקית'; }
+function autoPreviewShiftHtml(shift) {
+  const employee = employeeById(shift.employee_id); const classItem = classById(shift.class_id);
+  return `<div class="auto-preview-shift"><strong>${escapeHtml(employee?.full_name || 'עובד')}</strong><span>${escapeHtml(classItem?.name || '')} · ${timeHtml(shift.start_time,shift.end_time)}</span><small>${escapeHtml(SHIFT_ROLE_LABELS[shift.shift_role] || '')}</small></div>`;
+}
+function renderAutomaticSchedulePreview(preview) {
+  state.autoSchedulePreview = preview;
+  const metrics = preview.metrics || {};
+  const errors = preview.validation?.errors || []; const warnings = preview.validation?.warnings || [];
+  const dates = currentWeekDates();
+  const dayCards = dates.map((date) => {
+    const iso = dateISO(date); const rows = preview.finalRows.filter((row) => row.shift_date === iso);
+    const classBlocks = state.classes.filter((item) => item.active).map((classItem) => {
+      const classRows = rows.filter((row) => row.class_id === classItem.id);
+      return `<section><header><strong>${escapeHtml(classItem.name)}</strong><span>${classRows.length} עובדים</span></header>${classRows.length ? classRows.map(autoPreviewShiftHtml).join('') : '<div class="auto-empty-class">אין שיבוץ</div>'}</section>`;
+    }).join('');
+    const dayErrors = errors.filter((item) => item.date === iso).length;
+    return `<details class="auto-preview-day ${dayErrors ? 'has-errors' : ''}"><summary><div><strong>${DAY_NAMES[date.getDay()]}</strong><small>${formatDate(date,{day:'2-digit',month:'2-digit'})}</small></div><span>${new Set(rows.map((row)=>row.employee_id)).size} עובדים${dayErrors?` · ${dayErrors} לתיקון`:''}</span><i>⌄</i></summary><div class="auto-preview-day-body">${classBlocks}</div></details>`;
+  }).join('');
+  const issueHtml = errors.length ? `<section class="auto-issues"><header><strong>מה עדיין דורש טיפול?</strong><span>${errors.length}</span></header>${errors.slice(0,8).map((item)=>`<button type="button" data-auto-issue-date="${escapeHtml(item.date||'')}" data-auto-issue-class="${escapeHtml(item.class_id||'')}"><span>!</span><div><strong>${escapeHtml(item.message||'שגיאת תקינה')}</strong><small>אפשר להחיל כטיוטה ולתקן ידנית, או לחזור ולעדכן את כרטיסי העובדים.</small></div></button>`).join('')}${errors.length>8?`<small>ועוד ${errors.length-8} נקודות לבדיקה</small>`:''}</section>` : '<div class="notice success"><strong>לא נמצאו שגיאות חוסמות.</strong> ניתן להחיל את השיבוץ כטיוטה ולפרסם לאחר בדיקה.</div>';
+  $('#autoScheduleSetup').classList.add('hidden');
+  const target=$('#autoSchedulePreview'); target.classList.remove('hidden');
+  target.innerHTML = `<section class="auto-preview-hero"><div class="auto-quality-ring" style="--quality:${metrics.quality||0}"><strong>${metrics.quality||0}</strong><small>${autoQualityLabel(metrics.quality||0)}</small></div><div><p class="eyebrow">תצוגה מקדימה בלבד</p><h3>השיבוץ האוטומטי מוכן לבדיקה</h3><p>נוצרו ${metrics.generatedCount||0} שיבוצים. שום שינוי עדיין לא נשמר במערכת.</p></div></section><div class="auto-metrics"><article><strong>${metrics.coveragePercent||0}%</strong><span>כיסוי תקינה</span></article><article><strong>${metrics.leaderPercent||0}%</strong><span>כיסוי אחראי/ת כיתה</span></article><article><strong>${metrics.preferenceScore||0}%</strong><span>התאמה להעדפות</span></article><article class="${errors.length?'bad':'good'}"><strong>${errors.length}</strong><span>נקודות לתיקון</span></article></div>${issueHtml}<section class="auto-preview-schedule"><header><div><p class="eyebrow">השבוע המתוכנן</p><h4>${formatDate(state.weekStart)} – ${formatDate(addDays(state.weekStart,5))}</h4></div><span>${preview.mode==='fill'?'מילוי חוסרים':'בנייה מחדש'}</span></header>${dayCards}</section><div class="modal-actions auto-preview-actions"><button type="button" class="ghost-btn" data-auto-action="back">שינוי אפשרויות</button><button type="button" class="secondary-btn" data-auto-action="recalculate">חישוב מחדש</button><button type="button" class="auto-schedule-btn" data-auto-action="apply">${errors.length?'החלה כטיוטה עם חוסרים':'החלת השיבוץ כטיוטה'}</button></div>`;
+}
+async function calculateAutomaticSchedule() {
+  const button = $('#calculateAutoScheduleBtn'); const mode = $('#autoScheduleDialog input[name="auto_schedule_mode"]:checked')?.value || 'rebuild';
+  setBusy(button,true,'מחשב שיבוץ…');
+  try { const result=await apiFetch('/api/shifts',{method:'POST',body:{action:'auto_preview',week_start:dateISO(state.weekStart),mode},timeout:25000}); renderAutomaticSchedulePreview(result.preview); }
+  catch(error){ showToast(error.message,'error'); }
+  finally{ setBusy(button,false); }
+}
+async function applyAutomaticSchedule() {
+  const preview=state.autoSchedulePreview; if(!preview)return;
+  const errors=preview.validation?.errors||[];
+  if(errors.length&&!confirm(`נשארו ${errors.length} נקודות תקינה. להחיל את התוצאה כטיוטה ולהמשיך לתקן ידנית?`))return;
+  const button=$('#autoSchedulePreview [data-auto-action="apply"]'); setBusy(button,true,'שומר טיוטה…');
+  try {
+    const result=await apiFetch('/api/shifts',{method:'POST',body:{action:'auto_apply',week_start:dateISO(state.weekStart),mode:preview.mode,signature:preview.signature,allow_incomplete:errors.length>0},timeout:30000});
+    $('#autoScheduleDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({force:true});
+    showToast(`נשמרו ${result.count} שיבוצים אוטומטיים בטיוטה`,'success');
+    if(state.publication?.published_at)showPostPublishChangePrompt({title:'נוצר שיבוץ חדש לשבוע שכבר פורסם',message:'השיבוץ האוטומטי נשמר בטיוטה. יש לפרסם כדי שהצוות יראה את השינוי.'});
+  } catch(error){ if(error.status===409&&/השתנו/.test(error.message)){showToast(error.message,'error');await calculateAutomaticSchedule();}else showToast(error.message,'error'); }
+  finally{ setBusy(button,false); }
+}
+function handleAutoSchedulePreviewClick(event) {
+  const action=event.target.closest('[data-auto-action]')?.dataset.autoAction;
+  if(action==='back'){state.autoSchedulePreview=null;$('#autoSchedulePreview').classList.add('hidden');$('#autoScheduleSetup').classList.remove('hidden');return;}
+  if(action==='recalculate')return calculateAutomaticSchedule();
+  if(action==='apply')return applyAutomaticSchedule();
+  const issue=event.target.closest('[data-auto-issue-date]');
+  if(issue&&issue.dataset.autoIssueDate){$('#autoScheduleDialog').close();const index=currentWeekDates().findIndex((date)=>dateISO(date)===issue.dataset.autoIssueDate);state.scheduleDay=Math.max(0,index);state.scheduleMode='day';renderSchedule();requestAnimationFrame(()=>document.querySelector(`[data-day-class="${issue.dataset.autoIssueClass}"]`)?.scrollIntoView({behavior:'smooth',block:'center'}));}
+}
+
 async function openCopyWeekDialog() {
   const button = $('#copyWeekBtn'); setBusy(button, true, 'בודק…');
   try {

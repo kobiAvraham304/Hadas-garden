@@ -3,6 +3,7 @@ const {
   send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
 const { validateWeek, timeToMinutes, closingTimeForDate } = require('../lib/schedule');
+const { generateAutomaticSchedule } = require('../lib/auto-schedule');
 
 function addDays(dateString, days) {
   const d = new Date(`${dateString}T12:00:00Z`);
@@ -67,6 +68,93 @@ async function validateShift(payload, id, overrideDayOff = false) {
   const overlaps = assertDb(await existingQuery, 'בדיקת חפיפה נכשלה') || [];
   if (overlaps.length) throw httpError(409, 'העובד כבר משובץ בשעות חופפות');
   return { employee, classItem };
+}
+
+
+
+async function loadAutomaticScheduleData(weekStart) {
+  const weekEnd = addDays(weekStart, 5);
+  const previousStart = addDays(weekStart, -7);
+  const [employeesR, classesR, settingsR, constraintsR, patternsR, requestsR, existingR, previousR] = await Promise.all([
+    db().from('hadas_employees').select('*').eq('active', true),
+    db().from('hadas_classes').select('*').eq('active', true).order('sort_order'),
+    db().from('hadas_app_settings').select('*').eq('id', 1).single(),
+    db().from('hadas_employee_class_constraints').select('*'),
+    db().from('hadas_employee_weekly_patterns').select('*'),
+    db().from('hadas_requests').select('*').in('request_type', ['leave', 'day_off', 'sick']).in('status', ['approved', 'applied']).lte('request_date', weekEnd),
+    db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd),
+    db().from('hadas_shifts').select('*').gte('shift_date', previousStart).lte('shift_date', addDays(previousStart, 5)),
+  ]);
+  return {
+    employees: assertDb(employeesR, 'לא ניתן לטעון עובדים לשיבוץ האוטומטי') || [],
+    classes: assertDb(classesR, 'לא ניתן לטעון כיתות לשיבוץ האוטומטי') || [],
+    settings: assertDb(settingsR, 'לא ניתן לטעון הגדרות תקינה') || {},
+    constraints: assertDb(constraintsR, 'לא ניתן לטעון העדפות ואילוצים') || [],
+    patterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [],
+    requests: (assertDb(requestsR, 'לא ניתן לטעון חופשות ומחלות') || []).filter((row) => String(row.request_end_date || row.request_date) >= weekStart),
+    existingShifts: assertDb(existingR, 'לא ניתן לטעון את השיבוץ הקיים') || [],
+    previousShifts: assertDb(previousR, 'לא ניתן לטעון את השבוע הקודם') || [],
+  };
+}
+
+function publicAutomaticPreview(plan) {
+  return {
+    weekStart: plan.weekStart,
+    mode: plan.mode,
+    keptCount: plan.keptCount,
+    generated: plan.generated,
+    finalRows: plan.finalRows,
+    validation: plan.validation,
+    daySummaries: plan.daySummaries,
+    employeeHours: plan.employeeHours,
+    metrics: plan.metrics,
+    signature: plan.signature,
+  };
+}
+
+async function recordAutomaticChanges(caller, weekStart, deletedRows, insertedRows) {
+  const rows = [];
+  for (const shift of deletedRows) rows.push({
+    week_start: weekStart, shift_id: shift.id || null, change_type: 'delete',
+    before_data: shiftSnapshot(shift), after_data: null, created_by: caller.employee.id,
+  });
+  for (const shift of insertedRows) rows.push({
+    week_start: weekStart, shift_id: shift.id || null, change_type: 'create',
+    before_data: null, after_data: shiftSnapshot(shift), created_by: caller.employee.id,
+  });
+  if (rows.length) assertDb(await db().from('hadas_schedule_changes').insert(rows), 'לא ניתן לתעד את השיבוץ האוטומטי');
+}
+
+
+function autoShiftRestoreRow(shift) {
+  return {
+    id: shift.id,
+    shift_date: shift.shift_date,
+    class_id: shift.class_id,
+    employee_id: shift.employee_id,
+    start_time: shift.start_time,
+    end_time: shift.end_time,
+    shift_role: shift.shift_role,
+    status: shift.status || 'draft',
+    public_note: shift.public_note ?? null,
+    created_by: shift.created_by ?? null,
+    created_at: shift.created_at,
+    updated_at: shift.updated_at,
+  };
+}
+
+async function restoreAutomaticSchedule(deletedRows, insertedRows) {
+  const insertedIds = (insertedRows || []).map((row) => row.id).filter(Boolean);
+  if (insertedIds.length) {
+    const removeResult = await db().from('hadas_shifts').delete().in('id', insertedIds);
+    if (removeResult.error) return { ok:false, message:`מחיקת הטיוטה החדשה נכשלה: ${removeResult.error.message}` };
+  }
+  if (deletedRows?.length) {
+    const restoreRows = deletedRows.map(autoShiftRestoreRow);
+    const restoreResult = await db().from('hadas_shifts').insert(restoreRows);
+    if (restoreResult.error) return { ok:false, message:`שחזור השיבוץ הקודם נכשל: ${restoreResult.error.message}` };
+  }
+  return { ok:true };
 }
 
 async function getWeekValidation(weekStart) {
@@ -206,6 +294,44 @@ module.exports = async function handler(req, res) {
       assertDb(await db().from('hadas_schedule_acknowledgements').upsert({ employee_id: caller.employee.id, week_start: weekStart, acknowledged_at: new Date().toISOString() }, { onConflict: 'employee_id,week_start' }), 'לא ניתן לשמור אישור קריאה');
       await emitEvent('schedule_ack');
       return send(res, 200, { ok: true });
+    }
+
+
+    if (req.method === 'POST' && body.action === 'auto_preview') {
+      const weekStart = getSunday(String(body.week_start || israelDateISO()));
+      const mode = body.mode === 'fill' ? 'fill' : 'rebuild';
+      const data = await loadAutomaticScheduleData(weekStart);
+      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, createdBy: caller.employee.id });
+      return send(res, 200, { ok: true, preview: publicAutomaticPreview(plan) });
+    }
+
+    if (req.method === 'POST' && body.action === 'auto_apply') {
+      const weekStart = getSunday(String(body.week_start || israelDateISO()));
+      const mode = body.mode === 'fill' ? 'fill' : 'rebuild';
+      const data = await loadAutomaticScheduleData(weekStart);
+      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, createdBy: caller.employee.id });
+      if (body.signature && body.signature !== plan.signature) throw httpError(409, 'נתוני העובדים או השבוע השתנו מאז התצוגה המקדימה. יש לחשב מחדש את השיבוץ.');
+      if (plan.validation.errors.length && !body.allow_incomplete) throw httpError(409, 'נשארו חוסרים בשיבוץ האוטומטי. ניתן לחזור לתצוגה המקדימה או לאשר יצירת טיוטה חלקית.', plan.validation);
+      if (!plan.generated.length) throw httpError(409, mode === 'fill' ? 'לא נמצאו חוסרים שניתן למלא אוטומטית' : 'לא ניתן היה ליצור שיבוצים מהנתונים הקיימים');
+      const weekEnd = addDays(weekStart, 5);
+      const deletedRows = mode === 'rebuild' ? data.existingShifts : [];
+      const rows = plan.generated.map((row) => ({ ...row, status: 'draft', created_by: caller.employee.id }));
+      let inserted = [];
+      try {
+        if (deletedRows.length) assertDb(await db().from('hadas_shifts').delete().gte('shift_date', weekStart).lte('shift_date', weekEnd), 'לא ניתן לנקות את השבוע לפני השיבוץ האוטומטי');
+        inserted = assertDb(await db().from('hadas_shifts').insert(rows).select('*'), 'לא ניתן לשמור את השיבוץ האוטומטי') || [];
+        await recordAutomaticChanges(caller, weekStart, deletedRows, inserted);
+      } catch (error) {
+        const restored = await restoreAutomaticSchedule(deletedRows, inserted);
+        if (!restored.ok) throw httpError(500, `${error.message}. בנוסף, ${restored.message}. אין לבצע ניסיון נוסף לפני בדיקת השבוע.`);
+        throw error;
+      }
+      await audit(caller.employee.id, 'automatic_schedule', 'schedule', weekStart, {
+        mode, generated: inserted.length, quality: plan.metrics.quality,
+        errors: plan.validation.errors.length, warnings: plan.validation.warnings.length,
+      });
+      await emitEvent('shifts');
+      return send(res, 201, { ok: true, count: inserted.length, mode, metrics: plan.metrics, validation: plan.validation });
     }
 
     if (req.method === 'POST' && ['validate', 'publish_preview'].includes(body.action)) {

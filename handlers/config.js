@@ -1,3 +1,4 @@
+const { version } = require('../package.json');
 const { send, handleError } = require('../lib/server');
 
 module.exports = async function handler(req, res) {
@@ -12,7 +13,7 @@ module.exports = async function handler(req, res) {
       ok:true,
       supabaseUrl,
       supabasePublishableKey,
-      version:'0.14.0',
+      version,
       healthUrl:'/health',
     });
   } catch (error) { handleError(res, error); }

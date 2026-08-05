@@ -42,7 +42,9 @@ test('daily operations UI contains attendance, bulk actions, filters and direct 
 test('shift dialog ranks relevant workers before the full list',()=>{
   const html=read('index.html'); const app=read('app.js');
   assert.match(html,/id="shiftRecommendations"/);
-  assert.match(app,/optgroup label="מומלצים לפי התאמה"/);
+  assert.match(html,/id="shiftEmployeeSearch"/);
+  assert.match(html,/id="shiftEmployeeOptionsList"/);
+  assert.match(app,/<span>מומלצים<\/span>/);
   assert.match(app,/exclude_shift_id/);
   assert.match(app,/recommendation_level/);
 });
