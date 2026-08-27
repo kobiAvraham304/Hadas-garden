@@ -23,136 +23,35 @@ jobs:
           ref: agent/v0.19.0-production
           fetch-depth: 0
 
-      - name: Reconstruct and validate v0.19.0 patch
+      - name: Reconstruct validated v0.19.0 patch
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
           import base64
-          import heapq
           import lzma
 
-          paths = sorted(Path('.deploy').glob('v019.b64.part*'))
-          if not paths:
-              raise SystemExit('v0.19.0 payload parts are missing')
+          parts = [p.read_text(encoding='utf-8').strip() for p in sorted(Path('.deploy').glob('v019.b64.part*'))]
+          if len(parts) != 7:
+              raise SystemExit(f'expected 7 payload parts, found {len(parts)}')
 
-          parts = [p.read_text(encoding='utf-8').strip() for p in paths]
-          alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-          joined = ''.join(parts)
+          payload = ''.join(parts)
+          if len(payload) != 55454:
+              raise SystemExit(f'unexpected corrupted payload length: {len(payload)}')
 
-          def decode(candidate: str):
-              padded = candidate + ('=' * ((4 - len(candidate) % 4) % 4))
-              try:
-                  return base64.b64decode(padded, validate=True)
-              except Exception:
-                  return None
+          # These two deleted Base64 characters were recovered by an exhaustive
+          # search that accepted only a complete, checksum-valid XZ stream.
+          payload = payload[:36726] + 'p' + payload[36726:]
+          payload = payload[:52291] + 'f' + payload[52291:]
 
-          def progress(candidate: str, step=8):
-              packed = decode(candidate)
-              if packed is None:
-                  return (-1, -1, False, None)
-              dec = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
-              produced = 0
-              consumed = 0
-              try:
-                  for i in range(0, len(packed), step):
-                      block = packed[i:i + step]
-                      out = dec.decompress(block)
-                      produced += len(out)
-                      consumed = i + len(block)
-                      if dec.eof:
-                          patch = lzma.decompress(packed, format=lzma.FORMAT_XZ)
-                          valid = b'diff --git ' in patch and b'0.19.0' in patch
-                          return (10**9 + produced if valid else produced, consumed, valid, patch if valid else None)
-              except lzma.LZMAError:
-                  pass
-              return (produced, consumed, False, None)
-
-          def rank_insertions(source: str, center: int, radius: int, min_pos: int, max_pos: int, limit=8):
-              heap = []
-              lo = max(min_pos, center - radius)
-              hi = min(max_pos, center + radius)
-              print('search window:', (lo, hi), 'center=', center, flush=True)
-              for pos in range(lo, hi + 1):
-                  for ch in alphabet:
-                      candidate = source[:pos] + ch + source[pos:]
-                      score = progress(candidate, step=16)
-                      item = (score[0], score[1], pos, ch, candidate, score[2], score[3])
-                      if len(heap) < limit:
-                          heapq.heappush(heap, item)
-                      elif item[:2] > heap[0][:2]:
-                          heapq.heapreplace(heap, item)
-              heap.sort(reverse=True)
-              print('top:', [(x[0], x[1], x[2], x[3], x[5]) for x in heap], flush=True)
-              return heap
-
-          base = progress(joined, step=8)
-          if base[2]:
-              patch = base[3]
-          else:
-              max_chunk = max(len(p) for p in parts[:-1])
-              short_middle = [i for i, p in enumerate(parts[:-1]) if len(p) == max_chunk - 1]
-              if len(short_middle) != 1 or len(joined) % 4 != 2:
-                  raise SystemExit(f'unexpected payload shape: lengths={[len(p) for p in parts]}, total={len(joined)}')
-
-              starts = []
-              cursor = 0
-              for p in parts:
-                  starts.append(cursor)
-                  cursor += len(p)
-              mid = short_middle[0]
-              mid_start = starts[mid]
-              mid_end = mid_start + len(parts[mid])
-
-              # A missing Base64 char corrupts the decoded XZ stream from roughly
-              # 3/4 of its character position onward. The 8-byte XZ probe narrows
-              # the insertion location to a very small character window.
-              first_center = int(base[1] * 4 / 3)
-              first_center = max(mid_start, min(mid_end, first_center))
-              print('base progress:', base[:2], 'first center:', first_center, flush=True)
-              first_top = rank_insertions(joined, first_center, 40, mid_start, mid_end, limit=8)
-
-              found = None
-              for first_score, first_consumed, first_pos, first_ch, first_candidate, first_valid, first_patch in first_top:
-                  if first_valid:
-                      found = (first_pos, first_ch, None, None, first_patch)
-                      break
-
-                  # With the first deletion repaired correctly, XZ advances until
-                  # the second missing Base64 character. Probe again at 8-byte
-                  # resolution and search only the corresponding small window.
-                  precise = progress(first_candidate, step=8)
-                  second_center = int(precise[1] * 4 / 3)
-                  second_center = max(first_pos + 1, min(len(first_candidate), second_center))
-                  print('first candidate:', (first_pos, first_ch, precise[:2]), 'second center:', second_center, flush=True)
-                  second_top = rank_insertions(
-                      first_candidate,
-                      second_center,
-                      48,
-                      first_pos + 1,
-                      len(first_candidate),
-                      limit=8,
-                  )
-                  for _, _, second_pos, second_ch, second_candidate, second_valid, second_patch in second_top:
-                      if second_valid:
-                          found = (first_pos, first_ch, second_pos, second_ch, second_patch)
-                          break
-                  if found:
-                      break
-
-              if found is None:
-                  raise SystemExit('targeted XZ recovery did not find a fully valid payload')
-
-              first_pos, first_ch, second_pos, second_ch, patch = found
-              print(
-                  f'recovered v0.19.0 payload: first=({first_pos},{first_ch!r}) '
-                  f'second=({second_pos},{second_ch!r})',
-                  flush=True,
-              )
+          packed = base64.b64decode(payload, validate=True)
+          patch = lzma.decompress(packed, format=lzma.FORMAT_XZ)
+          if b'diff --git ' not in patch or b'0.19.0' not in patch:
+              raise SystemExit('reconstructed payload did not validate as v0.19.0 patch')
 
           Path('/tmp/v019.patch').write_bytes(patch)
-          print(f'validated v0.19.0 patch: {len(patch)} bytes', flush=True)
+          print(f'validated v0.19.0 patch: {len(patch)} bytes')
           PY
 
           git apply --check --binary /tmp/v019.patch
@@ -162,6 +61,15 @@ jobs:
       - name: Apply final matching-engine hardening
         shell: bash
         run: bash scripts/apply-v019-build.sh
+
+      - name: Restore safe environment template
+        shell: bash
+        run: |
+          cat > .env.example <<'EOF'
+          SUPABASE_URL=
+          SUPABASE_PUBLISHABLE_KEY=
+          SUPABASE_SECRET_KEY=
+          EOF
 
       - name: Validate release
         run: |
@@ -181,5 +89,6 @@ jobs:
           git config user.name "Hadas Release Bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
+          git add -f .env.example
           git commit -m "0.19.0 [v019-applied]"
           git push origin HEAD:agent/v0.19.0-production
