@@ -24,44 +24,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Apply guarded patch
+      - name: Prepare and apply guarded patch
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('scripts/apply-v021-scheduling.py')
-          lines=p.read_text(encoding='utf-8').splitlines()
-          out=[]; i=0
-          while i<len(lines):
-              line=lines[i]
-              if line.lstrip().startswith('regex_once(') and line.count('"')%2==1:
-                  combined=line; i+=1
-                  while i<len(lines) and combined.count('"')%2==1:
-                      combined += r'\n' + lines[i]
-                      i+=1
-                  out.append(combined)
-              else:
-                  out.append(line); i+=1
-          text='\n'.join(out)+'\n'
-          bad="""# Sort PDF cell items by role before drawing.
-replace_once('app.js',
-'''      const items = shifts.filter((shift) => shift.shift_date === dateISO(date) && shift.class_id === classItem.id);''',
-'''      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === dateISO(date) && shift.class_id === classItem.id));''')
-"""
-          if bad not in text: raise SystemExit('PDF patch helper block not found')
-          text=text.replace(bad,"# PDF role sorting is applied after the guarded patch.\n",1)
-          p.write_text(text,encoding='utf-8')
-          PY
+          python3 scripts/prepare-v021-patch.py
           python3 -m py_compile scripts/apply-v021-scheduling.py
           python3 scripts/apply-v021-scheduling.py
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('app.js'); s=p.read_text(encoding='utf-8')
-          old="""      const items = shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id)
-        .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)) || (employeeById(a.employee_id)?.full_name || '').localeCompare(employeeById(b.employee_id)?.full_name || '', 'he'));"""
-          new="""      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id));"""
-          if s.count(old)!=1: raise SystemExit(f'PDF actual sort guard failed: {s.count(old)}')
-          p.write_text(s.replace(old,new,1),encoding='utf-8')
-          PY
       - name: Full QA
         run: |
           npm test
