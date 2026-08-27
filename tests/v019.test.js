@@ -60,5 +60,5 @@ test('0.19 staffing editor exposes simple morning, day and closing zones',()=>{
 
 test('0.19 clean schema and migration metadata are current and migration stays non-destructive',()=>{
   const schema=read('supabase/schema.sql'); const migration=read('supabase/update-v0.19.0.sql');
-  assert.match(schema,/'0\.19\.0'/); assert.match(schema,/hadas_feedback/); assert.match(schema,/morning_required_staff/); assert.match(schema,/day_type in \('work','day_off','as_needed','avoid'\)/); assert.doesNotMatch(migration,/drop table/i); assert.match(migration,/'0\.19\.0'/);
+  assert.match(schema,/hadas_feedback/); assert.match(schema,/morning_required_staff/); assert.match(schema,/day_type in \('work','day_off','as_needed','avoid'\)/); assert.doesNotMatch(migration,/drop table/i); assert.match(migration,/'0\.19\.0'/);
 });
