@@ -1112,3 +1112,26 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
+/* ========================================================================== 
+   גרסה 0.21.0 — שיבוץ צפוף, בחירת עובדים ומשובים
+   ========================================================================== */
+.schedule-table{min-width:930px;table-layout:fixed}
+.schedule-table thead th{min-width:0;width:13.7%;padding:7px 6px}
+.schedule-table .class-name{min-width:80px;width:82px;padding:8px 6px}
+.schedule-table td{padding:6px}
+.schedule-cell{min-height:122px}
+.shift-item{padding:7px 8px;margin-bottom:5px;border-radius:11px}
+.shift-main strong{font-size:.86rem;line-height:1.2}.shift-main small{font-size:.72rem;line-height:1.25}.shift-time{font-size:.82rem}
+.shift-actions{gap:4px;margin-top:5px}.compact-shift-action{min-height:30px!important;padding:4px 7px!important;font-size:.7rem!important;border-radius:9px!important}.delete-shift{width:29px!important;height:29px!important}
+.schedule-issues-panel{padding:11px!important}.schedule-issue-card{padding:10px!important;gap:9px!important}.schedule-issue-card .issue-copy p{margin:3px 0;font-size:.82rem}.schedule-issue-card .issue-actions button{min-height:34px;padding:5px 9px;font-size:.75rem}
+.shift-employee-options{max-height:42vh;overflow:auto;overscroll-behavior:contain}.matching-rejected-details{margin-top:10px}.rejected-worker-list{display:grid;gap:7px;padding-top:8px}.rejected-worker-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid #ead5d5;border-radius:12px;background:#fffafa}.rejected-worker-row>div{min-width:0}.rejected-worker-row strong,.rejected-worker-row small,.rejected-worker-row em{display:block}.rejected-worker-row small{color:var(--muted);font-size:.74rem}.rejected-worker-row em{color:#93484f;font-size:.73rem;font-style:normal}.rejected-worker-row button{flex:0 0 auto;border:1px solid #e5babe;background:#fff;color:#9a4149;border-radius:9px;padding:6px 8px;font-weight:850;font-size:.72rem}
+.feedback-manager-toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin:12px 0}.feedback-search{position:relative;min-width:min(330px,100%);flex:1}.feedback-search>span{position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:1}.feedback-search input{padding-right:34px}.feedback-manager-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0}.feedback-manager-summary span{background:var(--surface-soft);border:1px solid var(--border);padding:9px;border-radius:12px;text-align:center;font-size:.75rem}.feedback-manager-summary strong{display:block;font-size:1.2rem}.feedback-list.manager-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.feedback-list.manager-list .feedback-card{margin:0}
+@media(max-width:900px){.schedule-table{min-width:850px}.feedback-list.manager-list{grid-template-columns:1fr}}
+@media(max-width:760px){
+  .schedule-wrap{max-width:100%;overflow-x:hidden}.schedule-wrap.mode-week .schedule-table{display:none}
+  .mobile-week-day,.mobile-week-class,.day-class-card{max-width:100%;min-width:0}.mobile-week-class{padding:10px}.mobile-week-class-shifts{display:grid;gap:5px}.shift-card{margin:0!important;padding:8px!important}.shift-actions{display:grid;grid-template-columns:1fr 1fr 34px;width:100%;gap:5px}.compact-shift-action{width:100%;min-height:38px!important}.delete-shift{width:34px!important;height:38px!important}
+  .shift-employee-picker{min-width:0}.shift-employee-options{max-height:38vh}.shift-employee-option{grid-template-columns:36px minmax(0,1fr) auto!important;padding:9px!important}.employee-picker-search{position:sticky;top:0;z-index:3;background:#fff;padding-bottom:6px}.rejected-worker-row{align-items:stretch;flex-direction:column}.rejected-worker-row button{width:100%;min-height:40px}
+  .feedback-manager-toolbar{align-items:stretch;flex-direction:column}.feedback-manager-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.feedback-list.manager-list{grid-template-columns:1fr}
+  #scheduleWarnings.hidden{display:none!important}.schedule-issues-panel header{align-items:stretch;flex-direction:column}.schedule-issue-card{grid-template-columns:30px minmax(0,1fr)!important}.schedule-issue-card .issue-actions{grid-column:1/-1;display:flex;flex-wrap:wrap}.schedule-issue-card .issue-actions button{flex:1}
+}
+

@@ -181,9 +181,7 @@ replace_once('app.js',
 '''  if (role === 'teacher') return { fill: '#e8f6ef', border: '#b9dfca', accent: '#267454' };
   if (role === 'lead') return { fill: '#f1ecfa', border: '#d7c8ee', accent: '#6b4aa0' };''')
 # Sort PDF cell items by role before drawing.
-replace_once('app.js',
-'''      const items = shifts.filter((shift) => shift.shift_date === dateISO(date) && shift.class_id === classItem.id);''',
-'''      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === dateISO(date) && shift.class_id === classItem.id));''')
+regex_once('app.js',r"      const items = shifts\.filter\(\(shift\) => shift\.shift_date === iso && shift\.class_id === classItem\.id\)\n        \.sort\(\(a, b\) => String\(a\.start_time\)\.localeCompare\(String\(b\.start_time\)\) \|\| \(employeeById\(a\.employee_id\)\?\.full_name \|\| ''\)\.localeCompare\(employeeById\(b\.employee_id\)\?\.full_name \|\| '', 'he'\)\);",'''      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id));''')
 
 # Full rejected list + explicit manual override button, searchable on mobile.
 new_rejected=r'''function rejectedReasonsHtml(rejected = []) {
@@ -246,8 +244,7 @@ new_feedback=r'''function renderFeedback() {
   $('#myFeedbackList').innerHTML=mine.length?mine.map((item)=>feedbackCardHtml(item)).join(''):'<div class="empty-state compact">עדיין לא שלחת משוב.</div>';
   $('#myFeedback')?.classList.toggle('hidden',manager && !mine.length);
 }'''
-regex_once('app.js',r"function renderFeedback\(\) \{.*?\n\}
-async function loadFeedback",new_feedback+'\nasync function loadFeedback')
+regex_once('app.js',r"function renderFeedback\(\) \{.*?\n\}\nasync function loadFeedback",new_feedback+'\nasync function loadFeedback')
 
 # ---------------------------------------------------------------------------
 # Matching: an unconfigured day is unavailable; as-needed is real last resort.
@@ -441,11 +438,7 @@ new_validate=r'''async function validateShift(payload, id, overrideDayOff = fals
   }
   return { employee, classItem };
 }'''
-regex_once('handlers/shifts.js',r"async function validateShift\(payload, id, overrideDayOff = false\) \{.*?\n\}
-
-
-
-async function loadAutomaticScheduleData",new_validate+'\n\nasync function loadAutomaticScheduleData')
+regex_once('handlers/shifts.js',r"async function validateShift\(payload, id, overrideDayOff = false\) \{.*?\n\}\n\n\n\nasync function loadAutomaticScheduleData",new_validate+'\n\nasync function loadAutomaticScheduleData')
 # snapshot fields.
 replace_once('handlers/shifts.js',
 '''const keys = ['id', 'shift_date', 'class_id', 'employee_id', 'start_time', 'end_time', 'shift_role', 'status', 'public_note', 'created_at', 'updated_at'];''',

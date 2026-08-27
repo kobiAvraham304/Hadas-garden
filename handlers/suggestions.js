@@ -77,7 +77,7 @@ module.exports = async function handler(req, res) {
       mode,
       context: { date, class_id: classId, start_time: start, end_time: end, shift_role: neededRole, target_shift_id: targetShift?.id || null },
       candidates,
-      rejected: ranking.rejected.slice(0, 20),
+      rejected: ranking.rejected,
       summary: {
         total: candidates.length,
         recommended: candidates.filter((item) => item.recommended).length,

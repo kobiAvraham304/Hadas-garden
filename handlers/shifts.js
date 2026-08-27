@@ -21,7 +21,7 @@ function getSunday(dateString) {
 
 function shiftSnapshot(shift) {
   if (!shift) return null;
-  const keys = ['id', 'shift_date', 'class_id', 'employee_id', 'start_time', 'end_time', 'shift_role', 'status', 'public_note', 'created_at', 'updated_at'];
+  const keys = ['id', 'shift_date', 'class_id', 'employee_id', 'start_time', 'end_time', 'shift_role', 'status', 'public_note', 'rule_override', 'rule_override_note', 'created_at', 'updated_at'];
   return Object.fromEntries(keys.map((key) => [key, shift[key] ?? null]));
 }
 
@@ -38,43 +38,41 @@ async function recordChange(caller, type, before, after) {
   }), 'לא ניתן לתעד את שינוי השיבוץ');
 }
 
-async function validateShift(payload, id, overrideDayOff = false) {
+async function validateShift(payload, id, overrideDayOff = false, overrideRules = false) {
   if (!payload.shift_date || !payload.class_id || !payload.employee_id) throw httpError(400, 'חסרים פרטי שיבוץ');
   if (!payload.start_time || !payload.end_time || timeToMinutes(payload.end_time) <= timeToMinutes(payload.start_time)) throw httpError(400, 'שעות השיבוץ אינן תקינות');
-  const [employeeR, classR, settingsR, patternR] = await Promise.all([
+  const [employeeR, classR, settingsR, patternR, requestsR] = await Promise.all([
     db().from('hadas_employees').select('*').eq('id', payload.employee_id).maybeSingle(),
     db().from('hadas_classes').select('*').eq('id', payload.class_id).maybeSingle(),
     db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
     db().from('hadas_employee_weekly_patterns').select('*').eq('employee_id', payload.employee_id),
+    db().from('hadas_requests').select('request_type,request_date,request_end_date,status').eq('requester_id',payload.employee_id).in('request_type',['leave','day_off','sick']).in('status',['approved','applied']).lte('request_date',payload.shift_date),
   ]);
-  const employee = assertDb(employeeR, 'העובד לא נמצא');
-  const classItem = assertDb(classR, 'הכיתה לא נמצאה');
-  const settings = assertDb(settingsR, 'הגדרות המערכת לא נמצאו');
-  const weeklyPatterns = assertDb(patternR, 'לא ניתן לבדוק את ימי העבודה הקבועים') || [];
+  const employee = assertDb(employeeR, 'העובד לא נמצא'); const classItem = assertDb(classR, 'הכיתה לא נמצאה'); const settings = assertDb(settingsR, 'הגדרות המערכת לא נמצאו');
+  const weeklyPatterns = assertDb(patternR, 'לא ניתן לבדוק את ימי העבודה הקבועים') || []; const requests=assertDb(requestsR,'לא ניתן לבדוק חופשות')||[];
   if (!employee?.active) throw httpError(409, 'העובד אינו פעיל');
   if (employee.is_schedulable === false) throw httpError(409, 'העובד אינו מוגדר כחלק ממערך השיבוצים');
-  if (employee.job_title === 'גננת' && employee.primary_class_id && employee.primary_class_id !== payload.class_id) throw httpError(409, 'גננת ניתנת לשיבוץ רק בכיתה הקבועה שלה');
   if (['teacher', 'lead'].includes(payload.shift_role) && !employeeCanLead(employee)) throw httpError(409, 'העובד אינו מורשה לשמש גננת/גנן או מוביל/ת כיתה');
   if (!classItem?.active) throw httpError(409, 'הכיתה אינה פעילה');
   const dayClosing = closingTimeForDate(settings, payload.shift_date);
-  if (timeToMinutes(payload.start_time) < timeToMinutes(settings.opening_time) || timeToMinutes(payload.end_time) > timeToMinutes(dayClosing)) {
-    throw httpError(409, `השיבוץ חייב להיות בין ${String(settings.opening_time).slice(0, 5)} ל-${dayClosing}${new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay() === 5 ? ' ביום שישי' : ''}`);
+  if (timeToMinutes(payload.start_time) < timeToMinutes(settings.opening_time) || timeToMinutes(payload.end_time) > timeToMinutes(dayClosing)) throw httpError(409, `השיבוץ חייב להיות בין ${String(settings.opening_time).slice(0,5)} ל-${dayClosing}`);
+  const existingQuery = db().from('hadas_shifts').select('id').eq('employee_id', payload.employee_id).eq('shift_date', payload.shift_date).lt('start_time', payload.end_time).gt('end_time', payload.start_time); if (id) existingQuery.neq('id', id);
+  const overlaps = assertDb(await existingQuery, 'בדיקת חפיפה נכשלה') || []; if (overlaps.length) throw httpError(409, 'העובד כבר משובץ בשעות חופפות');
+
+  if (!overrideRules) {
+    if (employee.job_title === 'גננת' && employee.primary_class_id && employee.primary_class_id !== payload.class_id) throw httpError(409, 'גננת ניתנת לשיבוץ רק בכיתה הקבועה שלה');
+    const constraintRows = assertDb(await db().from('hadas_employee_class_constraints').select('id,reason,valid_from,valid_to').eq('employee_id', payload.employee_id).eq('class_id', payload.class_id).eq('constraint_type', 'forbidden'), 'בדיקת אילוצים נכשלה') || [];
+    const forbidden = constraintRows.find((item) => (!item.valid_from || item.valid_from <= payload.shift_date) && (!item.valid_to || item.valid_to >= payload.shift_date));
+    if (forbidden) throw httpError(409, forbidden.reason ? `קיים איסור שיבוץ בכיתה: ${forbidden.reason}` : 'קיים איסור לשבץ את העובד בכיתה זו');
+    const approvedAbsence=requests.find((row)=>row.request_date<=payload.shift_date&&payload.shift_date<=String(row.request_end_date||row.request_date));
+    if(approvedAbsence) throw httpError(409, `לעובד יש ${approvedAbsence.request_type==='sick'?'מחלה':'חופשה/יום חופשי'} מאושרים בתאריך זה`);
+    const day = new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay(); const pattern = weeklyPatterns.find((row) => Number(row.weekday) === day);
+    if (!pattern) throw httpError(409, 'היום אינו מוגדר בכרטיס העובד. יש לעדכן יום עבודה/חופשי/לפי צורך או לבחור שיבוץ ידני חריג');
+    const fixedDayOff = pattern.day_type === 'day_off'; if (fixedDayOff && !(overrideDayOff||overrideRules)) throw httpError(409, 'זהו יום חופשי קבוע של העובד. ניתן לשמור רק כשיבוץ ידני חריג');
+    if (pattern.day_type==='work' && (timeToMinutes(payload.start_time)<timeToMinutes(pattern.start_time)||timeToMinutes(payload.end_time)>timeToMinutes(pattern.end_time))) throw httpError(409, `השעות חורגות מהשעות הקבועות ${String(pattern.start_time).slice(0,5)}–${String(pattern.end_time).slice(0,5)}`);
   }
-  const constraintRows = assertDb(await db().from('hadas_employee_class_constraints').select('id,reason,valid_from,valid_to').eq('employee_id', payload.employee_id).eq('class_id', payload.class_id).eq('constraint_type', 'forbidden'), 'בדיקת אילוצים נכשלה') || [];
-  const forbidden = constraintRows.find((item) => (!item.valid_from || item.valid_from <= payload.shift_date) && (!item.valid_to || item.valid_to >= payload.shift_date));
-  if (forbidden) throw httpError(409, forbidden.reason ? `קיים איסור שיבוץ בכיתה: ${forbidden.reason}` : 'קיים איסור לשבץ את העובד בכיתה זו');
-  const day = new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay();
-  const pattern = weeklyPatterns.find((row) => Number(row.weekday) === day);
-  const fixedDayOff = pattern?.day_type === 'day_off' || (!pattern && employee.fixed_day_off === day);
-  if (fixedDayOff && !overrideDayOff) throw httpError(409, 'זהו יום חופשי קבוע של העובד. ניתן לשמור רק לאחר אישור חריגה');
-  const existingQuery = db().from('hadas_shifts').select('id').eq('employee_id', payload.employee_id).eq('shift_date', payload.shift_date).lt('start_time', payload.end_time).gt('end_time', payload.start_time);
-  if (id) existingQuery.neq('id', id);
-  const overlaps = assertDb(await existingQuery, 'בדיקת חפיפה נכשלה') || [];
-  if (overlaps.length) throw httpError(409, 'העובד כבר משובץ בשעות חופפות');
   return { employee, classItem };
 }
-
-
 
 async function loadAutomaticScheduleData(weekStart) {
   const weekEnd = addDays(weekStart, 5);
@@ -142,6 +140,8 @@ function autoShiftRestoreRow(shift) {
     shift_role: shift.shift_role,
     status: shift.status || 'draft',
     public_note: shift.public_note ?? null,
+    rule_override:Boolean(shift.rule_override),
+    rule_override_note:shift.rule_override_note ?? null,
     created_by: shift.created_by ?? null,
     created_at: shift.created_at,
     updated_at: shift.updated_at,
@@ -531,9 +531,11 @@ module.exports = async function handler(req, res) {
         shift_role: ['teacher', 'lead', 'staff', 'replacement'].includes(body.shift_role) ? body.shift_role : 'staff',
         status: 'draft',
         public_note: String(body.public_note || '').trim() || null,
+        rule_override:Boolean(body.override_rules),
+        rule_override_note:Boolean(body.override_rules) ? (String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית') : null,
         created_by: caller.employee.id,
       };
-      await validateShift(payload, null, Boolean(body.override_day_off));
+      await validateShift(payload, null, Boolean(body.override_day_off), Boolean(body.override_rules));
       const shift = assertDb(await db().from('hadas_shifts').insert(payload).select('*').single(), 'לא ניתן לשמור שיבוץ');
       await recordChange(caller, 'create', null, shift);
       await audit(caller.employee.id, 'create', 'shift', shift.id, payload);
@@ -555,8 +557,10 @@ module.exports = async function handler(req, res) {
         shift_role: body.shift_role || current.shift_role,
         status: 'draft',
         public_note: body.public_note === undefined ? current.public_note : (String(body.public_note || '').trim() || null),
+        rule_override:body.override_rules === undefined ? Boolean(current.rule_override) : Boolean(body.override_rules),
+        rule_override_note:body.override_rules === undefined ? current.rule_override_note : (Boolean(body.override_rules)?(String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית'):null),
       };
-      await validateShift(payload, id, Boolean(body.override_day_off));
+      await validateShift(payload, id, Boolean(body.override_day_off), Boolean(payload.rule_override));
       const updated = assertDb(await db().from('hadas_shifts').update(payload).eq('id', id).select('*').single(), 'לא ניתן לעדכן שיבוץ');
       await recordChange(caller, 'update', current, updated);
       await audit(caller.employee.id, 'update', 'shift', id, payload);

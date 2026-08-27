@@ -1,0 +1,33 @@
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'); const path=require('node:path'); const root=path.resolve(__dirname,'..'); const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
+const { employeeAvailability, generateAutomaticSchedule }=require('../lib/auto-schedule');
+const { rankCandidates }=require('../lib/matching');
+
+test('0.21 metadata and migration are aligned',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.21.0'); assert.match(read('handlers/health.js'),/schema_version === '0\.21\.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\(1,'0\.21\.0','0\.21\.0'/); });
+
+test('employee day editor has exactly work, day off and as-needed semantics',()=>{ const app=read('app.js'); assert.match(app,/יום עבודה \(קבוע\)/); assert.match(app,/יום חופשי \(אסור לשבץ\)/); assert.match(app,/לפי צורך \(עדיפות נמוכה\)/); assert.doesNotMatch(app,/>לא קבוע</); const weeklySelect=app.match(/<select class=\"weekly-day-type\"[\s\S]*?<\/select>/)?.[0]||''; assert.doesNotMatch(weeklySelect,/value=\"avoid\"/); const handler=read('handlers/employees.js'); assert.match(handler,/\['work','day_off','as_needed'\]/); assert.match(handler,/seen\.size !== 6/); });
+
+test('missing weekly pattern is unavailable and as-needed is a low-priority fallback',()=>{ const employee={id:'e',active:true,is_schedulable:true,assignment_mode:'substitute',default_start:'07:30',default_end:'15:30'}; const settings={opening_time:'07:30',closing_time:'15:30',friday_closing_time:'12:00'}; assert.equal(employeeAvailability({employee,date:'2026-08-31',patterns:[],requests:[],settings}),null); const need=employeeAvailability({employee,date:'2026-09-01',patterns:[{employee_id:'e',weekday:2,day_type:'as_needed'}],requests:[],settings}); assert.equal(need.source,'as_needed'); assert.ok(need.confidence<0); });
+
+test('matching rejects an unconfigured day and keeps the reason visible',()=>{ const result=rankCandidates({employees:[{id:'e',full_name:'שרון',active:true,is_schedulable:true,assignment_mode:'substitute',job_title:'סייעת/ סייע',default_start:'07:30',default_end:'15:30'}],shifts:[],requests:[],constraints:[],patterns:[{employee_id:'other',weekday:1,day_type:'work',start_time:'07:30',end_time:'15:30'}],operations:[],attendance:[],classes:[{id:'c',name:'סיני'}],settings:{opening_time:'07:30',closing_time:'15:30',required_staff:1,closing_required_staff:1,require_leader:false},date:'2026-08-31',classId:'c',start:'07:30',end:'12:00',neededRole:'staff'}); assert.equal(result.candidates.length,0); assert.match(result.rejected[0].reason,/אינו מוגדר/); assert.doesNotMatch(read('handlers/suggestions.js'),/rejected\.slice\(0, 20\)/); });
+
+test('automatic scheduler never invents availability on a missing day',()=>{ const plan=generateAutomaticSchedule({weekStart:'2026-08-30',employees:[{id:'sharon',full_name:'שרון',active:true,is_schedulable:true,assignment_mode:'substitute',job_title:'סייעת/ סייע',default_start:'07:30',default_end:'15:30',max_weekly_hours:50}],classes:[{id:'c',name:'כיתה',active:true}],patterns:[{employee_id:'sharon',weekday:0,day_type:'as_needed'},{employee_id:'sharon',weekday:2,day_type:'as_needed'},{employee_id:'sharon',weekday:3,day_type:'as_needed'}],constraints:[],requests:[],settings:{opening_time:'07:30',closing_time:'15:30',friday_closing_time:'12:00',morning_required_staff:1,required_staff:1,closing_required_staff:1,closing_window_minutes:30,validation_slot_minutes:30,require_leader:false},existingShifts:[],previousShifts:[]}); assert.equal(plan.finalRows.some((row)=>row.employee_id==='sharon'&&row.shift_date==='2026-08-31'),false); });
+
+test('manual scheduling override is explicit and persisted',()=>{ const html=read('index.html'),app=read('app.js'),handler=read('handlers/shifts.js'),schema=read('supabase/schema.sql'); assert.match(html,/name="override_rules"/); assert.match(app,/שיבוץ ידני חריג/); assert.match(handler,/rule_override:Boolean\(body\.override_rules\)/); assert.match(schema,/rule_override boolean not null default false/); assert.match(read('lib/schedule.js'),/manual_rule_override/); });
+
+test('task badge ignores assignments belonging to inactive tasks',()=>{ const app=read('app.js'); assert.match(app,/function activeTaskAssignments/); assert.match(app,/activeIds\.has\(assignment\.task_id\)/); assert.equal((app.match(/activeTaskAssignments\(\)\.length/g)||[]).length>=2,true); });
+
+test('schedule rows have fixed role order and PDF colors are teacher green lead purple',()=>{ const app=read('app.js'); assert.match(app,/teacher:0, lead:1, staff:2, replacement:3/); assert.match(app,/role === 'teacher'.*#e8f6ef/); assert.match(app,/role === 'lead'.*#f1ecfa/); assert.ok((app.match(/sortScheduleRows\(/g)||[]).length>=6); });
+
+test('automatic scheduling chooses a whole week, not an arbitrary date',()=>{ const html=read('index.html'); assert.match(html,/<select id="autoScheduleWeek"/); assert.doesNotMatch(html,/id="autoScheduleWeek"[^>]*type="date"/); assert.match(read('app.js'),/function populateAutoScheduleWeeks/); });
+
+test('absence availability shows fixed classroom and schedule checks stay click-to-open',()=>{ const app=read('app.js'); assert.match(app,/כיתה קבועה:/); assert.match(app,/if \(!state\.scheduleIssuesOpen\) \{ panel\.innerHTML=''; return; \}/); });
+
+test('feedback manager has search, status filters and summary',()=>{ const html=read('index.html'),app=read('app.js'); assert.match(html,/id="feedbackSearch"/); assert.match(html,/id="feedbackStatusChips"/); assert.match(html,/id="feedbackManagerSummary"/); assert.match(app,/feedbackStatusFilter: 'open'/); });
+
+test('employee PATCH avoids post-save five-query reload',()=>{ const handler=read('handlers/employees.js'); const patch=handler.slice(handler.indexOf("if (req.method === 'PATCH')"),handler.indexOf("if (req.method === 'DELETE')")); assert.match(patch,/\[employeeR,userR\] = await Promise\.all/); assert.doesNotMatch(patch,/employeeResult\(employeeId\)/); });
+
+test('0.21 migration normalizes old avoid days, fills missing days and removes stale task badges',()=>{ const sql=read('supabase/update-v0.21.0.sql'); assert.match(sql,/set day_type='as_needed'/); assert.match(sql,/generate_series\(0,5\)/); assert.match(sql,/delete from public\.hadas_task_assignees/); assert.doesNotMatch(sql,/drop table/i); });
+
+test('schedule and picker have dense responsive controls',()=>{ const css=read('styles.css'); assert.match(css,/schedule-table\{min-width:930px/); assert.match(css,/rejected-worker-row/); assert.match(css,/grid-template-columns:1fr 1fr 34px/); });

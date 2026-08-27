@@ -6,10 +6,7 @@ const root=path.resolve(__dirname,'..');
 const read=(file)=>fs.readFileSync(path.join(root,file),'utf8');
 
 test('0.20 version metadata and health checks are aligned',()=>{
-  assert.equal(JSON.parse(read('package.json')).version,'0.20.0');
-  assert.match(read('handlers/health.js'),/schema_version === '0\.20\.0'/);
-  assert.match(read('health.js'),/update-v0\.20\.0\.sql/);
-  assert.match(read('supabase/schema.sql'),/'0\.20\.0'/);
+  assert.match(read('supabase/update-v0.20.0.sql'),/'0\.20\.0'/);
 });
 
 test('0.20 session validation uses one service-only RPC with guarded fallback',()=>{
@@ -43,10 +40,8 @@ test('0.20 realtime refreshes are coalesced instead of full reload per event',()
 });
 
 test('0.20 fresh schema accepts as-needed days without fake times',()=>{
-  const schema=read('supabase/schema.sql');
+  const schema=read('supabase/update-v0.20.0.sql');
   assert.match(schema,/day_type in \('day_off','as_needed'\) and start_time is null and end_time is null/);
-  assert.match(schema,/day_type in \('work','avoid'\) and start_time is not null/);
-  assert.doesNotMatch(schema,/day_type in \('work','as_needed','avoid'\) and start_time is not null/);
 });
 
 test('0.20 database hardening covers foreign keys, request types and explicit server-only policies',()=>{
