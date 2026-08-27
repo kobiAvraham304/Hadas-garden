@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.20.0 (סכמת נתונים 0.20.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.21.0 (סכמת נתונים 0.21.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -66,7 +66,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.20.0', '0.20.0')
+values (1, '0.21.0', '0.21.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -149,7 +149,7 @@ create table if not exists public.hadas_login_security (
 create table if not exists public.hadas_employee_weekly_patterns (
   employee_id uuid not null references public.hadas_employees(id) on delete cascade,
   weekday smallint not null check (weekday between 0 and 6),
-  day_type text not null check (day_type in ('work','day_off','as_needed','avoid')),
+  day_type text not null check (day_type in ('work','day_off','as_needed')),
   start_time time,
   end_time time,
   created_at timestamptz not null default now(),
@@ -158,12 +158,12 @@ create table if not exists public.hadas_employee_weekly_patterns (
   check (
     (day_type in ('day_off','as_needed') and start_time is null and end_time is null)
     or
-    (day_type in ('work','avoid') and start_time is not null and end_time is not null and end_time > start_time)
+    (day_type = 'work' and start_time is not null and end_time is not null and end_time > start_time)
   )
 );
 create index if not exists hadas_weekly_patterns_weekday_idx on public.hadas_employee_weekly_patterns(weekday, day_type);
 alter table public.hadas_employee_weekly_patterns drop constraint if exists hadas_employee_weekly_patterns_day_type_check;
-alter table public.hadas_employee_weekly_patterns add constraint hadas_employee_weekly_patterns_day_type_check check (day_type in ('work','day_off','as_needed','avoid'));
+alter table public.hadas_employee_weekly_patterns add constraint hadas_employee_weekly_patterns_day_type_check check (day_type in ('work','day_off','as_needed'));
 
 create table if not exists public.hadas_employee_class_constraints (
   id uuid primary key default gen_random_uuid(),
@@ -195,6 +195,8 @@ create table if not exists public.hadas_shifts (
   shift_role text not null default 'staff' check (shift_role in ('teacher','lead','staff','replacement')),
   status text not null default 'draft' check (status in ('draft','published')),
   public_note text,
+  rule_override boolean not null default false,
+  rule_override_note text,
   created_by uuid references public.hadas_employees(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),

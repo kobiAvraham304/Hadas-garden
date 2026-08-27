@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.20.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.21.0 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -74,6 +74,8 @@ const state = {
   autoScheduleIssueDecisions: new Map(),
   feedback: [],
   feedbackCanManage: false,
+  feedbackStatusFilter: 'open',
+  feedbackSearch: '', 
   postPublishContext: null,
   lastRefreshAt: 0,
   refreshing: false,
@@ -139,6 +141,10 @@ function canCreateContent() {
 }
 function employeeById(id) { return state.employees.find((item) => item.id === id); }
 function classById(id) { return state.classes.find((item) => item.id === id); }
+function shiftRoleRank(role) { return ({ teacher:0, lead:1, staff:2, replacement:3 })[role] ?? 9; }
+function sortScheduleRows(rows=[]) { return [...rows].sort((a,b)=>shiftRoleRank(a.shift_role)-shiftRoleRank(b.shift_role)||timeToMinutes(a.start_time)-timeToMinutes(b.start_time)||String(employeeById(a.employee_id)?.full_name||'').localeCompare(String(employeeById(b.employee_id)?.full_name||''),'he')); }
+function activeTaskAssignments(employeeId=state.profile?.id) { const activeIds=new Set(state.tasks.filter((task)=>task.active).map((task)=>task.id)); return state.taskAssignees.filter((assignment)=>assignment.employee_id===employeeId&&assignment.status!=='done'&&activeIds.has(assignment.task_id)); }
+function fixedClassLabel(employeeId) { const employee=employeeById(employeeId); return employee?.primary_class_id ? (classById(employee.primary_class_id)?.name || '') : ''; }
 function currentWeekDates() { return Array.from({ length: 6 }, (_, index) => addDays(state.weekStart, index)); }
 function showToast(message, type = '') { const toast = $('#toast'); toast.textContent = message; toast.className = `toast ${type}`.trim(); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.add('hidden'), 3800); }
 function setScreen(id) { for (const screen of ['loadingScreen', 'loginScreen', 'passwordScreen', 'appShell']) $(`#${screen}`).classList.toggle('hidden', screen !== id); }
@@ -208,7 +214,7 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.20.0';
+    const version = state.config.version || '0.21.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -240,7 +246,7 @@ function bindEvents() {
   $('#todayWeekBtn').addEventListener('click', () => setWeek(startOfWeek(new Date())));
   $('#autoScheduleBtn').addEventListener('click', openAutoScheduleDialog);
   $('#calculateAutoScheduleBtn').addEventListener('click', calculateAutomaticSchedule);
-  $('#autoScheduleWeek')?.addEventListener('change', normalizeAutoScheduleWeekInput);
+  $('#autoScheduleWeek')?.addEventListener('change', () => {});
   $('#autoSchedulePreview').addEventListener('click', handleAutoSchedulePreviewClick);
   $$('#autoScheduleDialog input[name="auto_schedule_mode"]').forEach((input) => input.addEventListener('change', syncAutoScheduleModeCards));
   $('#copyWeekBtn').addEventListener('click', openCopyWeekDialog);
@@ -264,6 +270,8 @@ function bindEvents() {
   $('#mobileFeedbackBtn')?.addEventListener('click', () => { closeMobileMore(); openFeedbackDialog(); });
   $('#feedbackForm')?.addEventListener('submit', saveFeedback);
   $('#feedbackRefreshBtn')?.addEventListener('click', () => loadFeedback({ force:true }));
+  $('#feedbackSearch')?.addEventListener('input', debounce((event)=>{ state.feedbackSearch=event.target.value; renderFeedback(); },120));
+  $('#feedbackStatusChips')?.addEventListener('click',(event)=>{ const button=event.target.closest('[data-feedback-status]'); if(!button)return; state.feedbackStatusFilter=button.dataset.feedbackStatus; renderFeedback(); });
   $('#feedbackList')?.addEventListener('click', handleFeedbackAction);
   $('#myFeedbackList')?.addEventListener('click', handleFeedbackAction);
   $('#employeeStatusFilter').addEventListener('change', (event) => { state.employeeStatusFilter = event.target.value; syncFilterChips('#employeeStatusChips', event.target.value); renderEmployees(); });
@@ -507,7 +515,7 @@ async function refreshScheduleWeek({ force = true } = {}) {
 async function setWeek(date) {
   const target = startOfWeek(date); const key = scheduleCacheKey(target);
   if (key === scheduleCacheKey() && !state.scheduleLoading) return;
-  state.weekStart = target; state.expandedWeekDay = null;
+  state.weekStart = target; state.expandedWeekDay = null; state.scheduleIssuesOpen = false;
   const cached = state.weekCache.get(key);
   if (cached) {
     applySchedulePayload(cached.payload); renderSchedule();
@@ -628,7 +636,7 @@ function renderPanel(tab) {
 function renderAll() { renderDashboard(); renderPanel(state.activeTab); renderNavBadges(); }
 function renderNavBadges() {
   const unread = state.announcements.filter((announcement) => announcement.requires_acknowledgement !== false && !state.announcementReads.some((read) => read.announcement_id === announcement.id && read.employee_id === state.profile.id)).length;
-  const openTasks = state.taskAssignees.filter((assignment) => assignment.employee_id === state.profile.id && assignment.status !== 'done').length;
+  const openTasks = activeTaskAssignments().length;
   const notificationCount = state.notifications.filter((item) => !item.read_at).length;
   for (const [id, count] of [['announcementBadge', unread], ['taskBadge', openTasks], ['notificationBadge', notificationCount]]) { const element = $(`#${id}`); if (!element) continue; element.textContent = count > 99 ? '99+' : String(count); element.classList.toggle('hidden', !count); }
 }
@@ -665,7 +673,7 @@ function renderDashboard() {
   const gridViewer=canViewScheduleGrid();
   const staffed=new Set(shifts.map((shift)=>shift.employee_id));
   const pending=state.requests.filter((request)=>request.status==='pending').length;
-  const dueTasks=state.taskAssignees.filter((assignment)=>assignment.employee_id===state.profile.id&&assignment.status!=='done').length;
+  const dueTasks=activeTaskAssignments().length;
   const unread=state.announcements.filter((announcement)=>announcement.requires_acknowledgement!==false&&!state.announcementReads.some((read)=>read.announcement_id===announcement.id&&read.employee_id===state.profile.id)).length;
   const unreadNotifications=state.notifications.filter((item)=>!item.read_at).length;
   const absentToday=state.scheduleAbsences.filter((item)=>item.absence_date===today).length;
@@ -680,7 +688,7 @@ function renderDashboard() {
   let details='';
   if(gridViewer){
     const visibleClasses=canViewClassSchedule()?state.classes.filter((item)=>item.id===state.profile.primary_class_id):state.classes.filter((item)=>item.active);
-    const classCards=visibleClasses.map((item,index)=>{ const rows=shifts.filter((shift)=>shift.class_id===item.id); const result=coverageFor(rows,today); return `<article class="class-card class-tone-${index%4}"><div class="class-card-top"><span class="class-symbol">${['☁','✿','☀','★'][index%4]}</span><div class="card-heading"><h3>${escapeHtml(item.name)}</h3><span class="status-chip ${result.ok?'ok':'error'}">${result.ok?'תקין':'דורש טיפול'}</span></div></div>${rows.length?rows.map(shiftLineHtml).join(''):'<div class="empty-state compact">אין שיבוץ להיום</div>'}<p class="small-note">${result.count} משובצים · ${result.closing} בסגירה${state.settings.require_leader!==false?` · ${result.leader?'יש אחראי/ת כיתה':'חסר/ה אחראי/ת כיתה'}`:''}</p></article>`; }).join('');
+    const classCards=visibleClasses.map((item,index)=>{ const rows=sortScheduleRows(shifts.filter((shift)=>shift.class_id===item.id)); const result=coverageFor(rows,today); return `<article class="class-card class-tone-${index%4}"><div class="class-card-top"><span class="class-symbol">${['☁','✿','☀','★'][index%4]}</span><div class="card-heading"><h3>${escapeHtml(item.name)}</h3><span class="status-chip ${result.ok?'ok':'error'}">${result.ok?'תקין':'דורש טיפול'}</span></div></div>${rows.length?rows.map(shiftLineHtml).join(''):'<div class="empty-state compact">אין שיבוץ להיום</div>'}<p class="small-note">${result.count} משובצים · ${result.closing} בסגירה${state.settings.require_leader!==false?` · ${result.leader?'יש אחראי/ת כיתה':'חסר/ה אחראי/ת כיתה'}`:''}</p></article>`; }).join('');
     details=`<div class="section-heading dashboard-section"><div><p class="eyebrow">תמונת מצב יומית</p><h2>${canViewClassSchedule()?'הכיתה שלי היום':'מצב הכיתות היום'}</h2><p class="muted">${staffed.size} עובדים משובצים · ${absentToday} בחופשה או בהיעדרות</p></div></div><div class="dashboard-grid class-grid">${classCards}</div>`;
   }else{
     details=`<div class="section-heading dashboard-section"><div><p class="eyebrow">היום שלי</p><h2>פרטי השיבוץ שלי</h2></div></div><div class="my-schedule-list">${mine.length?mine.map((shift)=>`<article class="my-day-card"><div class="my-day-date"><strong>${escapeHtml(classById(shift.class_id)?.name||'')}</strong><span>${timeHtml(shift.start_time,shift.end_time)}</span></div><div class="my-day-shifts"><div class="shift-item"><strong>${SHIFT_ROLE_LABELS[shift.shift_role]}</strong><small>${escapeHtml(shift.public_note||'ללא הערה')}</small></div></div></article>`).join(''):'<div class="empty-state">אין לך שיבוץ היום.</div>'}</div>`;
@@ -776,6 +784,7 @@ function renderWarnings() {
   count.textContent = validation.errors.length ? `${validation.errors.length} שגיאות · ${validation.warnings.length} התראות` : validation.warnings.length ? `${validation.warnings.length} התראות` : 'הכול תקין';
   toggle.setAttribute('aria-expanded', String(state.scheduleIssuesOpen));
   panel.classList.toggle('hidden', !state.scheduleIssuesOpen);
+  if (!state.scheduleIssuesOpen) { panel.innerHTML=''; return; }
   if (!total) {
     panel.innerHTML = '<div class="schedule-health-card is-ok"><span>✓</span><div><strong>השיבוץ עומד בבדיקות התקינה</strong><small>לא נמצאו חוסרים או חריגות שעות בשבוע המוצג.</small></div></div>';
     return;
@@ -826,12 +835,12 @@ function renderPublicationState() {
   $('#schedulePublicationState').innerHTML = text;
 }
 function shiftCardHtml(shift, compact = false) {
-  const employee = employeeById(shift.employee_id); const managerActions = isManager() ? `<div class="shift-actions"><button class="replace-shift" data-action="suggest" data-id="${shift.id}">מציאת מחליף/ה</button><button class="mini-btn" data-action="edit" data-id="${shift.id}">עריכה</button><button class="delete-shift" data-action="delete" data-id="${shift.id}" aria-label="מחיקת שיבוץ">×</button></div>` : '';
+  const employee = employeeById(shift.employee_id); const managerActions = isManager() ? `<div class="shift-actions"><button class="replace-shift compact-shift-action" data-action="suggest" data-id="${shift.id}" title="מציאת מחליף/ה" aria-label="מציאת מחליף/ה">↔ <span>מחליף</span></button><button class="mini-btn compact-shift-action" data-action="edit" data-id="${shift.id}" title="עריכה" aria-label="עריכת שיבוץ">✎ <span>עריכה</span></button><button class="delete-shift" data-action="delete" data-id="${shift.id}" aria-label="מחיקת שיבוץ">×</button></div>` : '';
   return `<article class="shift-item ${shift.status === 'draft' ? 'is-draft' : ''} ${compact ? 'shift-card' : ''}" data-shift-id="${shift.id}"><div class="shift-main"><strong>${escapeHtml(employee?.full_name || 'עובד')}</strong><span class="shift-time">${timeHtml(shift.start_time, shift.end_time)}</span><small>${SHIFT_ROLE_LABELS[shift.shift_role]}${shift.public_note ? ` · ${escapeHtml(shift.public_note)}` : ''}</small>${isManager() && shift.status === 'draft' ? '<span class="status-chip draft">טרם פורסם</span>' : ''}</div>${managerActions}</article>`;
 }
 function renderMobileWeekClass(classItem, date) {
   const iso = dateISO(date);
-  const rows = state.shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id);
+  const rows = sortScheduleRows(state.shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id));
   const coverage = coverageFor(rows, iso);
   return `<section class="mobile-week-class"><div class="mobile-week-class-head"><div><h4>${escapeHtml(classItem.name)}</h4><small>${coverage.count} משובצים · ${coverage.closing} בסגירה</small></div><span class="status-chip ${coverage.ok ? 'ok' : 'error'}">${coverage.ok ? 'תקין' : 'דורש טיפול'}</span></div><div class="mobile-week-class-shifts">${rows.length ? rows.map((shift) => shiftCardHtml(shift, true)).join('') : '<div class="empty-state compact">אין שיבוצים בכיתה</div>'}</div>${isManager() ? `<button class="mobile-add-shift" data-action="add" data-date="${iso}" data-class="${classItem.id}">＋ הוספת עובד לכיתה</button>` : ''}</section>`;
 }
@@ -846,14 +855,14 @@ function renderMobileWeekDay(date, index) {
 function renderScheduleWeek() {
   const dates = currentWeekDates();
   const header = dates.map((date) => `<th><strong>${DAY_NAMES[date.getDay()]}</strong><small>${formatDate(date, { day: '2-digit', month: '2-digit' })}</small></th>`).join('');
-  const rows = visibleScheduleClasses().map((classItem) => `<tr><td class="class-name">${escapeHtml(classItem.name)}</td>${dates.map((date) => { const iso = dateISO(date); const shifts = state.shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id); return `<td><div class="schedule-cell">${shifts.map((shift) => shiftCardHtml(shift)).join('')}<div class="cell-footer manager-only ${isManager() ? '' : 'hidden'}"><button class="mini-btn cell-action" data-action="add" data-date="${iso}" data-class="${classItem.id}">＋ הוספה</button><button class="mini-btn cell-action" data-action="suggest-empty" data-date="${iso}" data-class="${classItem.id}">הצעת מחליף/ה</button></div></div></td>`; }).join('')}</tr>`).join('');
+  const rows = visibleScheduleClasses().map((classItem) => `<tr><td class="class-name">${escapeHtml(classItem.name)}</td>${dates.map((date) => { const iso = dateISO(date); const shifts = sortScheduleRows(state.shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id)); return `<td><div class="schedule-cell">${shifts.map((shift) => shiftCardHtml(shift)).join('')}<div class="cell-footer manager-only ${isManager() ? '' : 'hidden'}"><button class="mini-btn cell-action" data-action="add" data-date="${iso}" data-class="${classItem.id}">＋ הוספה</button><button class="mini-btn cell-action" data-action="suggest-empty" data-date="${iso}" data-class="${classItem.id}">הצעת מחליף/ה</button></div></div></td>`; }).join('')}</tr>`).join('');
   const desktop = `<div class="schedule-desktop-week"><div class="schedule-table-scroll"><table class="schedule-table"><thead><tr><th class="class-name">כיתה</th>${header}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
   const mobile = `<div class="schedule-mobile-week"><div class="mobile-week-intro"><span>שבוע מלא בלי גלילה לצדדים</span><small>לחץ על יום כדי לפתוח את כל הכיתות והשיבוצים.</small></div>${dates.map(renderMobileWeekDay).join('')}</div>`;
   return desktop + mobile;
 }
 function renderScheduleDay() {
   const date = currentWeekDates()[Math.min(Math.max(state.scheduleDay, 0), 5)] || currentWeekDates()[0]; const iso = dateISO(date);
-  return `<div class="day-view-heading"><strong>${DAY_NAMES[date.getDay()]}</strong><span>${formatDate(date, { day: 'numeric', month: 'long' })}</span></div><div class="day-schedule-grid">${visibleScheduleClasses().map((classItem) => { const rows = state.shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id); const coverage = coverageFor(rows, iso); return `<article class="day-class-card" data-day-class="${classItem.id}"><div class="card-heading"><div><h3>${escapeHtml(classItem.name)}</h3><p>${coverage.count} משובצים · ${coverage.closing} בסגירה</p></div><span class="status-chip ${coverage.ok ? 'ok' : 'error'}">${coverage.ok ? 'תקין' : 'חוסר'}</span></div><div class="day-shifts">${rows.length ? rows.map((shift) => shiftCardHtml(shift, true)).join('') : '<div class="empty-state compact">אין שיבוצים</div>'}</div>${isManager() ? `<button class="secondary-btn full-button" data-action="add" data-date="${iso}" data-class="${classItem.id}">＋ הוספת עובד</button>` : ''}</article>`; }).join('')}</div>`;
+  return `<div class="day-view-heading"><strong>${DAY_NAMES[date.getDay()]}</strong><span>${formatDate(date, { day: 'numeric', month: 'long' })}</span></div><div class="day-schedule-grid">${visibleScheduleClasses().map((classItem) => { const rows = sortScheduleRows(state.shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id)); const coverage = coverageFor(rows, iso); return `<article class="day-class-card" data-day-class="${classItem.id}"><div class="card-heading"><div><h3>${escapeHtml(classItem.name)}</h3><p>${coverage.count} משובצים · ${coverage.closing} בסגירה</p></div><span class="status-chip ${coverage.ok ? 'ok' : 'error'}">${coverage.ok ? 'תקין' : 'חוסר'}</span></div><div class="day-shifts">${rows.length ? rows.map((shift) => shiftCardHtml(shift, true)).join('') : '<div class="empty-state compact">אין שיבוצים</div>'}</div>${isManager() ? `<button class="secondary-btn full-button" data-action="add" data-date="${iso}" data-class="${classItem.id}">＋ הוספת עובד</button>` : ''}</article>`; }).join('')}</div>`;
 }
 function renderScheduleMine() {
   return `<div class="my-schedule-list">${currentWeekDates().map((date) => { const iso = dateISO(date); const rows = state.shifts.filter((shift) => shift.shift_date === iso && shift.employee_id === state.profile.id); return `<article class="my-day-card"><div class="my-day-date"><strong>${DAY_NAMES[date.getDay()]}</strong><span>${formatDate(date, { day: '2-digit', month: '2-digit' })}</span></div><div class="my-day-shifts">${rows.length ? rows.map((shift) => `<div class="shift-item"><strong>${escapeHtml(classById(shift.class_id)?.name || '')}</strong><span class="shift-time">${timeHtml(shift.start_time, shift.end_time)}</span><small>${SHIFT_ROLE_LABELS[shift.shift_role]}${shift.public_note ? ` · ${escapeHtml(shift.public_note)}` : ''}</small></div>`).join('') : '<span class="day-off-label">יום חופשי / ללא שיבוץ</span>'}</div></article>`; }).join('')}</div>`;
@@ -863,7 +872,7 @@ function absenceIcon(type) { return type === 'leave' ? '☀' : type === 'day_off
 function renderAbsenceDay(date) {
   const iso = typeof date === 'string' ? date : dateISO(date);
   const rows = state.scheduleAbsences.filter((item) => item.absence_date === iso);
-  return `<article class="absence-day-card ${rows.length ? 'has-absences' : ''}"><div class="absence-day-heading"><div><strong>${DAY_NAMES[parseDateValue(iso).getDay()]}</strong><span>${formatDate(iso, { day: '2-digit', month: '2-digit' })}</span></div><span class="absence-count">${rows.length}</span></div><div class="absence-people">${rows.length ? rows.map((item) => `<div class="absence-person type-${item.absence_type}"><span class="absence-icon">${absenceIcon(item.absence_type)}</span><span><strong>${escapeHtml(employeeById(item.employee_id)?.full_name || item.employee_name || 'עובד')}</strong><small>${absenceLabel(item.absence_type)}</small></span></div>`).join('') : '<span class="absence-empty">אין חופשות או היעדרויות</span>'}</div></article>`;
+  return `<article class="absence-day-card ${rows.length ? 'has-absences' : ''}"><div class="absence-day-heading"><div><strong>${DAY_NAMES[parseDateValue(iso).getDay()]}</strong><span>${formatDate(iso, { day: '2-digit', month: '2-digit' })}</span></div><span class="absence-count">${rows.length}</span></div><div class="absence-people">${rows.length ? rows.map((item) => `<div class="absence-person type-${item.absence_type}"><span class="absence-icon">${absenceIcon(item.absence_type)}</span><span><strong>${escapeHtml(employeeById(item.employee_id)?.full_name || item.employee_name || 'עובד')}</strong><small>${absenceLabel(item.absence_type)}${fixedClassLabel(item.employee_id)?` · כיתה קבועה: ${escapeHtml(fixedClassLabel(item.employee_id))}`:''}</small></span></div>`).join('') : '<span class="absence-empty">אין חופשות או היעדרויות</span>'}</div></article>`;
 }
 function renderScheduleAbsences() {
   const target = $('#scheduleAbsences');
@@ -935,15 +944,10 @@ function candidateCautionsHtml(candidate) {
   return cautions.length ? `<ul class="candidate-cautions">${cautions.slice(0, 3).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : '';
 }
 function rejectedReasonsHtml(rejected = []) {
-  if (!rejected.length) return '';
-  const grouped = new Map();
-  rejected.forEach((item) => {
-    const reason = item.reason || 'לא עבר/ה את בדיקות ההתאמה';
-    if (!grouped.has(reason)) grouped.set(reason, []);
-    grouped.get(reason).push(item.full_name || 'עובד');
-  });
-  const rows = [...grouped.entries()].slice(0, 8).map(([reason, names]) => `<li><strong>${escapeHtml(reason)}</strong><span>${escapeHtml(names.slice(0, 4).join(', '))}${names.length > 4 ? ` ועוד ${names.length - 4}` : ''}</span></li>`).join('');
-  return `<details class="matching-rejected-details"><summary>למה עובדים אחרים לא הופיעו? <b>${rejected.length}</b></summary><ul>${rows}</ul></details>`;
+  const query=String(state.shiftPickerQuery||'').trim().toLowerCase();
+  const rows=rejected.filter((item)=>{ const employee=employeeById(item.employee_id); const hay=`${item.full_name||''} ${employee?.job_title||''} ${fixedClassLabel(item.employee_id)} ${item.reason||''}`.toLowerCase(); return !query||hay.includes(query); });
+  if (!rows.length) return '';
+  return `<details class="matching-rejected-details"><summary>למה עובדים אחרים לא הופיעו? · עובדים שלא עברו את הכללים <b>${rows.length}</b></summary><div class="rejected-worker-list">${rows.map((item)=>{ const employee=employeeById(item.employee_id); const className=fixedClassLabel(item.employee_id); return `<article class="rejected-worker-row"><div><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,className?`כיתה קבועה: ${className}`:''].filter(Boolean).join(' · '))}</small><em>${escapeHtml(item.reason||'לא עבר/ה את בדיקות ההתאמה')}</em></div><button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">שיבוץ ידני חריג</button></article>`; }).join('')}</div></details>`;
 }
 function suggestionCandidateCard(candidate, { actionLabel = 'בחירת העובד', shift = false } = {}) {
   const recommendationText = candidate.recommended ? 'מומלץ' : 'אפשרות נוספת';
@@ -954,7 +958,7 @@ function renderShiftEmployeePicker() {
   const form = $("#shiftForm"); const target = $("#shiftEmployeeOptionsList"); if (!form || !target) return;
   const selectedId = form.elements.employee_id.value;
   const query = String(state.shiftPickerQuery || '').trim().toLowerCase();
-  const rows = state.shiftPickerCandidates.filter((candidate) => !query || `${candidate.full_name} ${candidate.job_title}`.toLowerCase().includes(query));
+  const rows = state.shiftPickerCandidates.filter((candidate) => !query || `${candidate.full_name} ${candidate.job_title} ${fixedClassLabel(candidate.employee_id)}`.toLowerCase().includes(query));
   const recommended = rows.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 62);
   const possible = rows.filter((item) => !recommended.includes(item));
   const card = (candidate) => `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''} ${candidate.candidate_type === 'transfer' ? 'is-transfer' : ''} ${candidate.recommended ? 'is-recommended' : 'is-possible'}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small>${candidate.cautions?.length ? `<em>${escapeHtml(candidate.cautions[0])}</em>` : ''}</span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
@@ -971,8 +975,16 @@ function renderShiftEmployeePicker() {
   else pill.classList.add('hidden');
 }
 function handleShiftEmployeePickerClick(event) {
+  const override = event.target.closest('[data-manual-override]');
+  const form=$('#shiftForm');
+  if (override) {
+    form.elements.employee_id.value=override.dataset.manualOverride;
+    form.elements.override_rules.value='true'; form.elements.override_reason.value=override.dataset.overrideReason||'חריגה ידנית';
+    syncShiftRoleFromEmployee(true); syncShiftHoursFromPattern(); renderShiftEmployeePicker(); updateShiftEmployeeHint(); return;
+  }
   const button = event.target.closest('[data-picker-employee]'); if (!button) return;
-  const form = $('#shiftForm'); form.elements.employee_id.value = button.dataset.pickerEmployee;
+  form.elements.employee_id.value = button.dataset.pickerEmployee;
+  form.elements.override_rules.value='false'; form.elements.override_reason.value='';
   if (button.dataset.pickerRole && form.dataset.roleTouched !== 'true') form.elements.shift_role.value = button.dataset.pickerRole;
   renderShiftEmployeePicker(); syncShiftHoursFromPattern(); syncShiftRoleFromEmployee(true); updateShiftEmployeeHint();
 }
@@ -980,7 +992,7 @@ function updateShiftEmployeeHint() {
   const form = $("#shiftForm"); const employeeId = form.elements.employee_id.value;
   const candidate = state.shiftPickerCandidates.find((item) => item.employee_id === employeeId);
   const employee = employeeById(employeeId); const hint = $("#shiftEmployeeHint"); if (!hint) return;
-  hint.textContent = candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,3).join(" · ")}` : employee ? `${employee.job_title} אינו מופיע כרגע כמועמד זמין לשיבוץ הזה.` : "בחרו עובד מתוך הרשימה.";
+  const manual=form.elements.override_rules.value==='true'; hint.textContent = manual ? `חריגה ידנית: ${form.elements.override_reason.value}. השיבוץ יסומן כחריגה ולא ישפיע על המלצות אוטומטיות.` : candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,3).join(" · ")}` : employee ? `${employee.job_title} אינו מופיע כרגע כמועמד רגיל. אפשר לבחור אותו רק דרך “שיבוץ ידני חריג”.` : "בחרו עובד מתוך הרשימה.";
 }
 function renderShiftRecommendations(candidates = []) {
   const target = $("#shiftRecommendations"); const status = $("#shiftRecommendationStatus");
@@ -1062,7 +1074,7 @@ function openShiftDialog(shift = {}) {
   form.dataset.roleTouched = shift.id ? "true" : "false";
   form.elements.shift_role.value = shift.shift_role || suggestedShiftRoleForEmployee(employeeById(initialEmployee));
   form.elements.public_note.value = shift.public_note || "";
-  form.elements.override_day_off.value = "false";
+  form.elements.override_day_off.value = "false"; form.elements.override_rules.value = shift.rule_override ? "true" : "false"; form.elements.override_reason.value = shift.rule_override_note || "";
   $("#shiftRecommendations").innerHTML = '<div class="recommendation-loading"><span></span><span>מחשב התאמות…</span></div>';
   $("#shiftRecommendationStatus").textContent = "מחשב התאמות"; $("#shiftRecommendationStatus").className = "status-chip";
   $("#shiftDialog").showModal(); queueShiftRecommendations();
@@ -1084,10 +1096,12 @@ async function publishPendingChangeNow() {
 }
 
 async function saveShift(event) {
-  event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button[value="default"]'); const data = formObject(form); data.override_day_off = data.override_day_off === 'true'; const wasPublished=isPublishedWeekDate(data.shift_date); const employeeName=employeeById(data.employee_id)?.full_name || 'העובד'; setBusy(button, true);
+  event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button[value="default"]'); const data = formObject(form); data.override_day_off = data.override_day_off === 'true'; data.override_rules=data.override_rules==='true'; const wasPublished=isPublishedWeekDate(data.shift_date); const employeeName=employeeById(data.employee_id)?.full_name || 'העובד'; if(data.override_rules&&!confirm(`זהו שיבוץ ידני חריג עבור ${employeeName}.
+הכלל שנעקף: ${data.override_reason||'כלל שיבוץ'}
+להמשיך ולשמור?`)) return; setBusy(button, true);
   try {
     const candidate = selectedShiftCandidate();
-    if (candidate && candidate.employee_id === data.employee_id) {
+    if (!data.override_rules && candidate && candidate.employee_id === data.employee_id) {
       await apiFetch('/api/shifts', { method:'POST', body:{ action:'apply_suggestion', target_shift_id:data.id || null, candidate_id:data.employee_id, candidate_type:candidate.candidate_type || 'direct', source_shift_id:candidate.source_shift_id || null, shift_date:data.shift_date, class_id:data.class_id, start_time:data.start_time, end_time:data.end_time, shift_role:data.shift_role, public_note:data.public_note } });
     } else {
       try { await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); }
@@ -1132,13 +1146,16 @@ async function publishWeek() {
 function syncAutoScheduleModeCards() {
   $$('.auto-mode-card').forEach((card) => card.classList.toggle('selected', Boolean(card.querySelector('input:checked'))));
 }
+function relativeWeekLabel(offset) { return offset===0?'השבוע הנוכחי':offset===1?'שבוע הבא':offset===-1?'שבוע שעבר':offset>1?`בעוד ${offset} שבועות`:`לפני ${Math.abs(offset)} שבועות`; }
+function populateAutoScheduleWeeks() {
+  const input=$('#autoScheduleWeek'); if(!input)return;
+  const current=startOfWeek(new Date()); const selected=dateISO(startOfWeek(state.weekStart));
+  input.innerHTML=Array.from({length:17},(_,i)=>i-4).map((offset)=>{ const start=addDays(current,offset*7),end=addDays(start,5),value=dateISO(start); return `<option value="${value}" ${value===selected?'selected':''}>${relativeWeekLabel(offset)} · ${formatDate(start,{day:'2-digit',month:'2-digit'})}–${formatDate(end,{day:'2-digit',month:'2-digit'})}</option>`; }).join('');
+  if(!input.value) input.value=selected;
+}
 function autoSelectedWeekStart() {
   const input = $('#autoScheduleWeek');
-  return input?.value ? startOfWeek(parseDateValue(input.value)) : startOfWeek(state.weekStart);
-}
-function normalizeAutoScheduleWeekInput() {
-  const input = $('#autoScheduleWeek'); if (!input?.value) return;
-  input.value = dateISO(startOfWeek(parseDateValue(input.value)));
+  return input?.value ? parseDateValue(input.value) : startOfWeek(state.weekStart);
 }
 function autoPreviewDates(preview = state.autoSchedulePreview) {
   const start = parseDateValue(preview?.weekStart || dateISO(state.weekStart));
@@ -1154,7 +1171,7 @@ function openAutoScheduleDialog() {
   $('#autoSchedulePreview').classList.add('hidden');
   $('#autoSchedulePreview').innerHTML = '';
   const rebuild = $('#autoScheduleDialog input[value="rebuild"]'); if (rebuild) rebuild.checked = true;
-  const weekInput=$('#autoScheduleWeek'); if(weekInput) weekInput.value=dateISO(state.weekStart);
+  populateAutoScheduleWeeks();
   syncAutoScheduleModeCards();
   $('#autoScheduleDialog').showModal();
 }
@@ -1177,7 +1194,7 @@ function renderAutomaticSchedulePreview(preview) {
   const dayCards = dates.map((date) => {
     const iso = dateISO(date); const rows = preview.finalRows.filter((row) => row.shift_date === iso);
     const classBlocks = state.classes.filter((item) => item.active).map((classItem) => {
-      const classRows = rows.filter((row) => row.class_id === classItem.id);
+      const classRows = sortScheduleRows(rows.filter((row) => row.class_id === classItem.id));
       return `<section><header><strong>${escapeHtml(classItem.name)}</strong><span>${classRows.length} עובדים</span></header>${classRows.length ? classRows.map((row)=>autoPreviewShiftHtml(row,preview)).join('') : '<div class="auto-empty-class">אין שיבוץ</div>'}</section>`;
     }).join('');
     const dayErrors = errors.filter((item) => item.date === iso).length;
@@ -1191,7 +1208,7 @@ function renderAutomaticSchedulePreview(preview) {
 }
 async function calculateAutomaticSchedule() {
   const button = $('#calculateAutoScheduleBtn'); const mode = $('#autoScheduleDialog input[name="auto_schedule_mode"]:checked')?.value || 'rebuild';
-  const weekStart=autoSelectedWeekStart(); const weekInput=$('#autoScheduleWeek'); if(weekInput)weekInput.value=dateISO(weekStart);
+  const weekStart=autoSelectedWeekStart();
   state.autoScheduleIssueDecisions=new Map();
   setBusy(button,true,'מחשב שיבוץ…');
   try { const result=await apiFetch('/api/shifts',{method:'POST',body:{action:'auto_preview',week_start:dateISO(weekStart),mode},timeout:25000}); renderAutomaticSchedulePreview(result.preview); }
@@ -1283,8 +1300,8 @@ function drawCanvasText(ctx, text, x, y, maxWidth, { font = '700 18px Arial', co
 }
 function isolateCanvasLtr(value) { return `\u2066${String(value || '')}\u2069`; }
 function exportRolePalette(role) {
-  if (role === 'teacher') return { fill: '#eef1ff', border: '#cfd5ff', accent: '#565ec0' };
-  if (role === 'lead') return { fill: '#eefaf6', border: '#c9e8da', accent: '#2f8066' };
+  if (role === 'teacher') return { fill: '#e8f6ef', border: '#b9dfca', accent: '#267454' };
+  if (role === 'lead') return { fill: '#f1ecfa', border: '#d7c8ee', accent: '#6b4aa0' };
   if (role === 'replacement') return { fill: '#fff7e8', border: '#efd9aa', accent: '#9a6a13' };
   return { fill: '#f7f8fb', border: '#e2e4ec', accent: '#61677c' };
 }
@@ -1344,8 +1361,7 @@ function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStar
 
     dates.forEach((date, index) => {
       const iso = dateISO(date);
-      const items = shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id)
-        .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)) || (employeeById(a.employee_id)?.full_name || '').localeCompare(employeeById(b.employee_id)?.full_name || '', 'he'));
+      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id));
       const cellRight = width - margin - classColumnWidth - index * dayWidth;
       const cellLeft = cellRight - dayWidth;
       ctx.strokeStyle = '#e4e6ef'; ctx.beginPath(); ctx.moveTo(cellLeft, y); ctx.lineTo(cellLeft, y + rowHeight); ctx.stroke();
@@ -1551,21 +1567,19 @@ function syncWeeklyPatternRow(row) {
   row.classList.toggle('is-work', type === 'work');
   row.classList.toggle('is-day-off', type === 'day_off');
   row.classList.toggle('is-as-needed', type === 'as_needed');
-  row.classList.toggle('is-avoid', type === 'avoid');
-  $$('.weekly-time', row).forEach((field) => { field.classList.toggle('hidden', !['work','as_needed','avoid'].includes(type)); field.querySelector('input').required = type === 'work'; });
-  const note=$('.weekly-day-off-note',row); if(note) note.textContent=type==='as_needed'?'זמין/ה רק לפי צורך':type==='avoid'?'אפשרי, אך עדיף להימנע משיבוץ ביום זה':type==='day_off'?'יום חופשי קבוע':'';
+  $$('.weekly-time', row).forEach((field) => { field.classList.toggle('hidden', type !== 'work'); field.querySelector('input').required = type === 'work'; });
+  const note=$('.weekly-day-off-note',row); if(note) note.textContent=type==='as_needed'?'רק אם באמת חסר כוח אדם · עדיפות נמוכה':type==='day_off'?'אסור לשיבוץ אוטומטי':'שעות עבודה קבועות';
 }
 function renderWeeklyPatternFields(employee = {}) {
   const patterns = employee.weekly_patterns || [];
-  const substitute = (employee.assignment_mode || $('#employeeForm [name="assignment_mode"]')?.value) === 'substitute';
   $('#weeklyPatternFields').innerHTML = Array.from({ length: 6 }, (_, weekday) => {
     const pattern = patterns.find((row) => Number(row.weekday) === weekday);
-    const type = pattern?.day_type || '';
+    const type = ['work','day_off','as_needed'].includes(pattern?.day_type) ? pattern.day_type : (pattern?.day_type === 'avoid' ? 'as_needed' : 'day_off');
     const start = trimTime(pattern?.start_time) || trimTime(employee.default_start) || '07:30';
     const fallbackEnd=weekday===5?'12:00':trimTime(employee.default_end)||'15:30';
     let end = trimTime(pattern?.end_time) || fallbackEnd;
     if (weekday===5 && timeToMinutes(end)>720) end='12:00';
-    return `<article class="weekly-pattern-row" data-weekday="${weekday}"><div class="weekly-pattern-head"><strong>${DAY_NAMES[weekday]}</strong><select class="weekly-day-type" aria-label="הגדרת יום ${DAY_NAMES[weekday]}"><option value="" ${!type ? 'selected' : ''}>לא קבוע</option><option value="work" ${type === 'work' ? 'selected' : ''}>יום עבודה</option><option value="day_off" ${type === 'day_off' ? 'selected' : ''}>יום חופשי</option>${substitute?`<option value="as_needed" ${type==='as_needed'?'selected':''}>לפי צורך</option><option value="avoid" ${type==='avoid'?'selected':''}>עדיף להימנע</option>`:''}</select></div><label class="weekly-time">התחלה<input class="weekly-start" type="time" value="${start}"/></label><label class="weekly-time">סיום<input class="weekly-end" type="time" value="${end}" ${weekday===5?'max="12:00"':''}/></label><span class="weekly-day-off-note">${type==='as_needed'?'זמין/ה רק אם נדרש':type==='avoid'?'אפשרי, אך עדיף להימנע':'יום חופשי קבוע'}</span></article>`;
+    return `<article class="weekly-pattern-row" data-weekday="${weekday}"><div class="weekly-pattern-head"><strong>${DAY_NAMES[weekday]}</strong><select class="weekly-day-type" aria-label="הגדרת יום ${DAY_NAMES[weekday]}"><option value="work" ${type==='work'?'selected':''}>יום עבודה (קבוע)</option><option value="day_off" ${type==='day_off'?'selected':''}>יום חופשי (אסור לשבץ)</option><option value="as_needed" ${type==='as_needed'?'selected':''}>לפי צורך (עדיפות נמוכה)</option></select></div><label class="weekly-time">התחלה<input class="weekly-start" type="time" value="${start}"/></label><label class="weekly-time">סיום<input class="weekly-end" type="time" value="${end}" ${weekday===5?'max="12:00"':''}/></label><span class="weekly-day-off-note"></span></article>`;
   }).join('');
   $$('.weekly-pattern-row').forEach((row) => { syncWeeklyPatternRow(row); $('.weekly-day-type', row).addEventListener('change', () => syncWeeklyPatternRow(row)); });
 }
@@ -1688,7 +1702,15 @@ function feedbackCardHtml(item,{manager=false}={}) {
 function renderFeedback() {
   const manager=state.feedbackCanManage;
   $('#feedbackManagement')?.classList.toggle('hidden',!manager);
-  if(manager) $('#feedbackList').innerHTML=state.feedback.length?state.feedback.map((item)=>feedbackCardHtml(item,{manager:true})).join(''):'<div class="empty-state compact">עדיין לא התקבלו משובים.</div>';
+  if(manager) {
+    $$('#feedbackStatusChips [data-feedback-status]').forEach((button)=>button.classList.toggle('active',button.dataset.feedbackStatus===state.feedbackStatusFilter));
+    const query=String(state.feedbackSearch||'').trim().toLowerCase();
+    const rank={open:0,replied:1,closed:2};
+    const rows=[...state.feedback].filter((item)=>(state.feedbackStatusFilter==='all'||(state.feedbackStatusFilter==='open'?(item.status==='open'):item.status===state.feedbackStatusFilter))&&(!query||`${item.employee_name||''} ${item.topic||''} ${item.content||''} ${item.response_text||''}`.toLowerCase().includes(query))).sort((a,b)=>(rank[a.status]??9)-(rank[b.status]??9)||new Date(b.created_at)-new Date(a.created_at));
+    const counts={open:state.feedback.filter((i)=>i.status==='open').length,replied:state.feedback.filter((i)=>i.status==='replied').length,closed:state.feedback.filter((i)=>i.status==='closed').length};
+    $('#feedbackManagerSummary').innerHTML=`<span><strong>${counts.open}</strong> לטיפול</span><span><strong>${counts.replied}</strong> נענו</span><span><strong>${counts.closed}</strong> סגורים</span><span><strong>${rows.length}</strong> מוצגים</span>`;
+    $('#feedbackList').innerHTML=rows.length?rows.map((item)=>feedbackCardHtml(item,{manager:true})).join(''):'<div class="empty-state compact">אין משובים בסינון הזה.</div>';
+  }
   const mine=state.feedback.filter((item)=>item.employee_id===state.profile?.id);
   $('#myFeedbackList').innerHTML=mine.length?mine.map((item)=>feedbackCardHtml(item)).join(''):'<div class="empty-state compact">עדיין לא שלחת משוב.</div>';
   $('#myFeedback')?.classList.toggle('hidden',manager && !mine.length);

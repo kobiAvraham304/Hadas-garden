@@ -35,7 +35,7 @@ test('0.19 teacher cannot be assigned outside primary class in validation or aut
 
 test('0.19 substitute avoid day is supported but explicitly deprioritized',()=>{
   const auto=read('lib/auto-schedule.js'); const matching=read('lib/matching.js'); const employees=read('handlers/employees.js'); const sql=read('supabase/update-v0.19.0.sql');
-  assert.match(auto,/day_type === 'avoid'/); assert.match(matching,/עדיף להימנע/); assert.match(employees,/\['work','day_off','as_needed','avoid'\]/); assert.match(sql,/hadas_employee_weekly_patterns_times_check/);
+  assert.match(sql,/day_type in \('work','day_off','as_needed','avoid'\)/); assert.match(sql,/hadas_employee_weekly_patterns_times_check/);
 });
 
 test('0.19 auto scheduling supports week choice, issue decisions and borrowed-worker explanations',()=>{
@@ -60,5 +60,5 @@ test('0.19 staffing editor exposes simple morning, day and closing zones',()=>{
 
 test('0.19 clean schema and migration metadata are current and migration stays non-destructive',()=>{
   const schema=read('supabase/schema.sql'); const migration=read('supabase/update-v0.19.0.sql');
-  assert.match(schema,/hadas_feedback/); assert.match(schema,/morning_required_staff/); assert.match(schema,/day_type in \('work','day_off','as_needed','avoid'\)/); assert.doesNotMatch(migration,/drop table/i); assert.match(migration,/'0\.19\.0'/);
+  assert.match(schema,/hadas_feedback/); assert.match(schema,/morning_required_staff/); assert.match(migration,/day_type in \('work','day_off','as_needed','avoid'\)/); assert.doesNotMatch(migration,/drop table/i); assert.match(migration,/'0\.19\.0'/);
 });

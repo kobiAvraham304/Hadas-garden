@@ -77,40 +77,32 @@ function employeePayload(body) {
 
 function normalizeWeeklyPatterns(patterns, assignmentMode) {
   if (!Array.isArray(patterns)) return null;
+  if (assignmentMode === 'no_schedule') return [];
   const rows = [];
   const seen = new Set();
   for (const item of patterns) {
     const weekday = Number(item.weekday);
     const dayType = String(item.day_type || '');
-    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) throw httpError(400,'יום בשבוע אינו תקין');
+    if (!Number.isInteger(weekday) || weekday < 0 || weekday > 5) throw httpError(400,'יום בשבוע אינו תקין');
     if (seen.has(weekday)) throw httpError(400,'יום בשבוע הוגדר יותר מפעם אחת');
     seen.add(weekday);
-    if (!dayType) continue;
-    if (!['work','day_off','as_needed','avoid'].includes(dayType)) throw httpError(400,'סוג היום הקבוע אינו תקין');
-    if (dayType === 'as_needed') {
-      if (assignmentMode !== 'substitute') throw httpError(400,'האפשרות "לפי צורך" זמינה רק למשלימת מקום');
-      rows.push({ weekday, day_type:dayType, start_time:null, end_time:null });
-      continue;
-    }
-    if (dayType === 'avoid' && assignmentMode !== 'substitute') throw httpError(400,'האפשרות "עדיף להימנע" זמינה רק למשלימת מקום');
-    if (dayType === 'day_off') {
-      rows.push({ weekday, day_type:'day_off', start_time:null, end_time:null });
-      continue;
-    }
-    const start = String(item.start_time || '').slice(0,5);
-    const end = String(item.end_time || '').slice(0,5);
+    if (!['work','day_off','as_needed'].includes(dayType)) throw httpError(400,'יש לבחור לכל יום: יום עבודה, יום חופשי או לפי צורך');
+    if (dayType === 'day_off' || dayType === 'as_needed') { rows.push({ weekday, day_type:dayType, start_time:null, end_time:null }); continue; }
+    const start = String(item.start_time || '').slice(0,5); const end = String(item.end_time || '').slice(0,5);
     if (!start || !end || timeToMinutes(end) <= timeToMinutes(start)) throw httpError(400,'יש להזין שעות תקינות לכל יום עבודה קבוע');
     if (weekday === 5 && timeToMinutes(end) > timeToMinutes('12:00')) throw httpError(400,'ביום שישי ניתן להגדיר עבודה עד 12:00');
-    rows.push({ weekday, day_type:dayType === 'avoid' ? 'avoid' : 'work', start_time:start, end_time:end });
+    rows.push({ weekday, day_type:'work', start_time:start, end_time:end });
   }
+  if (seen.size !== 6 || [0,1,2,3,4,5].some((day)=>!seen.has(day))) throw httpError(400,'יש להגדיר כלל לכל אחד מימי ראשון–שישי');
   return rows;
 }
 
 async function replaceWeeklyPatterns(employeeId, patterns, assignmentMode) {
   const rows = normalizeWeeklyPatterns(patterns, assignmentMode);
-  if (rows === null) return;
+  if (rows === null) return null;
   assertDb(await db().from('hadas_employee_weekly_patterns').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן את ימי העבודה הקבועים');
   if (rows.length) assertDb(await db().from('hadas_employee_weekly_patterns').insert(rows.map((row) => ({ ...row, employee_id:employeeId }))), 'לא ניתן לשמור את ימי העבודה הקבועים');
+  return rows.map((row)=>({ ...row, employee_id:employeeId }));
 }
 
 async function replaceConstraints(employeeId, constraints, actorId) {
@@ -136,6 +128,7 @@ async function replaceConstraints(employeeId, constraints, actorId) {
   }
   assertDb(await db().from('hadas_employee_class_constraints').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן אילוצים');
   if (rows.length) assertDb(await db().from('hadas_employee_class_constraints').insert(rows), 'לא ניתן לשמור אילוצים');
+  return rows;
 }
 
 async function upsertPrivate(employeeId, notes) {
@@ -215,10 +208,12 @@ module.exports = async function handler(req,res) {
     if (req.method === 'PATCH') {
       const employeeId = String(body.id || '');
       if (!employeeId) throw httpError(400,'חסר מזהה עובד');
-      const employee = assertDb(await db().from('hadas_employees').select('*').eq('id',employeeId).maybeSingle(), 'העובד לא נמצא');
-      if (!employee) throw httpError(404,'העובד לא נמצא');
-      const user = assertDb(await db().from('hadas_users').select('*').eq('employee_id',employeeId).maybeSingle(), 'המשתמש לא נמצא');
-      if (!user) throw httpError(404,'לא נמצא משתמש לכרטיס העובד');
+      const [employeeR,userR] = await Promise.all([
+        db().from('hadas_employees').select('*').eq('id',employeeId).maybeSingle(),
+        db().from('hadas_users').select('*').eq('employee_id',employeeId).maybeSingle(),
+      ]);
+      const employee=assertDb(employeeR,'העובד לא נמצא'); if(!employee) throw httpError(404,'העובד לא נמצא');
+      const user=assertDb(userR,'המשתמש לא נמצא'); if(!user) throw httpError(404,'לא נמצא משתמש לכרטיס העובד');
 
       const nextRole = body.role !== undefined ? body.role : user.role;
       const nextActive = body.active !== undefined ? Boolean(body.active) : user.active;
@@ -246,18 +241,17 @@ module.exports = async function handler(req,res) {
         userUpdate.password_changed_at = null;
       }
 
-      await Promise.all([
+      const [, , savedPatterns, savedConstraints] = await Promise.all([
         Object.keys(employeeUpdate).length ? db().from('hadas_employees').update(employeeUpdate).eq('id',employeeId).then((r)=>assertDb(r,'לא ניתן לעדכן עובד')) : Promise.resolve(),
         Object.keys(userUpdate).length ? db().from('hadas_users').update(userUpdate).eq('id',user.id).then((r)=>assertDb(r,'לא ניתן לעדכן הרשאה')) : Promise.resolve(),
-        Array.isArray(body.weekly_patterns) ? replaceWeeklyPatterns(employeeId,body.weekly_patterns,employeeUpdate.assignment_mode || employee.assignment_mode) : Promise.resolve(),
-        Array.isArray(body.constraints) ? replaceConstraints(employeeId,body.constraints,caller.employee.id) : Promise.resolve(),
+        Array.isArray(body.weekly_patterns) ? replaceWeeklyPatterns(employeeId,body.weekly_patterns,employeeUpdate.assignment_mode || employee.assignment_mode) : Promise.resolve(null),
+        Array.isArray(body.constraints) ? replaceConstraints(employeeId,body.constraints,caller.employee.id) : Promise.resolve(null),
         upsertPrivate(employeeId,body.admin_notes),
       ]);
       if (body.reset_password || body.active === false) await revokeUserSessions(user.id);
-      await audit(caller.employee.id,'update','employee',employeeId,{ fields:Object.keys(body) });
-      await emitEvent('employees');
-      const result = await employeeResult(employeeId);
-      return send(res,200,{ ok:true,...result });
+      await Promise.all([audit(caller.employee.id,'update','employee',employeeId,{ fields:Object.keys(body) }),emitEvent('employees')]);
+      const mergedEmployee={ ...employee, ...employeeUpdate, id:employeeId, phone:displayPhone(userUpdate.phone || user.phone || employeeUpdate.contact_phone || employee.contact_phone), role:userUpdate.role || user.role, user_active:userUpdate.active ?? user.active, must_change_password:userUpdate.must_change_password ?? user.must_change_password, last_login_at:user.last_login_at || null, admin_notes:body.admin_notes === undefined ? '' : String(body.admin_notes || ''), weekly_patterns:savedPatterns || body.weekly_patterns || [] };
+      return send(res,200,{ ok:true,employee:mergedEmployee,constraints:savedConstraints || body.constraints || [] });
     }
 
     if (req.method === 'DELETE') {

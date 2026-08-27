@@ -244,7 +244,7 @@
   <dialog id="shiftDialog" class="modal">
     <form id="shiftForm" method="dialog" class="modal-card">
       <div class="modal-heading"><div><p class="eyebrow">שיבוץ צוות</p><h3>הוספה או עריכה</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <input type="hidden" name="id" /><input type="hidden" name="override_day_off" value="false" />
+      <input type="hidden" name="id" /><input type="hidden" name="override_day_off" value="false" /><input type="hidden" name="override_rules" value="false" /><input type="hidden" name="override_reason" value="" />
       <div class="form-grid">
         <label>תאריך<input name="shift_date" type="date" required /></label>
         <label>כיתה<select name="class_id" required></select></label>
@@ -256,11 +256,11 @@
           <div id="shiftRecommendations" class="shift-recommendations"><div class="empty-state compact">בחרו תאריך, כיתה ושעות כדי לקבל המלצות.</div></div>
         </section>
         <section class="full-field shift-employee-picker" aria-labelledby="shiftEmployeePickerTitle">
-          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד</strong><small>מומלצים, עובדים פנויים והעברות בטוחות בין כיתות</small></div><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div>
+          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד</strong><small>כל הצוות מוצג: מומלצים תחילה, ובהמשך מי שנחסם עם הסיבה ואפשרות לחריגה ידנית</small></div><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div>
           <input name="employee_id" type="hidden" required />
           <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש לפי שם או תפקיד" autocomplete="off" /></label>
           <div id="shiftEmployeeOptionsList" class="shift-employee-options" role="listbox" aria-label="עובדים זמינים"></div>
-          <small id="shiftEmployeeHint">מוצגים רק עובדים שעברו בדיקות זמינות ותקינה. העברה מכיתה אחרת תוצע רק אם כיתת המקור נשארת תקינה.</small>
+          <small id="shiftEmployeeHint">בחירה רגילה מכבדת את כל הכללים. מנהלת יכולה לבחור במפורש “שיבוץ ידני חריג” לעובד שנחסם, והחריגה תישמר ותסומן.</small>
         </section>
         <label class="full-field">הערה גלויה<input name="public_note" placeholder="לדוגמה: עד 12:30 או ישיבה מקצועית" /></label>
       </div>
@@ -274,7 +274,7 @@
       <div class="modal-heading"><div><p class="eyebrow">בניית שבוע חכמה</p><h3>שיבוץ אוטומטי</h3><p class="muted">המערכת בודקת ימי עבודה, שעות, חופשות שאושרו, כיתה קבועה, רוטציה, אילוצים, תפקיד, תקינה ומקסימום שעות שבועיות.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
       <section id="autoScheduleSetup" class="auto-schedule-setup">
         <div class="auto-explanation"><span>✦</span><div><strong>לפני שנוגעים בשיבוץ</strong><p>תחילה נוצרת תצוגה מקדימה בלבד. שום שינוי לא יישמר עד לאישור מפורש.</p></div></div>
-        <label class="auto-week-picker"><span>שבוע לשיבוץ</span><input id="autoScheduleWeek" name="auto_schedule_week" type="date" /><small>אפשר לבחור כל יום בשבוע — המערכת תעבוד על השבוע שמתחיל ביום ראשון.</small></label>
+        <label class="auto-week-picker"><span>שבוע לשיבוץ</span><select id="autoScheduleWeek" name="auto_schedule_week"></select><small>בוחרים שבוע שלם באופן ישיר — בלי לבחור יום אקראי בתוך השבוע.</small></label>
         <div class="auto-mode-grid" role="radiogroup" aria-label="אופן יצירת השיבוץ">
           <label class="auto-mode-card selected"><input type="radio" name="auto_schedule_mode" value="rebuild" checked /><span>↻</span><strong>בנייה מחדש</strong><small>מחשב את כל השבוע מחדש ומחליף את הטיוטה הקיימת.</small></label>
           <label class="auto-mode-card"><input type="radio" name="auto_schedule_mode" value="fill" /><span>＋</span><strong>מילוי חוסרים</strong><small>שומר את השיבוצים הקיימים ומוסיף רק מה שחסר.</small></label>
@@ -334,7 +334,7 @@
         <label><span class="field-title">שעת התחלה רגילה</span><input name="default_start" type="time" value="07:30" /></label>
         <label><span class="field-title">שעת סיום רגילה</span><input name="default_end" type="time" value="15:30" /></label>
       </div></section>
-      <details id="employeeScheduleSection" class="employee-form-details" open><summary><span class="section-number">4</span><span><strong>ימי עבודה ושעות</strong><small>אפשר לקבוע לכל יום שעות שונות או יום חופשי.</small></span><i>⌄</i></summary><fieldset class="weekly-patterns-box"><legend class="sr-only">ימי עבודה וחופשה קבועים</legend><p class="field-help">לכל יום אפשר לבחור יום עבודה עם שעות משלו, יום חופשי קבוע, או להשאיר ללא קביעה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset></details>
+      <details id="employeeScheduleSection" class="employee-form-details" open><summary><span class="section-number">4</span><span><strong>ימי עבודה ושעות</strong><small>לכל יום יש כלל חד-משמעי שהשיבוץ האוטומטי חייב לכבד.</small></span><i>⌄</i></summary><fieldset class="weekly-patterns-box"><legend class="sr-only">ימי עבודה וחופשה קבועים</legend><p class="field-help"><strong>יום עבודה (קבוע)</strong> — משבצים לפי השעות; <strong>יום חופשי</strong> — אסור לשיבוץ אוטומטי; <strong>לפי צורך</strong> — רק אם חסר כוח אדם ובעדיפות נמוכה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset></details>
       <details id="employeeConstraintsSection" class="employee-form-details"><summary><span class="section-number">5</span><span><strong>העדפות והגבלות כיתה</strong><small>מגדירים רק כאשר קיימת העדפה או מגבלה.</small></span><i>⌄</i></summary><fieldset class="constraints-box"><legend class="sr-only">העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset></details>
       <details id="employeeNotesSection" class="employee-form-details"><summary><span class="section-number">6</span><span><strong>הערה ניהולית</strong><small>מידע פרטי שרק לינור ואילנית רואות.</small></span><i>⌄</i></summary><label class="full-field employee-admin-note"><span class="field-title">הערה ניהולית</span><textarea name="admin_notes" rows="3" placeholder="מידע פרטי ורלוונטי לניהול השיבוץ"></textarea></label></details>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת העובד</button></div>
@@ -432,7 +432,7 @@
         <label class="full-field"><span class="field-title">מה תרצו לספר לנו?</span><textarea name="content" rows="5" minlength="3" maxlength="4000" placeholder="תארו בקצרה מה קרה, מה היה נוח פחות או מה הייתם רוצים לשפר" required></textarea></label>
         <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" type="submit">שליחת משוב</button></div>
       </form>
-      <section id="feedbackManagement" class="feedback-management hidden"><div class="feedback-management-head"><div><strong>משובים שהתקבלו</strong><small>רק לינור רואה את כל המשובים ויכולה להגיב.</small></div><button id="feedbackRefreshBtn" type="button" class="ghost-btn">רענון</button></div><div id="feedbackList" class="feedback-list"></div></section>
+      <section id="feedbackManagement" class="feedback-management hidden"><div class="feedback-management-head"><div><strong>ניהול משובים</strong><small>פתוחים בראש הרשימה, עם חיפוש וסינון מהיר.</small></div><button id="feedbackRefreshBtn" type="button" class="ghost-btn">רענון</button></div><div class="feedback-manager-toolbar"><label class="feedback-search"><span>⌕</span><input id="feedbackSearch" type="search" placeholder="חיפוש עובד, נושא או טקסט" autocomplete="off" /></label><div id="feedbackStatusChips" class="filter-chips compact-chips"><button type="button" class="filter-chip active" data-feedback-status="open">לטיפול</button><button type="button" class="filter-chip" data-feedback-status="replied">נענו</button><button type="button" class="filter-chip" data-feedback-status="closed">סגורים</button><button type="button" class="filter-chip" data-feedback-status="all">הכול</button></div></div><div id="feedbackManagerSummary" class="feedback-manager-summary"></div><div id="feedbackList" class="feedback-list manager-list"></div></section>
       <section id="myFeedback" class="my-feedback"><header><strong>המשובים שלי</strong></header><div id="myFeedbackList" class="feedback-list compact"></div></section>
     </div>
   </dialog>
