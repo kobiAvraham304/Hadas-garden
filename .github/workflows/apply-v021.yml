@@ -41,10 +41,27 @@ jobs:
                   out.append(combined)
               else:
                   out.append(line); i+=1
-          p.write_text('\n'.join(out)+'\n',encoding='utf-8')
+          text='\n'.join(out)+'\n'
+          bad="""# Sort PDF cell items by role before drawing.
+replace_once('app.js',
+'''      const items = shifts.filter((shift) => shift.shift_date === dateISO(date) && shift.class_id === classItem.id);''',
+'''      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === dateISO(date) && shift.class_id === classItem.id));''')
+"""
+          if bad not in text: raise SystemExit('PDF patch helper block not found')
+          text=text.replace(bad,"# PDF role sorting is applied after the guarded patch.\n",1)
+          p.write_text(text,encoding='utf-8')
           PY
           python3 -m py_compile scripts/apply-v021-scheduling.py
           python3 scripts/apply-v021-scheduling.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app.js'); s=p.read_text(encoding='utf-8')
+          old="""      const items = shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id)
+        .sort((a, b) => String(a.start_time).localeCompare(String(b.start_time)) || (employeeById(a.employee_id)?.full_name || '').localeCompare(employeeById(b.employee_id)?.full_name || '', 'he'));"""
+          new="""      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id));"""
+          if s.count(old)!=1: raise SystemExit(f'PDF actual sort guard failed: {s.count(old)}')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
       - name: Full QA
         run: |
           npm test
