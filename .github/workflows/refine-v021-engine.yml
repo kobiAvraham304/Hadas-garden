@@ -36,11 +36,11 @@ jobs:
           if root_old not in text:
               raise SystemExit('refinement ROOT guard failed')
           text=text.replace(root_old,"ROOT=Path.cwd()",1)
-          guard_old="      weeklyPatterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה') || [],\\n      weekStart,\\n    }),"
-          guard_new="      weeklyPatterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [],\\n      weekStart,\\n    }),"
-          if guard_old not in text:
-              raise SystemExit('refinement shifts guard patch failed')
-          text=text.replace(guard_old,guard_new,1)
+          phrase_old="לא ניתן לטעון ימי עבודה') || []"
+          phrase_new="לא ניתן לטעון ימי עבודה קבועים') || []"
+          if phrase_old not in text:
+              raise SystemExit('refinement shifts guard phrase not found')
+          text=text.replace(phrase_old,phrase_new,1)
           p.write_text(text,encoding='utf-8')
           PY
           python3 /tmp/refine-v021-engine.py
