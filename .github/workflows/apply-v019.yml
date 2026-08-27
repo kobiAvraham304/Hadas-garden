@@ -1,4 +1,3 @@
-# v0.19.0 fast validated recovery workflow
 name: Apply v0.19.0 production package
 
 on:
@@ -40,28 +39,27 @@ jobs:
 
           parts = [p.read_text(encoding='utf-8').strip() for p in paths]
           alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-          sample_chars = 'AQgw0+/'
           joined = ''.join(parts)
 
-          def decoded(candidate: str):
+          def decode(candidate: str):
               padded = candidate + ('=' * ((4 - len(candidate) % 4) % 4))
               try:
                   return base64.b64decode(padded, validate=True)
               except Exception:
                   return None
 
-          def inspect(candidate: str):
-              packed = decoded(candidate)
+          def progress(candidate: str, step=8):
+              packed = decode(candidate)
               if packed is None:
                   return (-1, -1, False, None)
               dec = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
               produced = 0
               consumed = 0
-              step = 256
               try:
                   for i in range(0, len(packed), step):
                       block = packed[i:i + step]
-                      produced += len(dec.decompress(block))
+                      out = dec.decompress(block)
+                      produced += len(out)
                       consumed = i + len(block)
                       if dec.eof:
                           patch = lzma.decompress(packed, format=lzma.FORMAT_XZ)
@@ -71,17 +69,28 @@ jobs:
                   pass
               return (produced, consumed, False, None)
 
-          def push_top(heap, limit, score, pos, ch, candidate):
-              item = (score[0], score[1], pos, ch, candidate)
-              if len(heap) < limit:
-                  heapq.heappush(heap, item)
-              elif item[:2] > heap[0][:2]:
-                  heapq.heapreplace(heap, item)
+          def rank_insertions(source: str, center: int, radius: int, min_pos: int, max_pos: int, limit=8):
+              heap = []
+              lo = max(min_pos, center - radius)
+              hi = min(max_pos, center + radius)
+              print('search window:', (lo, hi), 'center=', center, flush=True)
+              for pos in range(lo, hi + 1):
+                  for ch in alphabet:
+                      candidate = source[:pos] + ch + source[pos:]
+                      score = progress(candidate, step=16)
+                      item = (score[0], score[1], pos, ch, candidate, score[2], score[3])
+                      if len(heap) < limit:
+                          heapq.heappush(heap, item)
+                      elif item[:2] > heap[0][:2]:
+                          heapq.heapreplace(heap, item)
+              heap.sort(reverse=True)
+              print('top:', [(x[0], x[1], x[2], x[3], x[5]) for x in heap], flush=True)
+              return heap
 
-          base = inspect(joined)
-          patch = base[3] if base[2] else None
-
-          if patch is None:
+          base = progress(joined, step=8)
+          if base[2]:
+              patch = base[3]
+          else:
               max_chunk = max(len(p) for p in parts[:-1])
               short_middle = [i for i, p in enumerate(parts[:-1]) if len(p) == max_chunk - 1]
               if len(short_middle) != 1 or len(joined) % 4 != 2:
@@ -96,75 +105,51 @@ jobs:
               mid_start = starts[mid]
               mid_end = mid_start + len(parts[mid])
 
-              first_center = max(mid_start, min(mid_end, int(base[1] * 4 / 3)))
-              coarse_lo = max(mid_start, first_center - 1700)
-              coarse_hi = min(mid_end, first_center + 1700)
-              print('base progress:', base[:2], 'first coarse:', (coarse_lo, coarse_hi), flush=True)
-
-              coarse = []
-              for pos in range(coarse_lo, coarse_hi + 1, 12):
-                  for ch in sample_chars:
-                      candidate = joined[:pos] + ch + joined[pos:]
-                      push_top(coarse, 20, inspect(candidate), pos, ch, candidate)
-              coarse.sort(reverse=True)
-              print('first coarse top:', [(x[0], x[1], x[2], x[3]) for x in coarse[:10]], flush=True)
-
-              refine_positions = set()
-              for _, _, pos, _, _ in coarse[:12]:
-                  refine_positions.update(range(max(mid_start, pos - 40), min(mid_end, pos + 40) + 1))
-
-              first_top = []
-              for pos in sorted(refine_positions):
-                  for ch in alphabet:
-                      candidate = joined[:pos] + ch + joined[pos:]
-                      push_top(first_top, 16, inspect(candidate), pos, ch, candidate)
-              first_top.sort(reverse=True)
-              print('first refined top:', [(x[0], x[1], x[2], x[3]) for x in first_top], flush=True)
+              # A missing Base64 char corrupts the decoded XZ stream from roughly
+              # 3/4 of its character position onward. The 8-byte XZ probe narrows
+              # the insertion location to a very small character window.
+              first_center = int(base[1] * 4 / 3)
+              first_center = max(mid_start, min(mid_end, first_center))
+              print('base progress:', base[:2], 'first center:', first_center, flush=True)
+              first_top = rank_insertions(joined, first_center, 40, mid_start, mid_end, limit=8)
 
               found = None
-              for first_score, first_consumed, first_pos, first_ch, first_candidate in first_top:
-                  second_center = max(first_pos + 1, int(first_consumed * 4 / 3))
-                  second_coarse_lo = max(first_pos + 1, second_center - 1900)
-                  second_coarse_hi = min(len(first_candidate), second_center + 1900)
-                  print('second coarse:', (first_pos, first_ch, first_score, first_consumed), (second_coarse_lo, second_coarse_hi), flush=True)
-
-                  second_coarse = []
-                  for pos in range(second_coarse_lo, second_coarse_hi + 1, 12):
-                      for ch in sample_chars:
-                          candidate = first_candidate[:pos] + ch + first_candidate[pos:]
-                          score = inspect(candidate)
-                          if score[2]:
-                              found = (first_pos, first_ch, pos, ch, score[3])
-                              break
-                          push_top(second_coarse, 16, score, pos, ch, candidate)
-                      if found:
-                          break
-                  if found:
+              for first_score, first_consumed, first_pos, first_ch, first_candidate, first_valid, first_patch in first_top:
+                  if first_valid:
+                      found = (first_pos, first_ch, None, None, first_patch)
                       break
 
-                  second_coarse.sort(reverse=True)
-                  print('second coarse top:', [(x[0], x[1], x[2], x[3]) for x in second_coarse[:8]], flush=True)
-                  second_refine_positions = set()
-                  for _, _, pos, _, _ in second_coarse[:10]:
-                      second_refine_positions.update(range(max(first_pos + 1, pos - 40), min(len(first_candidate), pos + 40) + 1))
-
-                  for pos in sorted(second_refine_positions):
-                      for ch in alphabet:
-                          candidate = first_candidate[:pos] + ch + first_candidate[pos:]
-                          score = inspect(candidate)
-                          if score[2]:
-                              found = (first_pos, first_ch, pos, ch, score[3])
-                              break
-                      if found:
+                  # With the first deletion repaired correctly, XZ advances until
+                  # the second missing Base64 character. Probe again at 8-byte
+                  # resolution and search only the corresponding small window.
+                  precise = progress(first_candidate, step=8)
+                  second_center = int(precise[1] * 4 / 3)
+                  second_center = max(first_pos + 1, min(len(first_candidate), second_center))
+                  print('first candidate:', (first_pos, first_ch, precise[:2]), 'second center:', second_center, flush=True)
+                  second_top = rank_insertions(
+                      first_candidate,
+                      second_center,
+                      48,
+                      first_pos + 1,
+                      len(first_candidate),
+                      limit=8,
+                  )
+                  for _, _, second_pos, second_ch, second_candidate, second_valid, second_patch in second_top:
+                      if second_valid:
+                          found = (first_pos, first_ch, second_pos, second_ch, second_patch)
                           break
                   if found:
                       break
 
               if found is None:
-                  raise SystemExit('fast recovery did not find a fully valid Base64/XZ patch')
+                  raise SystemExit('targeted XZ recovery did not find a fully valid payload')
 
               first_pos, first_ch, second_pos, second_ch, patch = found
-              print(f'recovered v0.19.0 payload: first=({first_pos},{first_ch!r}) second=({second_pos},{second_ch!r})', flush=True)
+              print(
+                  f'recovered v0.19.0 payload: first=({first_pos},{first_ch!r}) '
+                  f'second=({second_pos},{second_ch!r})',
+                  flush=True,
+              )
 
           Path('/tmp/v019.patch').write_bytes(patch)
           print(f'validated v0.19.0 patch: {len(patch)} bytes', flush=True)
