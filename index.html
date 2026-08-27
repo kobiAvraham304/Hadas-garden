@@ -27,11 +27,11 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon-v0180.png" sizes="180x180" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=0180" />
+  <link rel="stylesheet" href="/styles.css?v=0190" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0180" defer></script>
+  <script src="/app.js?v=0190" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -80,6 +80,7 @@
       <div class="user-area">
         <div><strong id="userName"></strong><small id="userRole"></small></div>
         <button id="notificationsBtn" class="icon-text-btn notification-button" title="עדכונים והתראות"><span aria-hidden="true">🔔</span><span class="desktop-label">עדכונים</span><span id="notificationBadge" class="nav-badge hidden"></span></button>
+        <button id="feedbackBtn" class="icon-text-btn feedback-button" title="שלח משוב"><span aria-hidden="true">💬</span><span class="desktop-label">משוב</span></button>
         <button id="refreshBtn" class="icon-text-btn" title="רענון נתונים"><span aria-hidden="true">↻</span><span class="desktop-label">רענון</span></button>
         <button id="logoutBtn" class="icon-text-btn"><span aria-hidden="true">⇥</span><span class="desktop-label">יציאה</span></button>
       </div>
@@ -235,6 +236,7 @@
         <button type="button" data-more-tab="tasks"><span>☑</span><strong>משימות</strong><small>מעקב ביצוע</small></button>
         <button type="button" data-more-tab="calendar"><span>◫</span><strong>לוח שנה</strong><small>אירועים וישיבות</small></button>
         <button type="button" data-more-tab="employees" class="manager-only"><span>♙</span><strong>עובדים</strong><small>כוח אדם והרשאות</small></button>
+        <button type="button" id="mobileFeedbackBtn"><span>💬</span><strong>שלח משוב</strong><small>רעיון, תקלה או הצעה לשיפור</small></button>
       </div>
     </section>
   </div>
@@ -272,6 +274,7 @@
       <div class="modal-heading"><div><p class="eyebrow">בניית שבוע חכמה</p><h3>שיבוץ אוטומטי</h3><p class="muted">המערכת בודקת ימי עבודה, שעות, חופשות שאושרו, כיתה קבועה, רוטציה, אילוצים, תפקיד, תקינה ומקסימום שעות שבועיות.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
       <section id="autoScheduleSetup" class="auto-schedule-setup">
         <div class="auto-explanation"><span>✦</span><div><strong>לפני שנוגעים בשיבוץ</strong><p>תחילה נוצרת תצוגה מקדימה בלבד. שום שינוי לא יישמר עד לאישור מפורש.</p></div></div>
+        <label class="auto-week-picker"><span>שבוע לשיבוץ</span><input id="autoScheduleWeek" name="auto_schedule_week" type="date" /><small>אפשר לבחור כל יום בשבוע — המערכת תעבוד על השבוע שמתחיל ביום ראשון.</small></label>
         <div class="auto-mode-grid" role="radiogroup" aria-label="אופן יצירת השיבוץ">
           <label class="auto-mode-card selected"><input type="radio" name="auto_schedule_mode" value="rebuild" checked /><span>↻</span><strong>בנייה מחדש</strong><small>מחשב את כל השבוע מחדש ומחליף את הטיוטה הקיימת.</small></label>
           <label class="auto-mode-card"><input type="radio" name="auto_schedule_mode" value="fill" /><span>＋</span><strong>מילוי חוסרים</strong><small>שומר את השיבוצים הקיימים ומוסיף רק מה שחסר.</small></label>
@@ -305,7 +308,7 @@
 
   <dialog id="employeeDialog" class="modal">
     <form id="employeeForm" method="dialog" class="modal-card large-modal">
-      <div class="modal-heading"><div><p class="eyebrow">כרטיס צוות</p><h3>פרטי עובד</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <div class="modal-heading employee-sticky-heading"><div><p class="eyebrow">כרטיס צוות</p><h3 id="employeeDialogTitle">עובד חדש</h3><small id="employeeDialogSubtitle">פרטי עובד</small></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
       <input type="hidden" name="id" />
       <div class="notice privacy-notice">🔒 המידע בכרטיס העובד חסוי ונגיש רק למנהלת המעון ולאחראית השיבוץ.</div>
       <nav class="employee-form-nav" aria-label="חלקי כרטיס העובד">
@@ -412,6 +415,28 @@
     </div>
   </dialog>
 
+  <dialog id="feedbackDialog" class="modal">
+    <div class="modal-card large-modal feedback-modal">
+      <div class="modal-heading"><div><p class="eyebrow">עוזרים לנו להשתפר</p><h3>משוב למערכת</h3><p class="muted">אפשר לשלוח רעיון, לדווח על תקלה או להציע שיפור.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <form id="feedbackForm" class="feedback-form">
+        <div class="feedback-topic-grid" role="radiogroup" aria-label="נושא המשוב">
+          <label><input type="radio" name="topic" value="תקלה/באג" checked><span>🐞</span><strong>תקלה / באג</strong></label>
+          <label><input type="radio" name="topic" value="שיפור/רעיון"><span>💡</span><strong>שיפור / רעיון</strong></label>
+          <label><input type="radio" name="topic" value="שיבוצים"><span>▦</span><strong>שיבוצים</strong></label>
+          <label><input type="radio" name="topic" value="בקשות"><span>↔</span><strong>בקשות</strong></label>
+          <label><input type="radio" name="topic" value="תפעול יומי"><span>⚡</span><strong>תפעול יומי</strong></label>
+          <label><input type="radio" name="topic" value="עובדים"><span>♙</span><strong>עובדים</strong></label>
+          <label><input type="radio" name="topic" value="הודעות ומשימות"><span>☑</span><strong>הודעות ומשימות</strong></label>
+          <label><input type="radio" name="topic" value="לוח שנה"><span>◫</span><strong>לוח שנה</strong></label>
+        </div>
+        <label class="full-field"><span class="field-title">מה תרצו לספר לנו?</span><textarea name="content" rows="5" minlength="3" maxlength="4000" placeholder="תארו בקצרה מה קרה, מה היה נוח פחות או מה הייתם רוצים לשפר" required></textarea></label>
+        <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" type="submit">שליחת משוב</button></div>
+      </form>
+      <section id="feedbackManagement" class="feedback-management hidden"><div class="feedback-management-head"><div><strong>משובים שהתקבלו</strong><small>רק לינור רואה את כל המשובים ויכולה להגיב.</small></div><button id="feedbackRefreshBtn" type="button" class="ghost-btn">רענון</button></div><div id="feedbackList" class="feedback-list"></div></section>
+      <section id="myFeedback" class="my-feedback"><header><strong>המשובים שלי</strong></header><div id="myFeedbackList" class="feedback-list compact"></div></section>
+    </div>
+  </dialog>
+
   <dialog id="settingsDialog" class="modal"><form id="settingsForm" method="dialog" class="modal-card standards-modal">
     <div class="modal-heading"><div><p class="eyebrow">חוקי שיבוץ ובקרת כוח אדם</p><h3>הגדרות תקינה</h3><p class="muted">בחרו תקן בסיסי, בדקו את ההשפעה ושמרו. ההגדרות חלות על כל הכיתות.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
     <section class="standards-simple-intro"><div class="standards-intro-icon">✓</div><div><strong>מה המערכת בודקת?</strong><p>מספר אנשי צוות בכל מקטע זמן, כוח אדם בסגירה וקיום גננת/גנן או מוביל/ת כיתה.</p></div></section>
@@ -422,12 +447,13 @@
       <button id="settingsPresetLeanBtn" type="button" class="standards-preset-card"><strong>תקן מצומצם</strong><b>3 / 3</b><small>3 לאורך כל היום</small></button>
     </div>
     <div class="standards-section-title"><span>2</span><div><strong>מספר אנשי צוות</strong><small>השתמשו בכפתורי הפלוס והמינוס או הקלידו מספר.</small></div></div>
-    <div class="staffing-stepper-grid">
-      <article class="staffing-stepper-card"><span class="staffing-card-icon">☀</span><div><strong>במהלך היום</strong><small>בכל כיתה ובכל מקטע זמן</small></div><div class="number-stepper"><button type="button" data-step-field="required_staff" data-step="-1" aria-label="הפחתת תקן רגיל">−</button><input name="required_staff" type="number" min="1" max="10" inputmode="numeric" /><button type="button" data-step-field="required_staff" data-step="1" aria-label="הגדלת תקן רגיל">＋</button></div></article>
+    <div class="staffing-stepper-grid three-zones">
+      <article class="staffing-stepper-card morning"><span class="staffing-card-icon">🌅</span><div><strong>בוקר</strong><small>משעת הפתיחה עד השעה שתבחרו</small></div><div class="number-stepper"><button type="button" data-step-field="morning_required_staff" data-step="-1" aria-label="הפחתת תקן בוקר">−</button><input name="morning_required_staff" type="number" min="1" max="10" inputmode="numeric" /><button type="button" data-step-field="morning_required_staff" data-step="1" aria-label="הגדלת תקן בוקר">＋</button></div></article>
+      <article class="staffing-stepper-card"><span class="staffing-card-icon">☀</span><div><strong>במהלך היום</strong><small>לאחר חלון הבוקר ועד הסגירה</small></div><div class="number-stepper"><button type="button" data-step-field="required_staff" data-step="-1" aria-label="הפחתת תקן רגיל">−</button><input name="required_staff" type="number" min="1" max="10" inputmode="numeric" /><button type="button" data-step-field="required_staff" data-step="1" aria-label="הגדלת תקן רגיל">＋</button></div></article>
       <article class="staffing-stepper-card"><span class="staffing-card-icon closing">◷</span><div><strong>בסוף היום</strong><small>בחלון הסגירה שמוגדר למטה</small></div><div class="number-stepper"><button type="button" data-step-field="closing_required_staff" data-step="-1" aria-label="הפחתת תקן סגירה">−</button><input name="closing_required_staff" type="number" min="1" max="10" inputmode="numeric" /><button type="button" data-step-field="closing_required_staff" data-step="1" aria-label="הגדלת תקן סגירה">＋</button></div></article>
     </div>
     <div class="standards-section-title"><span>3</span><div><strong>שעות הפעילות</strong><small>יום שישי מוגבל עד 12:00.</small></div></div>
-    <div class="form-grid standards-grid"><label>שעת פתיחה<input name="opening_time" type="time" /></label><label>שעת סגירה א׳–ה׳<input name="closing_time" type="time" /></label><label>שעת סגירה ביום שישי<input name="friday_closing_time" type="time" max="12:00" readonly /></label><label>תחילת תקן הסגירה<select name="closing_window_minutes"><option value="0">ללא שינוי נפרד בסגירה</option><option value="15">15 דקות לפני הסגירה</option><option value="30">30 דקות לפני הסגירה</option><option value="45">45 דקות לפני הסגירה</option><option value="60">שעה לפני הסגירה</option><option value="90">שעה וחצי לפני הסגירה</option><option value="120">שעתיים לפני הסגירה</option></select></label></div>
+    <div class="form-grid standards-grid"><label>שעת פתיחה<input name="opening_time" type="time" /></label><label>סיום תקן בוקר<input name="morning_end_time" type="time" value="08:15" /></label><label>שעת סגירה א׳–ה׳<input name="closing_time" type="time" /></label><label>שעת סגירה ביום שישי<input name="friday_closing_time" type="time" max="12:00" readonly /></label><label>תחילת תקן הסגירה<select name="closing_window_minutes"><option value="0">ללא שינוי נפרד בסגירה</option><option value="15">15 דקות לפני הסגירה</option><option value="30">30 דקות לפני הסגירה</option><option value="45">45 דקות לפני הסגירה</option><option value="60">שעה לפני הסגירה</option><option value="90">שעה וחצי לפני הסגירה</option><option value="120">שעתיים לפני הסגירה</option></select></label></div>
     <details class="standards-advanced"><summary><span>הגדרות מתקדמות</span><small>דיוק הבדיקה וחובת אחראי/ת כיתה</small></summary><div class="form-grid standards-grid advanced-grid"><label>דיוק בדיקת התקינה<select name="validation_slot_minutes"><option value="15">כל 15 דקות — מדויק</option><option value="30">כל 30 דקות — מומלץ</option><option value="60">כל שעה — בסיסי</option></select></label><label class="toggle-field full-field"><input name="require_leader" type="checkbox" checked /><span><strong>חובה אחראי/ת כיתה</strong><small>גננת/גנן או מוביל/ת כיתה בכל מקטע זמן.</small></span></label></div></details>
     <div id="settingsPreview" class="standards-preview"></div>
     <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת הגדרות התקינה</button></div>

@@ -1,23 +1,21 @@
-# QA Report - v0.18.0
+# דוח QA — גרסה 0.19.0
 
-## Result
-- 139 of 139 automated tests passed.
-- `npm run check` passed.
-- JavaScript syntax checks passed.
-- No Supabase secret key is bundled.
-- Only one Vercel serverless function exists: `api/index.js`.
+- 147 מתוך 147 בדיקות אוטומטיות עברו.
+- `npm run check` עבר בהצלחה.
+- בדיקות תחביר JavaScript עברו.
+- אין Supabase Secret Key בקובצי הלקוח.
+- נשארה פונקציית Vercel אחת בלבד: `api/index.js`.
 
-## Covered areas
-- Login and permissions.
-- Request creation, approval, rejection, and schedule application.
-- Leave, day off, sickness, shift-time changes, and swaps.
-- Date ranges, fixed-day selection, and private sick certificates.
-- Pinned announcements/tasks, read tracking, and task completion tracking.
-- Correct task notification state after completion/reopen.
-- Daily-operations date navigation and adjacent-date prefetch.
-- Calendar month navigation, event types, legend, and agenda.
-- Schedule validation, API routing, and database migration consistency.
-- Safe DOM selector helpers accepting DOM roots, selector strings, and missing roots.
+## נבדק במיוחד
+- גננת חסומה מחוץ לכיתה הקבועה גם בבדיקה וגם בשיבוץ אוטומטי.
+- תקינת בוקר עד 08:15 והמשך מעבר לתקן יום/סגירה.
+- קדימות לעובדי כיתה קבועה והסבר במקרה של השאלה לכיתה אחרת.
+- בחירת שבוע בשיבוץ אוטומטי וטיפול בשגיאות preview.
+- `עדיף להימנע` למשלימי מקום.
+- שמירת עובד ללא `refreshAll`.
+- מערכת משוב והרשאת הניהול הייעודית ללינור.
+- API route ו־Vercel rewrite למשוב.
+- הסכמה והעדכון 0.19.0 אינם מוחקים נתוני עבודה.
 
-## Environment limitation
-A real iPhone Safari engine is unavailable in the build environment. After deployment, perform a short device check of the new dialogs and native iOS date inputs.
+## מגבלת בדיקה
+אין בסביבת הבנייה מנוע Safari אמיתי של iPhone; מבנה המובייל נשען על שכבת התצוגה הקיימת שכבר נבדקה ברוחבי 360/390/414px בגרסאות הקודמות, ולא נוספה בגרסה זו פריסת ניווט חדשה.

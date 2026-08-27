@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.18.0 (סכמת נתונים 0.18.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.19.0 (סכמת נתונים 0.19.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -17,6 +17,7 @@ END $$;
 
 -- ניקוי התקנות חלקיות או גרסאות קודמות של מערכת הדס בלבד.
 DROP TABLE IF EXISTS
+  public.hadas_feedback,
   public.hadas_notifications,
   public.hadas_announcement_recipients,
   public.hadas_announcement_reads,
@@ -64,7 +65,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.18.0', '0.18.0')
+values (1, '0.19.0', '0.19.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -147,19 +148,21 @@ create table if not exists public.hadas_login_security (
 create table if not exists public.hadas_employee_weekly_patterns (
   employee_id uuid not null references public.hadas_employees(id) on delete cascade,
   weekday smallint not null check (weekday between 0 and 6),
-  day_type text not null check (day_type in ('work','day_off','as_needed')),
+  day_type text not null check (day_type in ('work','day_off','as_needed','avoid')),
   start_time time,
   end_time time,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (employee_id, weekday),
   check (
-    (day_type in ('day_off','as_needed') and start_time is null and end_time is null)
+    (day_type='day_off' and start_time is null and end_time is null)
     or
-    (day_type='work' and start_time is not null and end_time is not null and end_time > start_time)
+    (day_type in ('work','as_needed','avoid') and start_time is not null and end_time is not null and end_time > start_time)
   )
 );
 create index if not exists hadas_weekly_patterns_weekday_idx on public.hadas_employee_weekly_patterns(weekday, day_type);
+alter table public.hadas_employee_weekly_patterns drop constraint if exists hadas_employee_weekly_patterns_day_type_check;
+alter table public.hadas_employee_weekly_patterns add constraint hadas_employee_weekly_patterns_day_type_check check (day_type in ('work','day_off','as_needed','avoid'));
 
 create table if not exists public.hadas_employee_class_constraints (
   id uuid primary key default gen_random_uuid(),
@@ -323,6 +326,8 @@ create table if not exists public.hadas_app_settings (
   opening_time time not null default '07:30',
   closing_time time not null default '15:30',
   friday_closing_time time not null default '12:00',
+  morning_end_time time not null default '08:15',
+  morning_required_staff integer not null default 4 check (morning_required_staff between 1 and 10),
   required_staff integer not null default 4 check (required_staff > 0),
   closing_required_staff integer not null default 3 check (closing_required_staff > 0),
   closing_window_minutes integer not null default 30 check (closing_window_minutes between 15 and 180),
@@ -333,6 +338,8 @@ create table if not exists public.hadas_app_settings (
 alter table public.hadas_app_settings add column if not exists closing_window_minutes integer not null default 30;
 alter table public.hadas_app_settings add column if not exists validation_slot_minutes integer not null default 30;
 alter table public.hadas_app_settings add column if not exists friday_closing_time time not null default '12:00';
+alter table public.hadas_app_settings add column if not exists morning_end_time time not null default '08:15';
+alter table public.hadas_app_settings add column if not exists morning_required_staff integer not null default 4;
 alter table public.hadas_app_settings add column if not exists require_leader boolean not null default true;
 insert into public.hadas_app_settings(id) values (1) on conflict (id) do nothing;
 
@@ -510,12 +517,28 @@ BEGIN
 END $$;
 
 
+create table if not exists public.hadas_feedback (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references public.hadas_employees(id) on delete cascade,
+  topic text not null check (topic in ('שיבוצים','בקשות','תפעול יומי','עובדים','הודעות ומשימות','לוח שנה','תקלה/באג','שיפור/רעיון','אחר')),
+  content text not null check (char_length(content) between 3 and 4000),
+  status text not null default 'open' check (status in ('open','replied','closed')),
+  response_text text,
+  responded_by uuid references public.hadas_employees(id) on delete set null,
+  responded_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists hadas_feedback_employee_idx on public.hadas_feedback(employee_id, created_at desc);
+create index if not exists hadas_feedback_status_idx on public.hadas_feedback(status, created_at desc);
+create index if not exists hadas_feedback_responded_by_idx on public.hadas_feedback(responded_by) where responded_by is not null;
+
 insert into storage.buckets(id, name, public, file_size_limit, allowed_mime_types)
 values ('hadas-sick-certificates','hadas-sick-certificates',false,3145728,array['application/pdf','image/jpeg','image/png','image/webp']::text[])
 on conflict (id) do update set public=false, file_size_limit=excluded.file_size_limit, allowed_mime_types=excluded.allowed_mime_types;
 
 create or replace function public.hadas_set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path=pg_catalog,public as $$
 begin new.updated_at = now(); return new; end;
 $$;
 
@@ -524,7 +547,7 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_employee_private','hadas_employee_weekly_patterns','hadas_shifts',
-    'hadas_schedule_publications','hadas_requests','hadas_announcements','hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings'
+    'hadas_schedule_publications','hadas_requests','hadas_announcements','hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings','hadas_feedback'
   ] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
       EXECUTE format('DROP TRIGGER IF EXISTS %I_updated_at ON public.%I', t, t);
@@ -534,7 +557,7 @@ BEGIN
 END $$;
 
 create or replace function public.hadas_prevent_shift_overlap()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path=pg_catalog,public as $$
 begin
   if current_setting('app.swap_mode', true) = 'on' then return new; end if;
   if exists (
@@ -718,7 +741,7 @@ grant execute on function public.hadas_apply_shift_swap(uuid,uuid) to service_ro
 
 
 create or replace function public.hadas_emit_realtime_event()
-returns trigger language plpgsql security definer set search_path=public as $$
+returns trigger language plpgsql security definer set search_path=pg_catalog,public as $$
 begin
   insert into public.hadas_realtime_events(topic) values (tg_table_name);
   if (select count(*) from public.hadas_realtime_events) > 2000 then
@@ -729,6 +752,12 @@ begin
   return new;
 end;
 $$;
+revoke all on function public.hadas_set_updated_at() from public, anon, authenticated;
+revoke all on function public.hadas_prevent_shift_overlap() from public, anon, authenticated;
+revoke all on function public.hadas_emit_realtime_event() from public, anon, authenticated;
+grant execute on function public.hadas_set_updated_at() to service_role;
+grant execute on function public.hadas_prevent_shift_overlap() to service_role;
+grant execute on function public.hadas_emit_realtime_event() to service_role;
 
 DO $$
 DECLARE t text;
@@ -736,7 +765,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_daily_operations','hadas_requests','hadas_notifications',
     'hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_announcements','hadas_announcement_recipients','hadas_announcement_reads',
-    'hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings'
+    'hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings','hadas_feedback'
   ] LOOP
     EXECUTE format('DROP TRIGGER IF EXISTS %I_realtime ON public.%I', t, t);
     EXECUTE format('CREATE TRIGGER %I_realtime AFTER INSERT OR UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.hadas_emit_realtime_event()', t, t);
@@ -751,7 +780,7 @@ BEGIN
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
     'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance','hadas_daily_operations',
     'hadas_requests','hadas_notifications','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings','hadas_announcements',
-    'hadas_announcement_recipients','hadas_announcement_reads','hadas_tasks','hadas_task_assignees','hadas_calendar_events',
+    'hadas_announcement_recipients','hadas_announcement_reads','hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_feedback',
     'hadas_audit_log','hadas_realtime_events'
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);

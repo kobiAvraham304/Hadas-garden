@@ -1,31 +1,25 @@
-# מערכת ניהול שיבוצים מעון הדס — גרסה 0.18.0
+# מערכת ניהול שיבוצים מעון הדס — גרסה 0.19.0
 
-Hadas Scheduling Management System v0.18.0
+גרסת עומק לשיבוץ האוטומטי, התאמת עובדים, כרטיס עובד, תקינת בוקר ומערכת משוב פנימית.
 
-This release upgrades requests, announcements, tasks, daily operations, and the monthly calendar. It also fixes the daily-operations error: `root.querySelectorAll is not a function`.
+## שדרוג מ־0.18.0
 
-## Upgrade from v0.17.1
+1. מריצים פעם אחת את `supabase/update-v0.19.0.sql`.
+2. לא מריצים מחדש את `schema.sql`.
+3. מעלים את קובצי 0.19.0 ל־GitHub וממתינים ל־Vercel `Ready`.
+4. ב־`/health` יש לוודא: אתר `0.19.0`, מסד `0.19.0`.
 
-1. In Supabase SQL Editor, run `supabase/update-v0.18.0.sql` once.
-2. Do not rerun `schema.sql`.
-3. Replace all v0.17.1 project files in GitHub with the v0.18.0 files.
-4. Keep only `api/index.js` inside the `api` folder.
-5. Commit and push, then wait for Vercel status `Ready`.
-6. Open `/health` and confirm:
-   - Site version: `0.18.0`
-   - Database version: `0.18.0`
+לא נוספו משתני סביבה חדשים.
 
-No Vercel environment-variable changes are required.
+## עיקרי הגרסה
 
-## Main changes
-
-- Clearer request workflow and a redesigned new-request form.
-- Leave and sick-date ranges, manual-form reminder, private sick certificate upload.
-- Selection of a specific fixed day off when an employee has more than one.
-- Searchable employee cards for swap requests.
-- Pinned announcements and tasks.
-- Read tracking for announcements and completion tracking for tasks.
-- Task notifications close correctly after completion.
-- Safe previous/today/next navigation in daily operations.
-- Upgraded calendar with event styles, legend, and monthly agenda.
-- UI assets use cache version `0180`.
+- גננת נעולה לכיתה הקבועה שלה בכל מסלולי השיבוץ.
+- למשלימ/ת מקום ניתן לסמן יום `עדיף להימנע`.
+- שמירת כרטיס עובד מהירה יותר ללא רענון מלא של המערכת.
+- שם העובד נשאר בכותרת כרטיס העובד בזמן גלילה.
+- שיבוץ אוטומטי מאפשר לבחור שבוע מראש.
+- שגיאות בתצוגה המקדימה מקבלות פעולות: תיקון, אישור חריגה או דחייה.
+- אם עובד מכיתה קבועה הושאל לכיתה אחרת, מוצג הסבר מדוע.
+- תקינת בוקר נפרדת עד שעה לבחירה (ברירת מחדל 08:15).
+- כפתור משוב לכל משתמש; לינור יכולה לצפות, להגיב, לסגור, להעתיק ולמחוק.
+- המילה `אסור לשבץ` הוחלפה ב־`לא ניתן לשבץ` בממשק.
