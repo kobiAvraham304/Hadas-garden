@@ -110,6 +110,7 @@ function publicAutomaticPreview(plan) {
     daySummaries: plan.daySummaries,
     employeeHours: plan.employeeHours,
     assignmentNotes: plan.assignmentNotes || [],
+    excluded: plan.excluded || [],
     metrics: plan.metrics,
     signature: plan.signature,
   };
@@ -164,13 +165,14 @@ async function restoreAutomaticSchedule(deletedRows, insertedRows) {
 
 async function getWeekValidation(weekStart) {
   const weekEnd = addDays(weekStart, 5);
-  const [shiftsR, classesR, employeesR, settingsR, constraintsR, patternsR] = await Promise.all([
+  const [shiftsR, classesR, employeesR, settingsR, constraintsR, patternsR, requestsR] = await Promise.all([
     db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd),
     db().from('hadas_classes').select('*').eq('active', true),
     db().from('hadas_employees').select('*').eq('active', true),
     db().from('hadas_app_settings').select('*').eq('id', 1).single(),
     db().from('hadas_employee_class_constraints').select('*'),
     db().from('hadas_employee_weekly_patterns').select('*'),
+    db().from('hadas_requests').select('requester_id,request_type,request_date,request_end_date,status').in('request_type',['leave','day_off','sick']).in('status',['approved','applied']).lte('request_date', weekEnd),
   ]);
   const shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
   return {
@@ -181,7 +183,8 @@ async function getWeekValidation(weekStart) {
       employees: assertDb(employeesR, 'לא ניתן לטעון עובדים') || [],
       settings: assertDb(settingsR, 'לא ניתן לטעון הגדרות') || {},
       constraints: assertDb(constraintsR, 'לא ניתן לטעון אילוצים') || [],
-      weeklyPatterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [],
+      weeklyPatterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה') || [],
+      requests: (assertDb(requestsR, 'לא ניתן לטעון חופשות ומחלות') || []).filter((row)=>String(row.request_end_date||row.request_date)>=weekStart),
       weekStart,
     }),
   };
@@ -316,6 +319,9 @@ module.exports = async function handler(req, res) {
       const data = await loadAutomaticScheduleData(weekStart);
       const plan = generateAutomaticSchedule({ ...data, weekStart, mode, createdBy: caller.employee.id });
       if (body.signature && body.signature !== plan.signature) throw httpError(409, 'נתוני העובדים או השבוע השתנו מאז התצוגה המקדימה. יש לחשב מחדש את השיבוץ.');
+      const incompleteCodes = new Set(['understaffed','missing_leader']);
+      const hardErrors = plan.validation.errors.filter((item)=>!incompleteCodes.has(item.code));
+      if (hardErrors.length) throw httpError(409, 'השיבוץ האוטומטי זיהה הפרת כלל קשיח ולכן לא ניתן להחיל אותו. יש לתקן את הנתונים או לחשב מחדש.', { errors:hardErrors, warnings:plan.validation.warnings });
       if (plan.validation.errors.length && !body.allow_incomplete) throw httpError(409, 'נשארו חוסרים בשיבוץ האוטומטי. ניתן לחזור לתצוגה המקדימה או לאשר יצירת טיוטה חלקית.', plan.validation);
       if (!plan.generated.length) throw httpError(409, mode === 'fill' ? 'לא נמצאו חוסרים שניתן למלא אוטומטית' : 'לא ניתן היה ליצור שיבוצים מהנתונים הקיימים');
       const weekEnd = addDays(weekStart, 5);
