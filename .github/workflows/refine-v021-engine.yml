@@ -28,6 +28,15 @@ jobs:
       - name: Apply scheduling refinement
         run: |
           cat .deploy/v021-engine.part1 .deploy/v021-engine.part2 .deploy/v021-engine.part3 | base64 -d | gzip -d > /tmp/refine-v021-engine.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('/tmp/refine-v021-engine.py')
+          text=p.read_text(encoding='utf-8')
+          old="ROOT=Path(__file__).resolve().parents[1]"
+          if old not in text:
+              raise SystemExit('refinement ROOT guard failed')
+          p.write_text(text.replace(old,"ROOT=Path.cwd()",1),encoding='utf-8')
+          PY
           python3 /tmp/refine-v021-engine.py
           rm -f .deploy/v021-engine.part1 .deploy/v021-engine.part2 .deploy/v021-engine.part3
           rmdir .deploy 2>/dev/null || true
