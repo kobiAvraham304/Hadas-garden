@@ -51,9 +51,9 @@ test('0.20 fresh schema accepts as-needed days without fake times',()=>{
 
 test('0.20 database hardening covers foreign keys, request types and explicit server-only policies',()=>{
   const migration=read('supabase/update-v0.20.0.sql');
-  for(const token of ['hadas_requests_requester_fk_idx','hadas_attendance_employee_fk_idx','hadas_announcements_class_fk_idx','hadas_daily_operations_class_fk_idx','hadas_task_assignees_employee_fk_idx']) assert.match(migration,new RegExp(token));
+  for(const token of ['hadas_requests_requester_fk_idx','hadas_attendance_employee_fk_idx','hadas_announcements_class_fk_idx','hadas_daily_operations_class_fk_idx','hadas_task_assignees_employee_fk_idx','hadas_documents_class_fk_idx','hadas_documents_created_by_fk_idx']) assert.match(migration,new RegExp(token));
   assert.match(migration,/request_type in \('leave','day_off','late_start','early_finish','sick','swap'\)/);
-  assert.match(migration,/CREATE POLICY hadas_server_only_deny/);
+  assert.match(migration,/hadas_schedule_acknowledgements/); assert.match(migration,/CREATE POLICY hadas_server_only_deny/);
   assert.doesNotMatch(migration,/drop table/i);
 });
 

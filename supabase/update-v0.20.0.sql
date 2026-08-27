@@ -27,6 +27,8 @@ create index if not exists hadas_daily_operations_resolved_by_fk_idx on public.h
 create index if not exists hadas_schedule_changes_created_by_fk_idx on public.hadas_schedule_changes(created_by);
 create index if not exists hadas_schedule_publications_published_by_fk_idx on public.hadas_schedule_publications(published_by);
 create index if not exists hadas_audit_log_actor_fk_idx on public.hadas_audit_log(actor_employee_id);
+create index if not exists hadas_documents_class_fk_idx on public.hadas_documents(class_id);
+create index if not exists hadas_documents_created_by_fk_idx on public.hadas_documents(created_by);
 
 alter table public.hadas_employee_weekly_patterns drop constraint if exists hadas_employee_weekly_patterns_times_check;
 alter table public.hadas_employee_weekly_patterns add constraint hadas_employee_weekly_patterns_times_check check (
@@ -66,7 +68,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
     'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts',
-    'hadas_schedule_publications','hadas_schedule_changes','hadas_attendance','hadas_daily_operations','hadas_requests',
+    'hadas_schedule_publications','hadas_schedule_changes','hadas_schedule_acknowledgements','hadas_attendance','hadas_daily_operations','hadas_requests',
     'hadas_notifications','hadas_announcements','hadas_announcement_reads','hadas_announcement_recipients','hadas_tasks',
     'hadas_task_assignees','hadas_calendar_events','hadas_documents','hadas_audit_log','hadas_app_settings','hadas_feedback'
   ] LOOP
