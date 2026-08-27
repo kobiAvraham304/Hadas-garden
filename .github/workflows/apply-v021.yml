@@ -29,6 +29,7 @@ jobs:
           python3 scripts/prepare-v021-patch.py
           python3 -m py_compile scripts/apply-v021-scheduling.py
           python3 scripts/apply-v021-scheduling.py
+          python3 scripts/finalize-v021-patch.py
       - name: Full QA
         run: |
           npm test
