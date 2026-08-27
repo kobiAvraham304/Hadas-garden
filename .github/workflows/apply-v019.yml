@@ -19,22 +19,89 @@ jobs:
           ref: agent/v0.19.0-production
           fetch-depth: 0
 
-      - name: Reconstruct and apply v0.19.0 patch
+      - name: Reconstruct and validate v0.19.0 patch
         shell: bash
         run: |
           set -euo pipefail
-          cat .deploy/v019.b64.part* > /tmp/v019.b64
-          base64 --decode /tmp/v019.b64 > /tmp/v019.patch.xz
-          xz --decompress --stdout /tmp/v019.patch.xz > /tmp/v019.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          import itertools
+          import lzma
+
+          paths = sorted(Path('.deploy').glob('v019.b64.part*'))
+          if not paths:
+              raise SystemExit('v0.19.0 payload parts are missing')
+
+          parts = [p.read_text(encoding='utf-8').strip() for p in paths]
+          alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+          def recover(candidate: str):
+              if len(candidate) % 4:
+                  return None
+              try:
+                  packed = base64.b64decode(candidate, validate=True)
+                  patch = lzma.decompress(packed, format=lzma.FORMAT_XZ)
+              except Exception:
+                  return None
+              if b'diff --git ' not in patch or b'0.19.0' not in patch:
+                  return None
+              return patch
+
+          joined = ''.join(parts)
+          patch = recover(joined)
+
+          # The upload was split into 8k Base64 chunks. One character is missing
+          # from part05 and one from the final part. Recover both only when the
+          # resulting Base64 + XZ stream validates completely.
+          if patch is None:
+              max_chunk = max(len(p) for p in parts[:-1])
+              short_middle = [i for i, p in enumerate(parts[:-1]) if len(p) == max_chunk - 1]
+              if len(short_middle) != 1 or len(joined) % 4 != 2:
+                  raise SystemExit(
+                      f'unexpected payload shape: lengths={[len(p) for p in parts]}, total={len(joined)}'
+                  )
+
+              mid = short_middle[0]
+              found = None
+              for a, b in itertools.product(alphabet, repeat=2):
+                  repaired = parts.copy()
+                  repaired[mid] = repaired[mid] + a
+                  repaired[-1] = repaired[-1] + b
+                  candidate = ''.join(repaired)
+                  result = recover(candidate)
+                  if result is not None:
+                      found = (a, b, result)
+                      break
+
+              if found is None:
+                  raise SystemExit('could not recover the two missing Base64 characters safely')
+
+              a, b, patch = found
+              print(f'recovered v0.19.0 payload using validated XZ stream (middle={a!r}, final={b!r})')
+
+          Path('/tmp/v019.patch').write_bytes(patch)
+          print(f'validated v0.19.0 patch: {len(patch)} bytes')
+          PY
+
           git apply --check --binary /tmp/v019.patch
           git apply --binary --whitespace=nowarn /tmp/v019.patch
           rm -rf .deploy
 
+      - name: Apply final matching-engine hardening
+        shell: bash
+        run: bash scripts/apply-v019-build.sh
+
       - name: Validate release
         run: |
           npm test
+          npm run check
           node --check app.js
           node --check api/index.js
+          node --check lib/matching.js
+          node --check lib/auto-schedule.js
+          node --check lib/schedule.js
+          grep -q '"version": "0.19.0"' package.json
 
       - name: Commit applied release
         shell: bash
