@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.18.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.19.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
@@ -50,7 +50,7 @@ test('initial accounts and schema version are present in clean installer', () =>
   const schema=read('supabase/schema.sql');
   assert.match(schema,/אילנית זאדייב/); assert.match(schema,/\+972544594513/); assert.match(schema,/'admin'/);
   assert.match(schema,/לינור אברהם/); assert.match(schema,/\+972542521780/); assert.match(schema,/'scheduler'/);
-  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.18\.0'/);
+  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.19\.0'/);
   assert.match(schema,/ENABLE ROW LEVEL SECURITY/i); assert.match(schema,/REVOKE ALL ON TABLE/i);
   assert.match(schema,/hadas_realtime_public_read/); assert.match(schema,/ALTER PUBLICATION supabase_realtime ADD TABLE/i);
 });
@@ -130,10 +130,10 @@ test('non-manager employee payload excludes private employment fields', () => {
   assert.match(dataApi,/if \(!manager\) return base/);
 });
 
-test('health page is CSP-compatible and references 0.18 migration', () => {
+test('health page is CSP-compatible and references current migration', () => {
   const html=read('health.html'); const js=read('health.js');
   assert.match(html,/src="\/health\.js"/); assert.doesNotMatch(html,/<script>[^<]/);
-  assert.match(js,/update-v0\.18\.0\.sql/);
+  assert.match(js,/update-v0\.19\.0\.sql/);
 });
 
 test('runtime avoids unsafe dynamic JavaScript and inline DOM handlers', () => {
@@ -209,7 +209,7 @@ test('staffing settings provide presets, validation guidance and a live time pre
   const html=read('index.html'); const app=read('app.js'); const css=read('styles.css');
   for(const id of ['settingsPresetBtn','settingsPreview']) assert.match(html,new RegExp(`id="${id}"`));
   assert.match(app,/renderSettingsPreview/); assert.match(app,/applyDefaultStandards/);
-  assert.match(app,/closingRequired > required/); assert.match(css,/\.standards-timeline/);
+  assert.match(app,/morningRequired/); assert.match(app,/morning_end_time/); assert.match(css,/staffing-stepper/);
 });
 
 test('mobile dialogs and request type controls are constrained to the viewport', () => {

@@ -53,6 +53,7 @@ async function validateShift(payload, id, overrideDayOff = false) {
   const weeklyPatterns = assertDb(patternR, 'לא ניתן לבדוק את ימי העבודה הקבועים') || [];
   if (!employee?.active) throw httpError(409, 'העובד אינו פעיל');
   if (employee.is_schedulable === false) throw httpError(409, 'העובד אינו מוגדר כחלק ממערך השיבוצים');
+  if (employee.job_title === 'גננת' && employee.primary_class_id && employee.primary_class_id !== payload.class_id) throw httpError(409, 'גננת ניתנת לשיבוץ רק בכיתה הקבועה שלה');
   if (['teacher', 'lead'].includes(payload.shift_role) && !employeeCanLead(employee)) throw httpError(409, 'העובד אינו מורשה לשמש גננת/גנן או מוביל/ת כיתה');
   if (!classItem?.active) throw httpError(409, 'הכיתה אינה פעילה');
   const dayClosing = closingTimeForDate(settings, payload.shift_date);
@@ -110,6 +111,7 @@ function publicAutomaticPreview(plan) {
     validation: plan.validation,
     daySummaries: plan.daySummaries,
     employeeHours: plan.employeeHours,
+    assignmentNotes: plan.assignmentNotes || [],
     metrics: plan.metrics,
     signature: plan.signature,
   };
