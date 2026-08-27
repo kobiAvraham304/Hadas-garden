@@ -32,10 +32,16 @@ jobs:
           from pathlib import Path
           p=Path('/tmp/refine-v021-engine.py')
           text=p.read_text(encoding='utf-8')
-          old="ROOT=Path(__file__).resolve().parents[1]"
-          if old not in text:
+          root_old="ROOT=Path(__file__).resolve().parents[1]"
+          if root_old not in text:
               raise SystemExit('refinement ROOT guard failed')
-          p.write_text(text.replace(old,"ROOT=Path.cwd()",1),encoding='utf-8')
+          text=text.replace(root_old,"ROOT=Path.cwd()",1)
+          guard_old="      weeklyPatterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה') || [],\\n      weekStart,\\n    }),"
+          guard_new="      weeklyPatterns: assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [],\\n      weekStart,\\n    }),"
+          if guard_old not in text:
+              raise SystemExit('refinement shifts guard patch failed')
+          text=text.replace(guard_old,guard_new,1)
+          p.write_text(text,encoding='utf-8')
           PY
           python3 /tmp/refine-v021-engine.py
           rm -f .deploy/v021-engine.part1 .deploy/v021-engine.part2 .deploy/v021-engine.part3
