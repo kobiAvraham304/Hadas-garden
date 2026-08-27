@@ -1,3 +1,4 @@
+# v0.19.0 recovery trigger
 name: Apply v0.19.0 production package
 
 on:
@@ -51,9 +52,6 @@ jobs:
           joined = ''.join(parts)
           patch = recover(joined)
 
-          # The upload was split into 8k Base64 chunks. One character is missing
-          # from part05 and one from the final part. Recover both only when the
-          # resulting Base64 + XZ stream validates completely.
           if patch is None:
               max_chunk = max(len(p) for p in parts[:-1])
               short_middle = [i for i, p in enumerate(parts[:-1]) if len(p) == max_chunk - 1]
@@ -68,8 +66,7 @@ jobs:
                   repaired = parts.copy()
                   repaired[mid] = repaired[mid] + a
                   repaired[-1] = repaired[-1] + b
-                  candidate = ''.join(repaired)
-                  result = recover(candidate)
+                  result = recover(''.join(repaired))
                   if result is not None:
                       found = (a, b, result)
                       break
