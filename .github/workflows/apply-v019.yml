@@ -1,4 +1,4 @@
-# v0.19.0 recovery workflow
+# v0.19.0 targeted recovery workflow
 name: Apply v0.19.0 production package
 
 on:
@@ -70,7 +70,7 @@ jobs:
               dec = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
               produced = 0
               consumed = 0
-              step = 256
+              step = 128
               for i in range(0, len(packed), step):
                   block = packed[i:i + step]
                   try:
@@ -91,51 +91,53 @@ jobs:
                       f'unexpected payload shape: lengths={[len(p) for p in parts]}, total={len(joined)}'
                   )
 
-              mid = short_middle[0]
               starts = []
               cursor = 0
               for p in parts:
                   starts.append(cursor)
                   cursor += len(p)
-
+              mid = short_middle[0]
               mid_start = starts[mid]
               mid_end = mid_start + len(parts[mid])
-              edge = 128
-              first_positions = sorted(set(
-                  range(mid_start, min(mid_end + 1, mid_start + edge + 1))
-              ) | set(
-                  range(max(mid_start, mid_end - edge), mid_end + 1)
-              ))
+
+              base_score = progress(joined)
+              first_center = int(base_score[1] * 4 / 3)
+              first_center = max(mid_start, min(mid_end, first_center))
+              first_radius = 900
+              first_lo = max(mid_start, first_center - first_radius)
+              first_hi = min(mid_end, first_center + first_radius)
+              print('base progress:', base_score, 'first search:', (first_lo, first_hi))
 
               top = []
-              for pos in first_positions:
+              for pos in range(first_lo, first_hi + 1):
                   for ch in alphabet:
                       candidate = joined[:pos] + ch + joined[pos:]
                       score = progress(candidate)
                       item = (score[0], score[1], pos, ch, candidate)
-                      if len(top) < 4:
+                      if len(top) < 32:
                           heapq.heappush(top, item)
                       elif item[:2] > top[0][:2]:
                           heapq.heapreplace(top, item)
 
               top.sort(reverse=True)
-              print('top first-character candidates:', [(x[0], x[1], x[2], x[3]) for x in top])
+              print('top first candidates:', [(x[0], x[1], x[2], x[3]) for x in top[:12]])
 
-              final_start_original = starts[-1]
-              final_len = len(parts[-1])
-              second_edge = 64
               found = None
+              for first_score, first_consumed, first_pos, first_ch, first_candidate in top:
+                  second_center = int(first_consumed * 4 / 3)
+                  # Account for the first inserted character already present in this candidate.
+                  if second_center <= first_pos:
+                      second_center = first_pos + 1
+                  second_radius = 1200
+                  second_lo = max(first_pos + 1, second_center - second_radius)
+                  second_hi = min(len(first_candidate), second_center + second_radius)
+                  print(
+                      'second search from first candidate:',
+                      (first_pos, first_ch, first_score, first_consumed),
+                      'range=', (second_lo, second_hi),
+                  )
 
-              for _, _, first_pos, first_ch, first_candidate in top:
-                  final_start = final_start_original + 1
-                  final_end = final_start + final_len
-                  second_positions = sorted(set(
-                      range(final_start, min(final_end + 1, final_start + second_edge + 1))
-                  ) | set(
-                      range(max(final_start, final_end - second_edge), final_end + 1)
-                  ))
-
-                  for pos in second_positions:
+                  for pos in range(second_lo, second_hi + 1):
                       for ch in alphabet:
                           candidate = first_candidate[:pos] + ch + first_candidate[pos:]
                           result = recover(candidate)
@@ -148,7 +150,7 @@ jobs:
                       break
 
               if found is None:
-                  raise SystemExit('could not recover payload from edge search; diagnostics printed above')
+                  raise SystemExit('targeted recovery did not find a fully valid Base64/XZ patch')
 
               first_pos, first_ch, second_pos, second_ch, patch = found
               print(
