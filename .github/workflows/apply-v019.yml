@@ -1,4 +1,4 @@
-# v0.19.0 recovery trigger
+# v0.19.0 recovery workflow
 name: Apply v0.19.0 production package
 
 on:
@@ -8,6 +8,10 @@ on:
 
 permissions:
   contents: write
+
+concurrency:
+  group: hadas-v019-release
+  cancel-in-progress: true
 
 jobs:
   apply-release:
@@ -27,7 +31,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import base64
-          import itertools
+          import heapq
           import lzma
 
           paths = sorted(Path('.deploy').glob('v019.b64.part*'))
@@ -36,12 +40,22 @@ jobs:
 
           parts = [p.read_text(encoding='utf-8').strip() for p in paths]
           alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+          joined = ''.join(parts)
+
+          def decoded(candidate: str):
+              padded = candidate + ('=' * ((4 - len(candidate) % 4) % 4))
+              try:
+                  return base64.b64decode(padded, validate=True)
+              except Exception:
+                  return None
 
           def recover(candidate: str):
               if len(candidate) % 4:
                   return None
+              packed = decoded(candidate)
+              if packed is None:
+                  return None
               try:
-                  packed = base64.b64decode(candidate, validate=True)
                   patch = lzma.decompress(packed, format=lzma.FORMAT_XZ)
               except Exception:
                   return None
@@ -49,9 +63,26 @@ jobs:
                   return None
               return patch
 
-          joined = ''.join(parts)
-          patch = recover(joined)
+          def progress(candidate: str):
+              packed = decoded(candidate)
+              if packed is None:
+                  return (-1, -1)
+              dec = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
+              produced = 0
+              consumed = 0
+              step = 256
+              for i in range(0, len(packed), step):
+                  block = packed[i:i + step]
+                  try:
+                      produced += len(dec.decompress(block))
+                      consumed = i + len(block)
+                      if dec.eof:
+                          return (10**9 + produced, consumed)
+                  except lzma.LZMAError:
+                      break
+              return (produced, consumed)
 
+          patch = recover(joined)
           if patch is None:
               max_chunk = max(len(p) for p in parts[:-1])
               short_middle = [i for i, p in enumerate(parts[:-1]) if len(p) == max_chunk - 1]
@@ -61,21 +92,69 @@ jobs:
                   )
 
               mid = short_middle[0]
+              starts = []
+              cursor = 0
+              for p in parts:
+                  starts.append(cursor)
+                  cursor += len(p)
+
+              mid_start = starts[mid]
+              mid_end = mid_start + len(parts[mid])
+              edge = 128
+              first_positions = sorted(set(
+                  range(mid_start, min(mid_end + 1, mid_start + edge + 1))
+              ) | set(
+                  range(max(mid_start, mid_end - edge), mid_end + 1)
+              ))
+
+              top = []
+              for pos in first_positions:
+                  for ch in alphabet:
+                      candidate = joined[:pos] + ch + joined[pos:]
+                      score = progress(candidate)
+                      item = (score[0], score[1], pos, ch, candidate)
+                      if len(top) < 4:
+                          heapq.heappush(top, item)
+                      elif item[:2] > top[0][:2]:
+                          heapq.heapreplace(top, item)
+
+              top.sort(reverse=True)
+              print('top first-character candidates:', [(x[0], x[1], x[2], x[3]) for x in top])
+
+              final_start_original = starts[-1]
+              final_len = len(parts[-1])
+              second_edge = 64
               found = None
-              for a, b in itertools.product(alphabet, repeat=2):
-                  repaired = parts.copy()
-                  repaired[mid] = repaired[mid] + a
-                  repaired[-1] = repaired[-1] + b
-                  result = recover(''.join(repaired))
-                  if result is not None:
-                      found = (a, b, result)
+
+              for _, _, first_pos, first_ch, first_candidate in top:
+                  final_start = final_start_original + 1
+                  final_end = final_start + final_len
+                  second_positions = sorted(set(
+                      range(final_start, min(final_end + 1, final_start + second_edge + 1))
+                  ) | set(
+                      range(max(final_start, final_end - second_edge), final_end + 1)
+                  ))
+
+                  for pos in second_positions:
+                      for ch in alphabet:
+                          candidate = first_candidate[:pos] + ch + first_candidate[pos:]
+                          result = recover(candidate)
+                          if result is not None:
+                              found = (first_pos, first_ch, pos, ch, result)
+                              break
+                      if found:
+                          break
+                  if found:
                       break
 
               if found is None:
-                  raise SystemExit('could not recover the two missing Base64 characters safely')
+                  raise SystemExit('could not recover payload from edge search; diagnostics printed above')
 
-              a, b, patch = found
-              print(f'recovered v0.19.0 payload using validated XZ stream (middle={a!r}, final={b!r})')
+              first_pos, first_ch, second_pos, second_ch, patch = found
+              print(
+                  'recovered v0.19.0 payload with validated XZ stream: '
+                  f'first=({first_pos},{first_ch!r}) second=({second_pos},{second_ch!r})'
+              )
 
           Path('/tmp/v019.patch').write_bytes(patch)
           print(f'validated v0.19.0 patch: {len(patch)} bytes')
