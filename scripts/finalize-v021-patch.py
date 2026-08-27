@@ -55,9 +55,9 @@ s=s.replace("  assert.match(schema,/hadas_feedback/); assert.match(schema,/morni
             "  assert.match(schema,/hadas_feedback/); assert.match(schema,/morning_required_staff/); assert.match(migration,/day_type in \\('work','day_off','as_needed','avoid'\\)/); assert.doesNotMatch(migration,/drop table/i); assert.match(migration,/'0\\.19\\.0'/);")
 write(p,s)
 
-# v0.21 test: only weekly-day dropdown loses `avoid`; class constraints may still legitimately use 'avoid'.
+# v0.21 test: inspect only the weekly-day selector; class constraints may still legitimately use `avoid`.
 p='tests/v021.test.js'; s=read(p)
-s=s.replace("assert.doesNotMatch(app,/>עדיף להימנע</);", "assert.doesNotMatch(app,/<option value=\\\"avoid\\\"/);")
+s=s.replace("assert.doesNotMatch(app,/>עדיף להימנע</);", "const weeklySelect=app.match(/<select class=\\\"weekly-day-type\\\"[\\s\\S]*?<\\/select>/)?.[0]||''; assert.doesNotMatch(weeklySelect,/value=\\\"avoid\\\"/);")
 # Ensure strict missing-day behavior is tested in a context that contains real pattern data for someone else.
 s=s.replace("patterns:[],operations:[]", "patterns:[{employee_id:'other',weekday:1,day_type:'work',start_time:'07:30',end_time:'15:30'}],operations:[]",1)
 write(p,s)
