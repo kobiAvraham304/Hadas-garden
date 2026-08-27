@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Prepares the guarded release patch before the full QA run.
 p=Path('scripts/apply-v021-scheduling.py')
 lines=p.read_text(encoding='utf-8').splitlines()
 
@@ -26,7 +27,6 @@ try:
     idx=lines.index(marker)
 except ValueError:
     raise SystemExit('PDF marker not found in patch script')
-# marker + replace_once + old triple + new triple = 4 lines total after marker in source script
 if idx+3 >= len(lines) or not lines[idx+1].startswith("replace_once('app.js'"):
     raise SystemExit('Unexpected PDF patch block shape')
 replacement = "regex_once('app.js',r\"      const items = shifts\\.filter\\(\\(shift\\) => shift\\.shift_date === iso && shift\\.class_id === classItem\\.id\\)\\n        \\.sort\\(\\(a, b\\) => String\\(a\\.start_time\\)\\.localeCompare\\(String\\(b\\.start_time\\)\\) \\|\\| \\(employeeById\\(a\\.employee_id\\)\\?\\.full_name \\|\\| ''\\)\\.localeCompare\\(employeeById\\(b\\.employee_id\\)\\?\\.full_name \\|\\| '', 'he'\\)\\);\",'''      const items = sortScheduleRows(shifts.filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id));''')"
