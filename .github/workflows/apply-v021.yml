@@ -25,7 +25,22 @@ jobs:
         with:
           node-version: 24
       - name: Apply guarded patch
-        run: python3 scripts/apply-v021-scheduling.py
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/apply-v021-scheduling.py')
+          lines=p.read_text(encoding='utf-8').splitlines()
+          out=[]; i=0
+          while i<len(lines):
+              if lines[i].startswith("regex_once('app.js',r\"function renderFeedback") and i+1<len(lines) and lines[i+1].startswith('async function loadFeedback'):
+                  out.append(lines[i] + r'\n' + lines[i+1])
+                  i+=2
+              else:
+                  out.append(lines[i]); i+=1
+          p.write_text('\n'.join(out)+'\n',encoding='utf-8')
+          PY
+          python3 -m py_compile scripts/apply-v021-scheduling.py
+          python3 scripts/apply-v021-scheduling.py
       - name: Full QA
         run: |
           npm test
