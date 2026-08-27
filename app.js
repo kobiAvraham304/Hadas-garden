@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.19.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.20.0 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -62,6 +62,7 @@ const state = {
   calendarMonth: monthStart(new Date()),
   realtimeChannel: null,
   reloadTimer: null,
+  realtimeTopics: new Set(),
   pollTimer: null,
   suggestionsContext: null,
   shiftSuggestionCache: new Map(),
@@ -207,7 +208,7 @@ async function init() {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
     if (!configResponse.ok) throw new Error(state.config.error || 'לא ניתן לטעון הגדרות');
-    const version = state.config.version || '0.19.0';
+    const version = state.config.version || '0.20.0';
     $('#loginVersion').textContent = `גרסה ${version}`;
     if ($('#appVersionBadge')) $('#appVersionBadge').textContent = `v${version}`;
     if (window.supabase) state.realtimeClient = window.supabase.createClient(state.config.supabaseUrl, state.config.supabasePublishableKey, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
@@ -564,13 +565,30 @@ function subscribeRealtime() {
   if (state.realtimeChannel) state.realtimeClient.removeChannel(state.realtimeChannel);
   state.realtimeChannel = state.realtimeClient.channel('hadas-public-refresh').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'hadas_realtime_events' }, (payload) => {
     const topic = String(payload?.new?.topic || 'refresh');
+    state.realtimeTopics.add(topic);
     clearTimeout(state.reloadTimer);
-    state.reloadTimer = setTimeout(() => {
-      if (['daily_operations','attendance'].includes(topic) && state.activeTab === 'daily') { invalidateDailyCache(state.dailyDate); loadDailyOperations(state.dailyDate,{ force:true }).catch(() => {}); }
-      else if (['shifts', 'schedule_ack', 'settings', 'requests'].includes(topic) && state.activeTab === 'schedule') refreshScheduleWeek({ force: true }).catch(() => {});
-      else if (topic === 'calendar' && state.activeTab === 'calendar') setCalendarMonth(state.calendarMonth, { force: true }).catch(() => {});
-      else refreshAll();
-    }, 220);
+    state.reloadTimer = setTimeout(async () => {
+      const topics = new Set(state.realtimeTopics); state.realtimeTopics.clear();
+      const onlyTopics = (allowed) => [...topics].every((item) => allowed.has(item));
+      try {
+        if (state.activeTab === 'daily' && onlyTopics(new Set(['hadas_daily_operations','hadas_attendance']))) {
+          invalidateDailyCache(state.dailyDate); await loadDailyOperations(state.dailyDate, { force:true }); return;
+        }
+        if (state.activeTab === 'schedule' && onlyTopics(new Set(['hadas_shifts','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings']))) {
+          await refreshScheduleWeek({ force:true }); return;
+        }
+        if (state.activeTab === 'calendar' && onlyTopics(new Set(['hadas_calendar_events']))) {
+          await setCalendarMonth(state.calendarMonth, { force:true }); return;
+        }
+        const elapsed = Date.now() - state.lastRefreshAt;
+        if (elapsed < 1200) {
+          clearTimeout(state.reloadTimer);
+          state.reloadTimer = setTimeout(() => refreshAll().catch(() => {}), 1250 - elapsed);
+          return;
+        }
+        await refreshAll();
+      } catch {}
+    }, 650);
   }).subscribe((status) => {
     if (status === 'SUBSCRIBED') setSyncState('online', 'מעודכן בזמן אמת');
     else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) setSyncState('error', 'עדכון חי נותק — קיים רענון אוטומטי');
