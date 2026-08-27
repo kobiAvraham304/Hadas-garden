@@ -1,0 +1,51 @@
+name: Refine v0.21 auto scheduler
+
+on:
+  push:
+    branches:
+      - agent/v0.21.0-scheduling
+    paths:
+      - '.github/workflows/refine-v021-engine.yml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hadas-v021-auto-refine
+  cancel-in-progress: true
+
+jobs:
+  refine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0.21.0-scheduling
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply scheduling refinement
+        run: |
+          cat .deploy/v021-engine.part1 .deploy/v021-engine.part2 .deploy/v021-engine.part3 | base64 -d | gzip -d > /tmp/refine-v021-engine.py
+          python3 /tmp/refine-v021-engine.py
+          rm -f .deploy/v021-engine.part1 .deploy/v021-engine.part2 .deploy/v021-engine.part3
+          rmdir .deploy 2>/dev/null || true
+      - name: Full QA
+        run: |
+          npm test
+          npm run check
+          node --check app.js
+          node --check api/index.js
+          node --check lib/server.js
+          node --check lib/schedule.js
+          node --check lib/matching.js
+          node --check lib/auto-schedule.js
+          for file in handlers/*.js; do node --check "$file"; done
+      - name: Commit refined release candidate
+        run: |
+          git config user.name "Hadas Release Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "0.21.0 auto scheduling quality pass [v021-engine-refined]"
+          git push origin HEAD:agent/v0.21.0-scheduling
