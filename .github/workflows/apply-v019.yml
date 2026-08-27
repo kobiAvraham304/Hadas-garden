@@ -1,4 +1,4 @@
-# v0.19.0 focused recovery workflow
+# v0.19.0 fast validated recovery workflow
 name: Apply v0.19.0 production package
 
 on:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: hadas-v019-release
+  group: hadas-v019-release-fast-v2
   cancel-in-progress: true
 
 jobs:
@@ -40,6 +40,7 @@ jobs:
 
           parts = [p.read_text(encoding='utf-8').strip() for p in paths]
           alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+          sample_chars = 'AQgw0+/'
           joined = ''.join(parts)
 
           def decoded(candidate: str):
@@ -56,7 +57,7 @@ jobs:
               dec = lzma.LZMADecompressor(format=lzma.FORMAT_XZ)
               produced = 0
               consumed = 0
-              step = 128
+              step = 256
               try:
                   for i in range(0, len(packed), step):
                       block = packed[i:i + step]
@@ -70,10 +71,17 @@ jobs:
                   pass
               return (produced, consumed, False, None)
 
+          def push_top(heap, limit, score, pos, ch, candidate):
+              item = (score[0], score[1], pos, ch, candidate)
+              if len(heap) < limit:
+                  heapq.heappush(heap, item)
+              elif item[:2] > heap[0][:2]:
+                  heapq.heapreplace(heap, item)
+
           base = inspect(joined)
-          if base[2]:
-              patch = base[3]
-          else:
+          patch = base[3] if base[2] else None
+
+          if patch is None:
               max_chunk = max(len(p) for p in parts[:-1])
               short_middle = [i for i, p in enumerate(parts[:-1]) if len(p) == max_chunk - 1]
               if len(short_middle) != 1 or len(joined) % 4 != 2:
@@ -89,34 +97,58 @@ jobs:
               mid_end = mid_start + len(parts[mid])
 
               first_center = max(mid_start, min(mid_end, int(base[1] * 4 / 3)))
-              first_radius = 380
-              first_lo = max(mid_start, first_center - first_radius)
-              first_hi = min(mid_end, first_center + first_radius)
-              print('base progress:', base[:2], 'first search:', (first_lo, first_hi), flush=True)
+              coarse_lo = max(mid_start, first_center - 1700)
+              coarse_hi = min(mid_end, first_center + 1700)
+              print('base progress:', base[:2], 'first coarse:', (coarse_lo, coarse_hi), flush=True)
 
-              top = []
-              for pos in range(first_lo, first_hi + 1):
+              coarse = []
+              for pos in range(coarse_lo, coarse_hi + 1, 12):
+                  for ch in sample_chars:
+                      candidate = joined[:pos] + ch + joined[pos:]
+                      push_top(coarse, 20, inspect(candidate), pos, ch, candidate)
+              coarse.sort(reverse=True)
+              print('first coarse top:', [(x[0], x[1], x[2], x[3]) for x in coarse[:10]], flush=True)
+
+              refine_positions = set()
+              for _, _, pos, _, _ in coarse[:12]:
+                  refine_positions.update(range(max(mid_start, pos - 40), min(mid_end, pos + 40) + 1))
+
+              first_top = []
+              for pos in sorted(refine_positions):
                   for ch in alphabet:
                       candidate = joined[:pos] + ch + joined[pos:]
-                      score = inspect(candidate)
-                      item = (score[0], score[1], pos, ch, candidate)
-                      if len(top) < 8:
-                          heapq.heappush(top, item)
-                      elif item[:2] > top[0][:2]:
-                          heapq.heapreplace(top, item)
-
-              top.sort(reverse=True)
-              print('top first candidates:', [(x[0], x[1], x[2], x[3]) for x in top], flush=True)
+                      push_top(first_top, 16, inspect(candidate), pos, ch, candidate)
+              first_top.sort(reverse=True)
+              print('first refined top:', [(x[0], x[1], x[2], x[3]) for x in first_top], flush=True)
 
               found = None
-              for first_score, first_consumed, first_pos, first_ch, first_candidate in top:
+              for first_score, first_consumed, first_pos, first_ch, first_candidate in first_top:
                   second_center = max(first_pos + 1, int(first_consumed * 4 / 3))
-                  second_radius = 420
-                  second_lo = max(first_pos + 1, second_center - second_radius)
-                  second_hi = min(len(first_candidate), second_center + second_radius)
-                  print('second search:', (first_pos, first_ch, first_score, first_consumed), (second_lo, second_hi), flush=True)
+                  second_coarse_lo = max(first_pos + 1, second_center - 1900)
+                  second_coarse_hi = min(len(first_candidate), second_center + 1900)
+                  print('second coarse:', (first_pos, first_ch, first_score, first_consumed), (second_coarse_lo, second_coarse_hi), flush=True)
 
-                  for pos in range(second_lo, second_hi + 1):
+                  second_coarse = []
+                  for pos in range(second_coarse_lo, second_coarse_hi + 1, 12):
+                      for ch in sample_chars:
+                          candidate = first_candidate[:pos] + ch + first_candidate[pos:]
+                          score = inspect(candidate)
+                          if score[2]:
+                              found = (first_pos, first_ch, pos, ch, score[3])
+                              break
+                          push_top(second_coarse, 16, score, pos, ch, candidate)
+                      if found:
+                          break
+                  if found:
+                      break
+
+                  second_coarse.sort(reverse=True)
+                  print('second coarse top:', [(x[0], x[1], x[2], x[3]) for x in second_coarse[:8]], flush=True)
+                  second_refine_positions = set()
+                  for _, _, pos, _, _ in second_coarse[:10]:
+                      second_refine_positions.update(range(max(first_pos + 1, pos - 40), min(len(first_candidate), pos + 40) + 1))
+
+                  for pos in sorted(second_refine_positions):
                       for ch in alphabet:
                           candidate = first_candidate[:pos] + ch + first_candidate[pos:]
                           score = inspect(candidate)
@@ -129,7 +161,7 @@ jobs:
                       break
 
               if found is None:
-                  raise SystemExit('focused recovery did not find a fully valid Base64/XZ patch')
+                  raise SystemExit('fast recovery did not find a fully valid Base64/XZ patch')
 
               first_pos, first_ch, second_pos, second_ch, patch = found
               print(f'recovered v0.19.0 payload: first=({first_pos},{first_ch!r}) second=({second_pos},{second_ch!r})', flush=True)
