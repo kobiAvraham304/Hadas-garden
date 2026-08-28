@@ -12,7 +12,7 @@ const ASSIGNMENT_MODES = new Set(['fixed','rotation','substitute','no_schedule']
 
 function employeePayload(body) {
   const payload = {};
-  const fields = ['full_name','job_title','primary_class_id','weekly_hours','max_weekly_hours','employment_percent','default_start','default_end','active','started_at','ended_at','assignment_mode'];
+  const fields = ['full_name','job_title','primary_class_id','weekly_hours','max_weekly_hours','max_work_days_per_week','employment_percent','default_start','default_end','active','started_at','ended_at','assignment_mode'];
   for (const field of fields) if (body[field] !== undefined) payload[field] = body[field] === '' ? null : body[field];
   if (payload.full_name !== undefined) {
     payload.full_name = String(payload.full_name || '').trim();
@@ -34,6 +34,13 @@ function employeePayload(body) {
   if (payload.max_weekly_hours !== undefined && payload.max_weekly_hours !== null) {
     payload.max_weekly_hours = Number(payload.max_weekly_hours);
     if (!Number.isFinite(payload.max_weekly_hours) || payload.max_weekly_hours < 0 || payload.max_weekly_hours > 80) throw httpError(400,'מקסימום השעות השבועיות אינו תקין');
+  }
+  if (payload.max_work_days_per_week !== undefined) {
+    if (payload.max_work_days_per_week === '' || payload.max_work_days_per_week === null) payload.max_work_days_per_week = null;
+    else {
+      payload.max_work_days_per_week = Number(payload.max_work_days_per_week);
+      if (!Number.isInteger(payload.max_work_days_per_week) || payload.max_work_days_per_week < 1 || payload.max_work_days_per_week > 6) throw httpError(400,'מקסימום ימי העבודה השבועיים חייב להיות בין 1 ל-6');
+    }
   }
   if (payload.weekly_hours != null && payload.max_weekly_hours != null && payload.max_weekly_hours < payload.weekly_hours) {
     throw httpError(400,'מקסימום השעות השבועיות לא יכול להיות נמוך מהיקף השעות המתוכנן');
@@ -57,6 +64,7 @@ function employeePayload(body) {
     payload.is_schedulable = true;
     payload.can_lead = true;
   }
+  if (payload.assignment_mode !== undefined && payload.assignment_mode !== 'substitute') payload.max_work_days_per_week = null;
   if (NON_SCHEDULABLE_TITLES.has(title)) {
     payload.assignment_mode = 'no_schedule';
     payload.primary_class_id = null;
@@ -110,21 +118,29 @@ async function replaceConstraints(employeeId, constraints, actorId) {
   const rows = constraints.filter((item) => item.class_id && ['preferred','avoid','forbidden'].includes(item.constraint_type)).map((item) => {
     const validFrom=item.valid_from || null, validTo=item.valid_to || null;
     if (validFrom && validTo && validTo < validFrom) throw httpError(400,'תאריך סיום האילוץ אינו יכול להיות לפני תאריך ההתחלה');
+    const priorityRank = item.constraint_type === 'preferred' && item.priority_rank !== undefined && item.priority_rank !== null && item.priority_rank !== ''
+      ? Number(item.priority_rank) : null;
+    if (priorityRank !== null && (!Number.isInteger(priorityRank) || priorityRank < 1 || priorityRank > 20)) throw httpError(400,'סדר עדיפות הכיתה אינו תקין');
     return {
       employee_id:employeeId,
       class_id:item.class_id,
       constraint_type:item.constraint_type,
+      priority_rank:priorityRank,
       valid_from:validFrom,
       valid_to:validTo,
       reason:String(item.reason || '').trim() || null,
       created_by:actorId,
     };
   });
-  const duplicateKeys=new Set();
+  const duplicateKeys=new Set(); const ranks=new Set();
   for(const row of rows){
     const key=[row.class_id,row.constraint_type,row.valid_from||'',row.valid_to||''].join('|');
     if(duplicateKeys.has(key)) throw httpError(400,'קיים אילוץ כפול לאותה כיתה ותקופה');
     duplicateKeys.add(key);
+    if(row.constraint_type==='preferred' && row.priority_rank!==null){
+      if(ranks.has(row.priority_rank)) throw httpError(400,'יש לבחור סדר עדיפות שונה לכל כיתה');
+      ranks.add(row.priority_rank);
+    }
   }
   assertDb(await db().from('hadas_employee_class_constraints').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן אילוצים');
   if (rows.length) assertDb(await db().from('hadas_employee_class_constraints').insert(rows), 'לא ניתן לשמור אילוצים');

@@ -29,9 +29,9 @@
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=0190" />
+  <link rel="stylesheet" href="/styles.css?v=0220" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0190" defer></script>
+  <script src="/app.js?v=0220" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -251,12 +251,9 @@
         <label>שעת התחלה<input name="start_time" type="time" value="07:30" required /></label>
         <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
         <label class="full-field">תפקיד בשיבוץ הזה<select name="shift_role"><option value="teacher">גננת/גנן — אחראי/ת כיתה</option><option value="lead">מוביל/ת כיתה — אחראי/ת כיתה</option><option value="staff" selected>צוות כיתה</option><option value="replacement">מילוי מקום / החלפה</option></select><small>הבחירה משפיעה על מנוע ההתאמה. זהו התפקיד באותו יום בלבד.</small></label>
-        <section class="shift-recommendation-section full-field" aria-live="polite">
-          <div class="shift-recommendation-heading"><div><strong>העובדים המתאימים ביותר</strong><small>אותו מנוע משמש בהוספת שיבוץ ובמציאת מחליף: זמינות, תקינה, כיתה, שעות, תפקיד ואילוצים</small></div><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span></div>
-          <div id="shiftRecommendations" class="shift-recommendations"><div class="empty-state compact">בחרו תאריך, כיתה ושעות כדי לקבל המלצות.</div></div>
-        </section>
-        <section class="full-field shift-employee-picker" aria-labelledby="shiftEmployeePickerTitle">
-          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד</strong><small>כל הצוות מוצג: מומלצים תחילה, ובהמשך מי שנחסם עם הסיבה ואפשרות לחריגה ידנית</small></div><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div>
+        <section class="full-field shift-employee-picker unified-shift-picker" aria-labelledby="shiftEmployeePickerTitle">
+          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד / מחליף</strong><small>המומלצים מופיעים ראשונים באותה רשימה, יחד עם זמינות, התאמה וסיבת חסימה.</small></div><div class="picker-status-group"><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div></div>
+          <div id="shiftRecommendations" class="hidden" aria-hidden="true"></div>
           <input name="employee_id" type="hidden" required />
           <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש לפי שם או תפקיד" autocomplete="off" /></label>
           <div id="shiftEmployeeOptionsList" class="shift-employee-options" role="listbox" aria-label="עובדים זמינים"></div>
@@ -265,7 +262,7 @@
         <label class="full-field">הערה גלויה<input name="public_note" placeholder="לדוגמה: עד 12:30 או ישיבה מקצועית" /></label>
       </div>
       <div class="notice soft-notice">כל שינוי נשמר כטיוטה ומופיע לצוות רק לאחר פרסום השיבוץ.</div>
-      <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת השיבוץ</button></div>
+      <div class="modal-actions shift-modal-actions"><button id="deleteShiftFromDialogBtn" type="button" class="danger-btn hidden">מחיקת השיבוץ</button><span class="modal-action-spacer"></span><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת השיבוץ</button></div>
     </form>
   </dialog>
 
@@ -274,7 +271,12 @@
       <div class="modal-heading"><div><p class="eyebrow">בניית שבוע חכמה</p><h3>שיבוץ אוטומטי</h3><p class="muted">המערכת בודקת ימי עבודה, שעות, חופשות שאושרו, כיתה קבועה, רוטציה, אילוצים, תפקיד, תקינה ומקסימום שעות שבועיות.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
       <section id="autoScheduleSetup" class="auto-schedule-setup">
         <div class="auto-explanation"><span>✦</span><div><strong>לפני שנוגעים בשיבוץ</strong><p>תחילה נוצרת תצוגה מקדימה בלבד. שום שינוי לא יישמר עד לאישור מפורש.</p></div></div>
-        <label class="auto-week-picker"><span>שבוע לשיבוץ</span><select id="autoScheduleWeek" name="auto_schedule_week"></select><small>בוחרים שבוע שלם באופן ישיר — בלי לבחור יום אקראי בתוך השבוע.</small></label>
+        <label class="auto-week-picker"><span>שבוע לשיבוץ</span><select id="autoScheduleWeek" name="auto_schedule_week"></select><small>לאחר בחירת השבוע ניתן לבחור את כולו או רק ימים מסוימים.</small></label>
+        <div class="auto-scope-grid" role="radiogroup" aria-label="היקף השיבוץ">
+          <label class="auto-scope-card selected"><input type="radio" name="auto_schedule_scope" value="week" checked /><strong>כל השבוע</strong><small>ראשון–שישי</small></label>
+          <label class="auto-scope-card"><input type="radio" name="auto_schedule_scope" value="partial" /><strong>חלק מהשבוע</strong><small>בחירת ימים ספציפיים</small></label>
+        </div>
+        <div id="autoScheduleDateChoices" class="auto-date-choices hidden" aria-label="בחירת ימים לשיבוץ"></div>
         <div class="auto-mode-grid" role="radiogroup" aria-label="אופן יצירת השיבוץ">
           <label class="auto-mode-card selected"><input type="radio" name="auto_schedule_mode" value="rebuild" checked /><span>↻</span><strong>בנייה מחדש</strong><small>מחשב את כל השבוע מחדש ומחליף את הטיוטה הקיימת.</small></label>
           <label class="auto-mode-card"><input type="radio" name="auto_schedule_mode" value="fill" /><span>＋</span><strong>מילוי חוסרים</strong><small>שומר את השיבוצים הקיימים ומוסיף רק מה שחסר.</small></label>
@@ -330,12 +332,13 @@
       <section id="employeeWorkSection" class="form-section employee-form-section"><div class="form-section-heading"><div><span class="section-number">3</span><div><h4>משרה ושעות</h4><p>היקף המשרה וברירות המחדל לשיבוץ.</p></div></div></div><div class="form-grid">
         <label><span class="field-title">שעות שבועיות מתוכננות</span><input name="weekly_hours" type="number" inputmode="decimal" min="0" max="60" step="0.25" placeholder="לדוגמה 32" /></label>
         <label><span class="field-title">מקסימום שעות שבועיות</span><input name="max_weekly_hours" type="number" inputmode="decimal" min="0" max="80" step="0.25" placeholder="לדוגמה 40" /></label>
+        <label id="maxWorkDaysField" class="hidden"><span class="field-title">מקסימום ימי עבודה בשבוע</span><select name="max_work_days_per_week"><option value="">ללא מגבלה</option><option value="1">1 יום</option><option value="2">2 ימים</option><option value="3">3 ימים</option><option value="4">4 ימים</option><option value="5">5 ימים</option><option value="6">6 ימים</option></select><small>למשל: זמינה בשלושה ימים, אבל בכל שבוע ניתן לשבץ אותה לכל היותר פעמיים.</small></label>
         <label><span class="field-title">אחוז משרה</span><input name="employment_percent" type="number" inputmode="numeric" min="0" max="200" step="1" placeholder="100" /></label>
         <label><span class="field-title">שעת התחלה רגילה</span><input name="default_start" type="time" value="07:30" /></label>
         <label><span class="field-title">שעת סיום רגילה</span><input name="default_end" type="time" value="15:30" /></label>
       </div></section>
       <details id="employeeScheduleSection" class="employee-form-details" open><summary><span class="section-number">4</span><span><strong>ימי עבודה ושעות</strong><small>לכל יום יש כלל חד-משמעי שהשיבוץ האוטומטי חייב לכבד.</small></span><i>⌄</i></summary><fieldset class="weekly-patterns-box"><legend class="sr-only">ימי עבודה וחופשה קבועים</legend><p class="field-help"><strong>יום עבודה (קבוע)</strong> — משבצים לפי השעות; <strong>יום חופשי</strong> — אסור לשיבוץ אוטומטי; <strong>לפי צורך</strong> — רק אם חסר כוח אדם ובעדיפות נמוכה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset></details>
-      <details id="employeeConstraintsSection" class="employee-form-details"><summary><span class="section-number">5</span><span><strong>העדפות והגבלות כיתה</strong><small>מגדירים רק כאשר קיימת העדפה או מגבלה.</small></span><i>⌄</i></summary><fieldset class="constraints-box"><legend class="sr-only">העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset></details>
+      <details id="employeeConstraintsSection" class="employee-form-details"><summary><span class="section-number">5</span><span><strong>עדיפות כיתות והגבלות</strong><small>הכיתה הקבועה תמיד ראשונה; מדרגים רק את שאר הכיתות.</small></span><i>⌄</i></summary><fieldset class="constraints-box"><legend class="sr-only">העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset></details>
       <details id="employeeNotesSection" class="employee-form-details"><summary><span class="section-number">6</span><span><strong>הערה ניהולית</strong><small>מידע פרטי שרק לינור ואילנית רואות.</small></span><i>⌄</i></summary><label class="full-field employee-admin-note"><span class="field-title">הערה ניהולית</span><textarea name="admin_notes" rows="3" placeholder="מידע פרטי ורלוונטי לניהול השיבוץ"></textarea></label></details>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת העובד</button></div>
     </form>

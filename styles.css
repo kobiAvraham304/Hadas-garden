@@ -1135,3 +1135,43 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
   #scheduleWarnings.hidden{display:none!important}.schedule-issues-panel header{align-items:stretch;flex-direction:column}.schedule-issue-card{grid-template-columns:30px minmax(0,1fr)!important}.schedule-issue-card .issue-actions{grid-column:1/-1;display:flex;flex-wrap:wrap}.schedule-issue-card .issue-actions button{flex:1}
 }
 
+/* v0.22 schedule experience */
+.time-value,.shift-time,input[type="time"]{direction:ltr!important;unicode-bidi:isolate!important}
+.time-value{display:inline-block;text-align:left;white-space:nowrap}
+.class-priority-fixed{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border:1px solid var(--border,#dfe3ee);border-radius:14px;background:rgba(111,114,217,.08);grid-column:1/-1}
+.class-priority-fixed>span{font-size:20px}.class-priority-fixed small{display:block;margin-top:3px}
+.class-priority-fixed.no-fixed{background:rgba(32,166,111,.07)}
+.class-priority-row{grid-template-columns:minmax(130px,1fr) minmax(140px,1fr);align-items:end}
+#maxWorkDaysField small{display:block;margin-top:4px}
+.auto-scope-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+.auto-scope-card{display:grid;gap:3px;padding:12px;border:1px solid var(--border,#dfe3ee);border-radius:14px;cursor:pointer;background:#fff}
+.auto-scope-card input{position:absolute;opacity:0;pointer-events:none}.auto-scope-card.selected{outline:2px solid #6f72d9;background:rgba(111,114,217,.08)}
+.auto-date-choices{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin:8px 0 16px}
+.auto-date-chip{display:grid;text-align:center;gap:2px;padding:9px 5px;border:1px solid var(--border,#dfe3ee);border-radius:12px;cursor:pointer}
+.auto-date-chip input{position:absolute;opacity:0}.auto-date-chip.selected{background:rgba(32,166,111,.11);border-color:rgba(32,166,111,.45)}
+.auto-issue-presence{margin:8px 0 0;border-top:1px dashed var(--border,#dfe3ee);padding-top:8px}
+.auto-issue-presence summary{cursor:pointer;font-weight:700;font-size:.86rem}
+.auto-issue-presence>div{display:grid;gap:5px;margin-top:7px}.auto-issue-presence>div>span{display:flex;justify-content:space-between;gap:12px;padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.035)}
+.picker-status-group{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.shift-modal-actions{display:flex;align-items:center}.modal-action-spacer{flex:1}
+.publication-toggle{position:relative;display:inline-flex!important;align-items:center;gap:8px;transition:.2s ease}
+.publication-toggle-dot{width:22px;height:12px;border-radius:999px;background:#d4d7df;position:relative;display:inline-block}
+.publication-toggle-dot:after{content:"";position:absolute;top:2px;right:2px;width:8px;height:8px;border-radius:50%;background:white;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.2s ease}
+.publication-toggle.is-published .publication-toggle-dot{background:#3eb982}.publication-toggle.is-published .publication-toggle-dot:after{right:12px}
+.publication-banner.compact{padding:8px 12px;min-height:auto}.publication-banner.compact small{font-size:.78rem}
+.schedule-table{border-collapse:separate;border-spacing:4px;min-width:930px}
+.schedule-table th{position:sticky;top:0;z-index:2}.schedule-table td{vertical-align:top;background:#fbfcff;border-radius:10px;padding:5px}
+.schedule-cell{display:flex;flex-direction:column;min-height:148px;gap:4px}
+.shift-item.is-editable{cursor:pointer;position:relative;transition:transform .12s ease,box-shadow .12s ease;border:1px solid transparent}
+.shift-item.is-editable:hover,.shift-item.is-editable:focus-visible{transform:translateY(-1px);box-shadow:0 3px 12px rgba(40,48,80,.12);outline:none;border-color:rgba(111,114,217,.35)}
+.shift-item.role-teacher{background:#e8f6ef}.shift-item.role-lead{background:#f1ecfa}.shift-item.role-staff,.shift-item.role-replacement{background:#f4f5f8}
+.shift-edit-hint{position:absolute;left:6px;bottom:5px;opacity:.36;font-size:.72rem}
+.cell-footer{margin-top:auto;padding-top:5px}.cell-footer .cell-action{width:100%;justify-content:center}
+.absence-person.one-time-absence{background:#fff0f0;border:1px solid #efb1b1}.absence-person.one-time-absence .absence-icon{color:#c33}
+.absence-person.worked-day-off{background:#edf9f1;border:1px solid #a8dbb8}.absence-person.worked-day-off .absence-icon{color:#168044}
+@media(max-width:760px){
+  .auto-scope-grid{grid-template-columns:1fr 1fr}.auto-date-choices{grid-template-columns:repeat(3,1fr)}
+  .class-priority-row{grid-template-columns:1fr}.shift-modal-actions{flex-wrap:wrap}.modal-action-spacer{display:none;width:100%}
+  .shift-modal-actions .danger-btn{order:3;width:100%}
+  .shift-item.is-editable{min-height:58px}.shift-edit-hint{left:8px;bottom:8px}
+}

@@ -19,6 +19,15 @@ function getSunday(dateString) {
   return d.toISOString().slice(0, 10);
 }
 
+function selectedDatesForWeek(weekStart,input) {
+  const allowed=new Set(Array.from({length:6},(_,index)=>addDays(weekStart,index)));
+  if(input===undefined||input===null)return [...allowed];
+  if(!Array.isArray(input))throw httpError(400,'רשימת הימים לשיבוץ אינה תקינה');
+  const rows=[...new Set(input.map(String).filter((date)=>allowed.has(date)))].sort();
+  if(!rows.length)throw httpError(400,'יש לבחור לפחות יום אחד לשיבוץ האוטומטי');
+  return rows;
+}
+
 function shiftSnapshot(shift) {
   if (!shift) return null;
   const keys = ['id', 'shift_date', 'class_id', 'employee_id', 'start_time', 'end_time', 'shift_role', 'status', 'public_note', 'rule_override', 'rule_override_note', 'created_at', 'updated_at'];
@@ -58,6 +67,13 @@ async function validateShift(payload, id, overrideDayOff = false, overrideRules 
   if (timeToMinutes(payload.start_time) < timeToMinutes(settings.opening_time) || timeToMinutes(payload.end_time) > timeToMinutes(dayClosing)) throw httpError(409, `השיבוץ חייב להיות בין ${String(settings.opening_time).slice(0,5)} ל-${dayClosing}`);
   const existingQuery = db().from('hadas_shifts').select('id').eq('employee_id', payload.employee_id).eq('shift_date', payload.shift_date).lt('start_time', payload.end_time).gt('end_time', payload.start_time); if (id) existingQuery.neq('id', id);
   const overlaps = assertDb(await existingQuery, 'בדיקת חפיפה נכשלה') || []; if (overlaps.length) throw httpError(409, 'העובד כבר משובץ בשעות חופפות');
+
+  if (!overrideRules && Number.isInteger(Number(employee.max_work_days_per_week)) && Number(employee.max_work_days_per_week)>0) {
+    const weekStart=getSunday(payload.shift_date),weekEnd=addDays(weekStart,5);
+    const weekRows=assertDb(await db().from('hadas_shifts').select('id,shift_date').eq('employee_id',payload.employee_id).gte('shift_date',weekStart).lte('shift_date',weekEnd),'בדיקת מספר ימי העבודה נכשלה')||[];
+    const relevant=weekRows.filter((row)=>!id||row.id!==id); const dates=new Set(relevant.map((row)=>row.shift_date));
+    if(!dates.has(payload.shift_date)&&dates.size>=Number(employee.max_work_days_per_week)) throw httpError(409,`לעובד הוגדר מקסימום ${employee.max_work_days_per_week} ימי עבודה בשבוע. ניתן לשמור רק כשיבוץ ידני חריג.`);
+  }
 
   if (!overrideRules) {
     if (employee.job_title === 'גננת' && employee.primary_class_id && employee.primary_class_id !== payload.class_id) throw httpError(409, 'גננת ניתנת לשיבוץ רק בכיתה הקבועה שלה');
@@ -102,6 +118,7 @@ async function loadAutomaticScheduleData(weekStart) {
 function publicAutomaticPreview(plan) {
   return {
     weekStart: plan.weekStart,
+    selectedDates: plan.selectedDates || [],
     mode: plan.mode,
     keptCount: plan.keptCount,
     generated: plan.generated,
@@ -207,41 +224,35 @@ function restoreLastPublished(currentRows, pendingChanges) {
   return [...result.values()].sort((a, b) => `${a.shift_date}-${a.start_time}`.localeCompare(`${b.shift_date}-${b.start_time}`));
 }
 
-function buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart) {
-  const dates = Array.from({ length: 6 }, (_, index) => addDays(weekStart, index));
-  const validDates = new Set(dates);
-  const absenceMap = new Map();
-  for (const request of requests) {
-    if (!['approved', 'applied'].includes(request.status)) continue;
-    if (!['leave', 'day_off', 'sick'].includes(request.request_type)) continue;
-    const endDate = request.request_end_date || request.request_date;
-    for (const cursor of dates) {
-      if (cursor < request.request_date || cursor > endDate) continue;
-      absenceMap.set(`${request.requester_id}:${cursor}`, {
-        employee_id: request.requester_id,
-        absence_date: cursor,
-        absence_type: request.request_type,
-      });
+function buildScheduleAbsences(requests, employees, weeklyPatterns, shifts, weekStart) {
+  const dates=Array.from({length:6},(_,index)=>addDays(weekStart,index));
+  const absenceMap=new Map();
+  for(const request of requests){
+    if(!['approved','applied'].includes(request.status)||!['leave','day_off','sick'].includes(request.request_type))continue;
+    const endDate=request.request_end_date||request.request_date;
+    for(const cursor of dates){
+      if(cursor<request.request_date||cursor>endDate)continue;
+      absenceMap.set(`${request.requester_id}:${cursor}`,{employee_id:request.requester_id,absence_date:cursor,absence_type:request.request_type,absence_kind:'one_time_absence'});
     }
   }
-  const employeesWithPatterns = new Set(weeklyPatterns.map((row) => row.employee_id));
-  for (const pattern of weeklyPatterns.filter((row) => row.day_type === 'day_off')) {
-    for (const date of dates) {
-      const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-      if (weekday !== Number(pattern.weekday)) continue;
-      const key = `${pattern.employee_id}:${date}`;
-      if (!absenceMap.has(key)) absenceMap.set(key, { employee_id: pattern.employee_id, absence_date: date, absence_type: 'day_off' });
+  const employeesWithPatterns=new Set(weeklyPatterns.map((row)=>row.employee_id));
+  for(const pattern of weeklyPatterns.filter((row)=>row.day_type==='day_off')){
+    for(const date of dates){
+      if(new Date(`${date}T12:00:00Z`).getUTCDay()!==Number(pattern.weekday))continue;
+      if(!shifts.some((shift)=>shift.employee_id===pattern.employee_id&&shift.shift_date===date))continue;
+      const key=`${pattern.employee_id}:${date}`;
+      if(!absenceMap.has(key))absenceMap.set(key,{employee_id:pattern.employee_id,absence_date:date,absence_type:'day_off_worked',absence_kind:'worked_day_off'});
     }
   }
-  for (const employee of employees.filter((row) => row.active && row.fixed_day_off !== null && row.fixed_day_off !== undefined && !employeesWithPatterns.has(row.id))) {
-    for (const date of dates) {
-      const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-      if (weekday !== Number(employee.fixed_day_off)) continue;
-      const key = `${employee.id}:${date}`;
-      if (!absenceMap.has(key)) absenceMap.set(key, { employee_id: employee.id, absence_date: date, absence_type: 'day_off' });
+  for(const employee of employees.filter((row)=>row.active&&row.fixed_day_off!==null&&row.fixed_day_off!==undefined&&!employeesWithPatterns.has(row.id))){
+    for(const date of dates){
+      if(new Date(`${date}T12:00:00Z`).getUTCDay()!==Number(employee.fixed_day_off))continue;
+      if(!shifts.some((shift)=>shift.employee_id===employee.id&&shift.shift_date===date))continue;
+      const key=`${employee.id}:${date}`;
+      if(!absenceMap.has(key))absenceMap.set(key,{employee_id:employee.id,absence_date:date,absence_type:'day_off_worked',absence_kind:'worked_day_off'});
     }
   }
-  return [...absenceMap.values()].sort((a, b) => `${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`));
+  return [...absenceMap.values()].sort((a,b)=>`${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`));
 }
 
 module.exports = async function handler(req, res) {
@@ -280,7 +291,7 @@ module.exports = async function handler(req, res) {
         else if (!fullScheduleViewer) shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
         acknowledgements = acknowledgements.filter((row) => row.employee_id === caller.employee.id);
       }
-      let scheduleAbsences = buildScheduleAbsences(requests, employees, weeklyPatterns, weekStart);
+      let scheduleAbsences = buildScheduleAbsences(requests, employees, weeklyPatterns, shifts, weekStart);
       if (scope === 'class') {
         const classEmployeeIds = new Set(employees.filter((row) => row.primary_class_id === caller.employee.primary_class_id).map((row) => row.id));
         scheduleAbsences = scheduleAbsences.filter((row) => classEmployeeIds.has(row.employee_id));
@@ -308,28 +319,29 @@ module.exports = async function handler(req, res) {
     if (req.method === 'POST' && body.action === 'auto_preview') {
       const weekStart = getSunday(String(body.week_start || israelDateISO()));
       const mode = body.mode === 'fill' ? 'fill' : 'rebuild';
+      const selectedDates=selectedDatesForWeek(weekStart,body.selected_dates);
       const data = await loadAutomaticScheduleData(weekStart);
-      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, createdBy: caller.employee.id });
+      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, selectedDates, createdBy: caller.employee.id });
       return send(res, 200, { ok: true, preview: publicAutomaticPreview(plan) });
     }
 
     if (req.method === 'POST' && body.action === 'auto_apply') {
       const weekStart = getSunday(String(body.week_start || israelDateISO()));
       const mode = body.mode === 'fill' ? 'fill' : 'rebuild';
+      const selectedDates=selectedDatesForWeek(weekStart,body.selected_dates);
       const data = await loadAutomaticScheduleData(weekStart);
-      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, createdBy: caller.employee.id });
+      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, selectedDates, createdBy: caller.employee.id });
       if (body.signature && body.signature !== plan.signature) throw httpError(409, 'נתוני העובדים או השבוע השתנו מאז התצוגה המקדימה. יש לחשב מחדש את השיבוץ.');
       const incompleteCodes = new Set(['understaffed','missing_leader']);
       const hardErrors = plan.validation.errors.filter((item)=>!incompleteCodes.has(item.code));
       if (hardErrors.length) throw httpError(409, 'השיבוץ האוטומטי זיהה הפרת כלל קשיח ולכן לא ניתן להחיל אותו. יש לתקן את הנתונים או לחשב מחדש.', { errors:hardErrors, warnings:plan.validation.warnings });
       if (plan.validation.errors.length && !body.allow_incomplete) throw httpError(409, 'נשארו חוסרים בשיבוץ האוטומטי. ניתן לחזור לתצוגה המקדימה או לאשר יצירת טיוטה חלקית.', plan.validation);
       if (!plan.generated.length) throw httpError(409, mode === 'fill' ? 'לא נמצאו חוסרים שניתן למלא אוטומטית' : 'לא ניתן היה ליצור שיבוצים מהנתונים הקיימים');
-      const weekEnd = addDays(weekStart, 5);
-      const deletedRows = mode === 'rebuild' ? data.existingShifts : [];
+      const deletedRows = mode === 'rebuild' ? data.existingShifts.filter((row)=>selectedDates.includes(row.shift_date)) : [];
       const rows = plan.generated.map((row) => ({ ...row, status: 'draft', created_by: caller.employee.id }));
       let inserted = [];
       try {
-        if (deletedRows.length) assertDb(await db().from('hadas_shifts').delete().gte('shift_date', weekStart).lte('shift_date', weekEnd), 'לא ניתן לנקות את השבוע לפני השיבוץ האוטומטי');
+        if (deletedRows.length) assertDb(await db().from('hadas_shifts').delete().in('shift_date', selectedDates), 'לא ניתן לנקות את הימים שנבחרו לפני השיבוץ האוטומטי');
         inserted = assertDb(await db().from('hadas_shifts').insert(rows).select('*'), 'לא ניתן לשמור את השיבוץ האוטומטי') || [];
         await recordAutomaticChanges(caller, weekStart, deletedRows, inserted);
       } catch (error) {
@@ -338,7 +350,7 @@ module.exports = async function handler(req, res) {
         throw error;
       }
       await audit(caller.employee.id, 'automatic_schedule', 'schedule', weekStart, {
-        mode, generated: inserted.length, quality: plan.metrics.quality,
+        mode, selected_dates:selectedDates, generated: inserted.length, quality: plan.metrics.quality,
         errors: plan.validation.errors.length, warnings: plan.validation.warnings.length,
       });
       await emitEvent('shifts');
