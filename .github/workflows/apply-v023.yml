@@ -33,6 +33,8 @@ jobs:
           p=Path('scripts/apply-v023.py')
           s=p.read_text(encoding='utf-8')
           s=s.replace("insert_marker='function dailyOperationByShift(shiftId)'", "insert_marker='function dailyOperationRange(operation,shift)'")
+          s=s.replace("marker=\"create index if not exists hadas_requests_requester_date_idx\"", "marker=\"create index if not exists hadas_requests_date_idx\"")
+          s=s.replace("if(/גנ(?:נ|ן)/.test(title)||", "if(/(גננת|גנן)/.test(title)||")
           p.write_text(s,encoding='utf-8')
           PY
       - name: Validate release patch
