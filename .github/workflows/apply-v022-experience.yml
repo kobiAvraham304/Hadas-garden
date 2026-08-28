@@ -37,6 +37,42 @@ jobs:
           PY
       - name: Apply v0.22 changes
         run: python3 scripts/apply-v022-experience.py
+      - name: Refine regressions and QA expectations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def edit(path, old, new, count=1):
+              p=Path(path); s=p.read_text(encoding='utf-8')
+              if old not in s: raise SystemExit(f'missing refinement marker: {path}: {old[:100]}')
+              p.write_text(s.replace(old,new,count),encoding='utf-8')
+
+          edit('lib/schedule.js',
+               "  for (const employee of activeEmployees) {\n    const weeklyMinutes = calculateWeeklyMinutes(shifts, employee.id);\n    const workDays=new Set(employeeShifts.map((shift)=>shift.shift_date));",
+               "  for (const employee of activeEmployees) {\n    const employeeShifts=shifts.filter((shift)=>shift.employee_id===employee.id);\n    const weeklyMinutes = calculateWeeklyMinutes(shifts, employee.id);\n    const workDays=new Set(employeeShifts.map((shift)=>shift.shift_date));")
+
+          edit('handlers/employees.js',
+               "  if (payload.max_work_days_per_week !== undefined && payload.max_work_days_per_week !== null) {\n    payload.max_work_days_per_week = Number(payload.max_work_days_per_week);\n    if (!Number.isInteger(payload.max_work_days_per_week) || payload.max_work_days_per_week < 1 || payload.max_work_days_per_week > 6) throw httpError(400,'מקסימום ימי העבודה השבועיים חייב להיות בין 1 ל-6');\n  }",
+               "  if (payload.max_work_days_per_week !== undefined) {\n    if (payload.max_work_days_per_week === '' || payload.max_work_days_per_week === null) payload.max_work_days_per_week = null;\n    else {\n      payload.max_work_days_per_week = Number(payload.max_work_days_per_week);\n      if (!Number.isInteger(payload.max_work_days_per_week) || payload.max_work_days_per_week < 1 || payload.max_work_days_per_week > 6) throw httpError(400,'מקסימום ימי העבודה השבועיים חייב להיות בין 1 ל-6');\n    }\n  }")
+          edit('handlers/employees.js',
+               "  if ((payload.assignment_mode ?? body.assignment_mode ?? body.current_assignment_mode) !== 'substitute') payload.max_work_days_per_week = null;",
+               "  if (payload.assignment_mode !== undefined && payload.assignment_mode !== 'substitute') payload.max_work_days_per_week = null;")
+
+          for path in ['tests/api.test.js','tests/router.test.js','tests/static.test.js']:
+              p=Path(path); p.write_text(p.read_text(encoding='utf-8').replace('0.21.0','0.22.0'),encoding='utf-8')
+
+          p=Path('tests/v021.test.js'); s=p.read_text(encoding='utf-8')
+          old="test('0.21 metadata and migration are aligned',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.21.0'); assert.match(read('handlers/health.js'),/schema_version === '0\\.21\\.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\\(1,'0\\.21\\.0','0\\.21\\.0'/); });"
+          new="test('0.21 migration remains compatible under current release',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.22.0'); assert.match(read('handlers/health.js'),/schema_version === '0\\.22\\.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\\(1,'0\\.21\\.0','0\\.21\\.0'/); });"
+          if old not in s: raise SystemExit('v021 current-version assertion marker missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('tests/v017.test.js'); s=p.read_text(encoding='utf-8').replace('styles\\.css\\?v=0190','styles\\.css\\?v=0220').replace('app\\.js\\?v=0190','app\\.js\\?v=0220'); p.write_text(s,encoding='utf-8')
+
+          p=Path('VERSION.md'); s=p.read_text(encoding='utf-8');
+          if 'מערכת ניהול שיבוצים מעון הדס' not in s: s=s.replace('# גרסה 0.22.0','# מערכת ניהול שיבוצים מעון הדס — גרסה 0.22.0',1)
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Full QA
         run: |
           npm test
