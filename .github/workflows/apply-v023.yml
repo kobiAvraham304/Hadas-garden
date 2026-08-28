@@ -41,6 +41,26 @@ jobs:
         run: python3 -m py_compile scripts/apply-v023.py
       - name: Apply v0.23 changes
         run: python3 scripts/apply-v023.py
+      - name: Align regression tests with v0.23 behavior
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p=Path('tests/v013.test.js')
+          s=p.read_text(encoding='utf-8')
+          old="  for(const label of ['גננת/גנן — אחראי/ת כיתה','מוביל/ת כיתה — אחראי/ת כיתה','צוות כיתה','מילוי מקום / החלפה']) assert.match(html,new RegExp(label.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')));"
+          new="  assert.match(html,/type=\"hidden\" name=\"shift_role\"/); assert.doesNotMatch(html,/תפקיד בשיבוץ הזה/); assert.match(app,/suggestedShiftRoleForEmployee/);"
+          if old not in s: raise SystemExit('v013 role assertion marker missing')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('tests/v017.test.js')
+          s=p.read_text(encoding='utf-8').replace('v=0220','v=0230')
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('tests/v023.test.js')
+          s=p.read_text(encoding='utf-8').replace("assert.match(app,/decision-fixing/);", "assert.match(app,/autoIssueCorrectionHtml/);assert.match(app,/fixing/);")
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Full QA
         run: |
           npm test
