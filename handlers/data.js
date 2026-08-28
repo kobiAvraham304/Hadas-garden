@@ -98,6 +98,7 @@ module.exports = async function handler(req, res) {
       db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd).order('shift_date').order('start_time'),
       db().from('hadas_attendance').select('*').eq('attendance_date', attendanceDate),
       db().from('hadas_requests').select('*').order('created_at', { ascending: false }).limit(500),
+      db().from('hadas_request_messages').select('*').order('created_at').limit(1500),
       db().from('hadas_schedule_acknowledgements').select('*').eq('week_start', weekStart),
       db().from('hadas_announcements').select('*').order('published_at', { ascending: false }).limit(200),
       db().from('hadas_announcement_recipients').select('*'),
@@ -115,7 +116,7 @@ module.exports = async function handler(req, res) {
       db().from('hadas_notifications').select('*').eq('employee_id', caller.employee.id).order('created_at', { ascending: false }).limit(150),
     ]);
 
-    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, dailyShiftsR, dailyAttendanceR, notificationsR] = results;
+    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, requestMessagesR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, dailyShiftsR, dailyAttendanceR, notificationsR] = results;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
     const employeeRows = assertDb(employeesR, 'לא ניתן לטעון עובדים') || [];
     const userRows = assertDb(usersR, 'לא ניתן לטעון הרשאות') || [];
@@ -126,6 +127,8 @@ module.exports = async function handler(req, res) {
     let shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
     let attendance = assertDb(attendanceR, 'לא ניתן לטעון נוכחות') || [];
     let requests = assertDb(requestsR, 'לא ניתן לטעון בקשות') || [];
+    let requestMessages = assertDb(requestMessagesR, 'לא ניתן לטעון תגובות לבקשות') || [];
+    const allRequestsForCalendar=[...requests];
     let acknowledgements = assertDb(ackR, 'לא ניתן לטעון אישורי קריאה') || [];
     let announcements = assertDb(announcementsR, 'לא ניתן לטעון הודעות') || [];
     let announcementRecipients = assertDb(recipientsR, 'לא ניתן לטעון מקבלי הודעות') || [];
@@ -168,23 +171,6 @@ module.exports = async function handler(req, res) {
         });
       }
     }
-    for (const pattern of weeklyPatterns.filter((row) => row.day_type === 'day_off')) {
-      for (const date of absenceDates) {
-        const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-        if (weekday !== Number(pattern.weekday)) continue;
-        const key = `${pattern.employee_id}:${date}`;
-        if (!absenceMap.has(key)) absenceMap.set(key, { employee_id: pattern.employee_id, absence_date: date, absence_type: 'day_off' });
-      }
-    }
-    // תאימות לעובדים שטרם נשמרה עבורם תבנית שבועית חדשה.
-    for (const employee of employeeRows.filter((row) => row.active && row.fixed_day_off !== null && row.fixed_day_off !== undefined && !patternsByEmployee.has(row.id))) {
-      for (const date of absenceDates) {
-        const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-        if (weekday !== Number(employee.fixed_day_off)) continue;
-        const key = `${employee.id}:${date}`;
-        if (!absenceMap.has(key)) absenceMap.set(key, { employee_id: employee.id, absence_date: date, absence_type: 'day_off' });
-      }
-    }
     if (!manager) {
       shifts = restoreLastPublished(shifts, scheduleChanges);
       todayShifts = restoreLastPublished(todayShifts, todayChanges);
@@ -211,6 +197,13 @@ module.exports = async function handler(req, res) {
       assignees = assignees.filter((row) => row.employee_id === caller.employee.id || createdTaskIds.has(row.task_id));
       calendar = calendar.filter((row) => row.created_by === caller.employee.id || row.visibility === 'all' || (row.visibility === 'class' && row.class_id === caller.employee.primary_class_id));
     }
+
+    const visibleRequestIds=new Set(requests.map((row)=>row.id));requestMessages=requestMessages.filter((row)=>visibleRequestIds.has(row.request_id));
+    const visibleShiftPool=[...shifts,...todayShifts];
+    for(const shift of visibleShiftPool){const pattern=(patternsByEmployee.get(shift.employee_id)||[]).find((row)=>Number(row.weekday)===new Date(`${shift.shift_date}T12:00:00Z`).getUTCDay());const employee=employeeRows.find((row)=>row.id===shift.employee_id);const fixedOff=pattern?pattern.day_type==='day_off':Number(employee?.fixed_day_off)===new Date(`${shift.shift_date}T12:00:00Z`).getUTCDay();if(fixedOff){const key=`${shift.employee_id}:${shift.shift_date}`;if(!absenceMap.has(key))absenceMap.set(key,{employee_id:shift.employee_id,absence_date:shift.shift_date,absence_type:'day_off_worked'});}}
+    const calendarVisibleLeave=(employee)=>manager||fullScheduleViewer||(classScheduleViewer&&employee?.primary_class_id===caller.employee.primary_class_id)||employee?.id===caller.employee.id;
+    for(const request of allRequestsForCalendar){if(!['approved','applied'].includes(request.status)||request.request_type!=='leave')continue;const employee=employeeRows.find((row)=>row.id===request.requester_id);if(!employee||!calendarVisibleLeave(employee))continue;const end=request.request_end_date||request.request_date;for(const date of dateRange(request.request_date,Math.floor((new Date(`${end}T12:00:00Z`)-new Date(`${request.request_date}T12:00:00Z`))/86400000)+1)){if(date<calRange.start||date>calRange.end)continue;calendar.push({id:`leave:${request.id}:${date}`,title:employee.id===caller.employee.id?'חופשה מאושרת':`חופשה · ${employee.full_name}`,description:'חופשה מאושרת במערכת הבקשות',event_type:'approved_leave',event_date:date,start_time:null,end_time:null,visibility:'leave_request',class_id:employee.primary_class_id,created_by:null,source:'approved_leave',request_id:request.id,employee_id:employee.id,read_only:true});}}
+    calendar.sort((a,b)=>`${a.event_date}-${a.start_time||''}-${a.title||''}`.localeCompare(`${b.event_date}-${b.start_time||''}-${b.title||''}`,'he'));
 
     if (classScheduleViewer) {
       const visibleIds = new Set(employeeRows.filter((row) => row.primary_class_id === caller.employee.primary_class_id).map((row) => row.id));
@@ -258,6 +251,7 @@ module.exports = async function handler(req, res) {
       todayShifts,
       attendance,
       requests,
+      requestMessages: requestMessages.map((row)=>({...row,author_name:employeeRows.find((e)=>e.id===row.author_id)?.full_name||'עובד',author_is_manager:userRows.some((u)=>u.employee_id===row.author_id&&['admin','scheduler'].includes(u.role))})),
       acknowledgements,
       announcements,
       announcementRecipients,

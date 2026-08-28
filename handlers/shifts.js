@@ -2,7 +2,7 @@ const {
   requireSession, parseBody, db, assertDb, emitEvent, audit, isManager, scheduleScope, canViewFullSchedule, notifyEmployees,
   send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
-const { validateWeek, timeToMinutes, closingTimeForDate } = require('../lib/schedule');
+const { validateWeek, timeToMinutes, closingTimeForDate, requiredStaffAt, leaderRequiredAt } = require('../lib/schedule');
 const { generateAutomaticSchedule } = require('../lib/auto-schedule');
 const dailyOperations = require('./daily-operations');
 const { employeeCanLead, sourceClassCanRelease, loadContext: loadDailyContext } = dailyOperations;
@@ -60,6 +60,7 @@ async function validateShift(payload, id, overrideDayOff = false, overrideRules 
   const employee = assertDb(employeeR, 'העובד לא נמצא'); const classItem = assertDb(classR, 'הכיתה לא נמצאה'); const settings = assertDb(settingsR, 'הגדרות המערכת לא נמצאו');
   const weeklyPatterns = assertDb(patternR, 'לא ניתן לבדוק את ימי העבודה הקבועים') || []; const requests=assertDb(requestsR,'לא ניתן לבדוק חופשות')||[];
   if (!employee?.active) throw httpError(409, 'העובד אינו פעיל');
+  const title=String(employee.job_title||''); payload.shift_role=/(גננת|גנן)/.test(title)?'teacher':(title==='סייעת מובילה'||employee.can_lead)?'lead':'staff';
   if (employee.is_schedulable === false) throw httpError(409, 'העובד אינו מוגדר כחלק ממערך השיבוצים');
   if (['teacher', 'lead'].includes(payload.shift_role) && !employeeCanLead(employee)) throw httpError(409, 'העובד אינו מורשה לשמש גננת/גנן או מוביל/ת כיתה');
   if (!classItem?.active) throw httpError(409, 'הכיתה אינה פעילה');
@@ -131,6 +132,26 @@ function publicAutomaticPreview(plan) {
     metrics: plan.metrics,
     signature: plan.signature,
   };
+}
+
+
+function shortTime(value){return value?String(value).slice(0,5):'';}
+function autoRole(employee){const title=String(employee?.job_title||'');return /(גננת|גנן)/.test(title)?'teacher':(title==='סייעת מובילה'||employee?.can_lead)?'lead':'staff';}
+function autoPattern(patterns,employeeId,date){const weekday=new Date(`${date}T12:00:00Z`).getUTCDay();return patterns.find((row)=>row.employee_id===employeeId&&Number(row.weekday)===weekday);}
+function autoAbsent(requests,employeeId,date){return requests.some((row)=>row.requester_id===employeeId&&['approved','applied'].includes(row.status)&&['leave','day_off','sick'].includes(row.request_type)&&row.request_date<=date&&date<=String(row.request_end_date||row.request_date));}
+function sanitizeManualGenerated(rows,data,selectedDates,callerId){
+  if(!Array.isArray(rows))return null;const dateSet=new Set(selectedDates),employees=new Map(data.employees.map((e)=>[e.id,e])),classes=new Set(data.classes.map((c)=>c.id));const result=[];
+  for(const raw of rows){const employee=employees.get(String(raw.employee_id||''));const date=String(raw.shift_date||'');const classId=String(raw.class_id||'');const start=shortTime(raw.start_time),end=shortTime(raw.end_time);if(!employee||!employee.active||employee.is_schedulable===false||!dateSet.has(date)||!classes.has(classId)||!start||!end||timeToMinutes(end)<=timeToMinutes(start))throw httpError(400,'אחד מתיקוני השיבוץ האוטומטי אינו תקין');result.push({shift_date:date,class_id:classId,employee_id:employee.id,start_time:start,end_time:end,shift_role:autoRole(employee),status:'draft',public_note:String(raw.public_note||'').trim()||null,created_by:callerId});}
+  return result;
+}
+function buildManualAutomaticPlan(base,data,{weekStart,mode,selectedDates,manualGenerated,callerId}){
+  const generated=sanitizeManualGenerated(manualGenerated,data,selectedDates,callerId);if(!generated)return base;const selectedSet=new Set(selectedDates);const kept=mode==='fill'?data.existingShifts.map((r)=>({...r})):data.existingShifts.filter((r)=>!selectedSet.has(r.shift_date)).map((r)=>({...r}));const finalRows=[...kept,...generated];
+  const validation=validateWeek({shifts:finalRows,classes:data.classes,employees:data.employees,settings:data.settings,constraints:data.constraints,weeklyPatterns:data.patterns,requests:data.requests,weekStart});
+  validation.errors=validation.errors.filter((item)=>!item.date||selectedSet.has(item.date));validation.warnings=validation.warnings.filter((item)=>!item.date||selectedSet.has(item.date));
+  for(const row of generated){const employee=data.employees.find((e)=>e.id===row.employee_id),pattern=autoPattern(data.patterns,row.employee_id,row.shift_date);if(!employee||pattern?.day_type!=='as_needed')continue;const open=shortTime(employee.default_start)||shortTime(data.settings.opening_time)||'07:30',close=shortTime(employee.default_end)||closingTimeForDate(data.settings,row.shift_date);if(shortTime(row.start_time)!==open||shortTime(row.end_time)!==close)validation.errors.push({code:'short_nonfixed_shift',date:row.shift_date,class_id:row.class_id,employee_id:row.employee_id,start_time:row.start_time,end_time:row.end_time,message:`${employee.full_name}: מוצעת משמרת קצרה ${row.start_time}-${row.end_time} ביום לפי צורך — נדרש אישור או תיקון`});}
+  for(const date of selectedDates){for(const employee of data.employees.filter((e)=>e.active&&e.is_schedulable!==false&&e.assignment_mode!=='no_schedule')){const pattern=autoPattern(data.patterns,employee.id,date);if(pattern?.day_type!=='work'||autoAbsent(data.requests,employee.id,date))continue;if(!finalRows.some((row)=>row.employee_id===employee.id&&row.shift_date===date))validation.errors.push({code:'work_day_unscheduled',date,employee_id:employee.id,message:`${employee.full_name}: יום עבודה קבוע לא שובץ — יש לתקן לפני החלה`});}}
+  const dedupe=(items)=>{const seen=new Set();return items.filter((item)=>{const key=[item.code,item.date||'',item.class_id||'',item.employee_id||'',item.start_time||item.time||'',item.message||''].join('|');if(seen.has(key))return false;seen.add(key);return true;});};validation.errors=dedupe(validation.errors);validation.warnings=dedupe(validation.warnings);
+  return {...base,generated,finalRows,keptCount:kept.length,validation,metrics:{...(base.metrics||{}),generatedCount:generated.length,unresolvedErrors:validation.errors.length,warnings:validation.warnings.length}};
 }
 
 async function recordAutomaticChanges(caller, weekStart, deletedRows, insertedRows) {
@@ -321,7 +342,10 @@ module.exports = async function handler(req, res) {
       const mode = body.mode === 'fill' ? 'fill' : 'rebuild';
       const selectedDates=selectedDatesForWeek(weekStart,body.selected_dates);
       const data = await loadAutomaticScheduleData(weekStart);
-      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, selectedDates, createdBy: caller.employee.id });
+      const basePlan = generateAutomaticSchedule({ ...data, weekStart, mode, selectedDates, createdBy: caller.employee.id });
+      if(body.signature&&body.signature!==basePlan.signature)throw httpError(409,'נתוני העובדים או השבוע השתנו מאז התצוגה המקדימה. יש לחשב מחדש את השיבוץ.');
+      const plan=buildManualAutomaticPlan(basePlan,data,{weekStart,mode,selectedDates,manualGenerated:body.manual_generated,callerId:caller.employee.id});
+      plan.signature=basePlan.signature;
       return send(res, 200, { ok: true, preview: publicAutomaticPreview(plan) });
     }
 
@@ -330,11 +354,12 @@ module.exports = async function handler(req, res) {
       const mode = body.mode === 'fill' ? 'fill' : 'rebuild';
       const selectedDates=selectedDatesForWeek(weekStart,body.selected_dates);
       const data = await loadAutomaticScheduleData(weekStart);
-      const plan = generateAutomaticSchedule({ ...data, weekStart, mode, selectedDates, createdBy: caller.employee.id });
-      if (body.signature && body.signature !== plan.signature) throw httpError(409, 'נתוני העובדים או השבוע השתנו מאז התצוגה המקדימה. יש לחשב מחדש את השיבוץ.');
-      const incompleteCodes = new Set(['understaffed','missing_leader']);
+      const basePlan = generateAutomaticSchedule({ ...data, weekStart, mode, selectedDates, createdBy: caller.employee.id });
+      if (body.signature && body.signature !== basePlan.signature) throw httpError(409, 'נתוני העובדים או השבוע השתנו מאז התצוגה המקדימה. יש לחשב מחדש את השיבוץ.');
+      const plan=buildManualAutomaticPlan(basePlan,data,{weekStart,mode,selectedDates,manualGenerated:body.manual_generated,callerId:caller.employee.id});
+      const incompleteCodes = new Set(['understaffed','missing_leader','short_nonfixed_shift']);
       const hardErrors = plan.validation.errors.filter((item)=>!incompleteCodes.has(item.code));
-      if (hardErrors.length) throw httpError(409, 'השיבוץ האוטומטי זיהה הפרת כלל קשיח ולכן לא ניתן להחיל אותו. יש לתקן את הנתונים או לחשב מחדש.', { errors:hardErrors, warnings:plan.validation.warnings });
+      if (hardErrors.length) throw httpError(409, 'נשארו נקודות שחייבות תיקון לפני החלת השיבוץ. פתחו את הנקודה ובצעו תיקון בתצוגה המקדימה.', { errors:hardErrors, warnings:plan.validation.warnings });
       if (plan.validation.errors.length && !body.allow_incomplete) throw httpError(409, 'נשארו חוסרים בשיבוץ האוטומטי. ניתן לחזור לתצוגה המקדימה או לאשר יצירת טיוטה חלקית.', plan.validation);
       if (!plan.generated.length) throw httpError(409, mode === 'fill' ? 'לא נמצאו חוסרים שניתן למלא אוטומטית' : 'לא ניתן היה ליצור שיבוצים מהנתונים הקיימים');
       const deletedRows = mode === 'rebuild' ? data.existingShifts.filter((row)=>selectedDates.includes(row.shift_date)) : [];

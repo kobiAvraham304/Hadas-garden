@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.22.0 (סכמת נתונים 0.22.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.23.0 (סכמת נתונים 0.23.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -27,6 +27,7 @@ DROP TABLE IF EXISTS
   public.hadas_schedule_acknowledgements,
   public.hadas_schedule_changes,
   public.hadas_schedule_publications,
+  public.hadas_request_messages,
   public.hadas_requests,
   public.hadas_shifts,
   public.hadas_employee_weekly_patterns,
@@ -66,7 +67,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.22.0', '0.22.0')
+values (1, '0.23.0', '0.23.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -296,12 +297,24 @@ create table if not exists public.hadas_requests (
   attachment_size integer,
   status text not null default 'pending' check (status in ('pending','approved','rejected','applied','cancelled')),
   manager_note text,
+  created_by uuid references public.hadas_employees(id) on delete set null,
+  submitted_by_manager boolean not null default false,
   decided_by uuid references public.hadas_employees(id) on delete set null,
   decided_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (request_end_date is null or request_end_date >= request_date)
 );
+create table if not exists public.hadas_request_messages (
+  id bigserial primary key,
+  request_id uuid not null references public.hadas_requests(id) on delete cascade,
+  author_id uuid not null references public.hadas_employees(id) on delete restrict,
+  message text not null check (char_length(message) between 1 and 2000),
+  created_at timestamptz not null default now()
+);
+create index if not exists hadas_request_messages_request_idx on public.hadas_request_messages(request_id,created_at);
+create index if not exists hadas_request_messages_author_idx on public.hadas_request_messages(author_id);
+
 create index if not exists hadas_requests_date_idx on public.hadas_requests(request_date);
 
 
@@ -769,7 +782,7 @@ DO $$
 DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_daily_operations','hadas_requests','hadas_notifications',
+    'hadas_classes','hadas_employees','hadas_employee_weekly_patterns','hadas_shifts','hadas_attendance','hadas_daily_operations','hadas_requests','hadas_request_messages','hadas_notifications',
     'hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_announcements','hadas_announcement_recipients','hadas_announcement_reads',
     'hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_app_settings','hadas_feedback'
   ] LOOP
@@ -785,7 +798,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
     'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts','hadas_attendance','hadas_daily_operations',
-    'hadas_requests','hadas_notifications','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings','hadas_announcements',
+    'hadas_requests','hadas_request_messages','hadas_notifications','hadas_schedule_acknowledgements','hadas_schedule_publications','hadas_schedule_changes','hadas_app_settings','hadas_announcements',
     'hadas_announcement_recipients','hadas_announcement_reads','hadas_tasks','hadas_task_assignees','hadas_calendar_events','hadas_feedback',
     'hadas_audit_log','hadas_realtime_events'
   ] LOOP
@@ -883,7 +896,7 @@ BEGIN
   FOREACH t IN ARRAY ARRAY[
     'hadas_app_meta','hadas_classes','hadas_employees','hadas_users','hadas_sessions','hadas_login_security',
     'hadas_employee_weekly_patterns','hadas_employee_class_constraints','hadas_employee_private','hadas_shifts',
-    'hadas_schedule_publications','hadas_schedule_changes','hadas_schedule_acknowledgements','hadas_attendance','hadas_daily_operations','hadas_requests',
+    'hadas_schedule_publications','hadas_schedule_changes','hadas_schedule_acknowledgements','hadas_attendance','hadas_daily_operations','hadas_requests','hadas_request_messages',
     'hadas_notifications','hadas_announcements','hadas_announcement_reads','hadas_announcement_recipients','hadas_tasks',
     'hadas_task_assignees','hadas_calendar_events','hadas_documents','hadas_audit_log','hadas_app_settings','hadas_feedback'
   ] LOOP

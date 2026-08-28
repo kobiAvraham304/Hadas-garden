@@ -76,7 +76,8 @@ module.exports = async function handler(req,res) {
     const action = body.action || 'create';
 
     if (action === 'swap_candidates') {
-      const candidates = await swapCandidates(String(body.request_date || ''), caller.employee.id);
+      const requesterId=isManager(caller)&&body.requester_id?String(body.requester_id):caller.employee.id;
+      const candidates = await swapCandidates(String(body.request_date || ''), requesterId);
       return send(res,200,{ ok:true,candidates });
     }
 
@@ -92,11 +93,17 @@ module.exports = async function handler(req,res) {
     if (action === 'create') {
       const type = String(body.request_type || '');
       if (!REQUEST_TYPES.has(type)) throw httpError(400,'סוג הבקשה אינו תקין');
+      const requestedRequester=String(body.requester_id||''); const onBehalf=Boolean(requestedRequester&&requestedRequester!==caller.employee.id);
+      if(onBehalf&&!isManager(caller))throw httpError(403,'רק הנהלת המעון יכולה להגיש בקשה עבור עובד אחר');
+      const requesterId=onBehalf?requestedRequester:caller.employee.id;
+      if(onBehalf){const target=assertDb(await db().from('hadas_employees').select('id,full_name,active').eq('id',requesterId).maybeSingle(),'העובד לא נמצא');if(!target?.active)throw httpError(409,'העובד אינו פעיל');}
       if (!validDate(body.request_date)) throw httpError(400,'יש לבחור תאריך');
       const endDate = ['leave','sick'].includes(type) && body.request_end_date ? String(body.request_end_date) : null;
       if (endDate && (!validDate(endDate) || endDate < body.request_date)) throw httpError(400,'תאריך הסיום חייב להיות לאחר תאריך ההתחלה');
       const payload = {
-        requester_id:caller.employee.id,
+        requester_id:requesterId,
+        created_by:caller.employee.id,
+        submitted_by_manager:onBehalf,
         request_type:type,
         request_date:String(body.request_date),
         request_end_date:endDate,
@@ -108,7 +115,9 @@ module.exports = async function handler(req,res) {
         reason:String(body.reason || '').trim() || null,
         allow_schedule_on_day_off:['leave','day_off'].includes(type) ? (body.allow_schedule_on_day_off === true || String(body.allow_schedule_on_day_off) === 'true') : false,
         available_fixed_day_weekday: body.available_fixed_day_weekday !== undefined && body.available_fixed_day_weekday !== '' ? Number(body.available_fixed_day_weekday) : null,
-        status:'pending',
+        status:onBehalf?'approved':'pending',
+        decided_by:onBehalf?caller.employee.id:null,
+        decided_at:onBehalf?new Date().toISOString():null,
       };
       if (payload.available_fixed_day_weekday !== null && (!Number.isInteger(payload.available_fixed_day_weekday) || payload.available_fixed_day_weekday < 0 || payload.available_fixed_day_weekday > 5)) throw httpError(400,'יום החופשי הקבוע אינו תקין');
       if (!payload.allow_schedule_on_day_off) payload.available_fixed_day_weekday = null;
@@ -116,17 +125,17 @@ module.exports = async function handler(req,res) {
       if (['late_start','early_finish'].includes(type)) {
         if (!payload.shift_id) throw httpError(400,'יש לבחור את השיבוץ הרלוונטי');
         own = assertDb(await db().from('hadas_shifts').select('*').eq('id',payload.shift_id).maybeSingle(),'השיבוץ שלך לא נמצא');
-        if (!own || own.employee_id !== caller.employee.id) throw httpError(409,'השיבוץ שנבחר אינו שייך לך');
+        if (!own || own.employee_id !== requesterId) throw httpError(409,'השיבוץ שנבחר אינו שייך לך');
         payload.request_date = own.shift_date;
       }
       if (type === 'late_start' && (!payload.requested_start || timeToMinutes(payload.requested_start) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_start) >= timeToMinutes(own.end_time))) throw httpError(400,'שעת ההתחלה המבוקשת חייבת להיות בתוך שעות השיבוץ');
       if (type === 'early_finish' && (!payload.requested_end || timeToMinutes(payload.requested_end) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_end) >= timeToMinutes(own.end_time))) throw httpError(400,'שעת הסיום המבוקשת חייבת להיות בתוך שעות השיבוץ');
       if (type === 'swap') {
         if (!payload.target_employee_id) throw httpError(400,'יש לבחור עובד שנמצא ביום חופשי');
-        if (payload.target_employee_id === caller.employee.id) throw httpError(400,'לא ניתן לבחור את עצמך');
-        await validateSwapTarget(payload.request_date,caller.employee.id,payload.target_employee_id);
+        if (payload.target_employee_id === requesterId) throw httpError(400,'לא ניתן לבחור את עצמך');
+        await validateSwapTarget(payload.request_date,requesterId,payload.target_employee_id);
       }
-      const certificate = type === 'sick' ? decodeCertificate(body,caller.employee.id) : null;
+      const certificate = type === 'sick' ? decodeCertificate(body,requesterId) : null;
       if (certificate) {
         await uploadPrivateFile(CERTIFICATE_BUCKET,certificate.path,certificate.buffer,certificate.type);
         Object.assign(payload,{ attachment_path:certificate.path,attachment_name:certificate.name,attachment_type:certificate.type,attachment_size:certificate.size });
@@ -138,23 +147,41 @@ module.exports = async function handler(req,res) {
         if (certificate) await deletePrivateFile(CERTIFICATE_BUCKET,certificate.path);
         throw error;
       }
+      if(onBehalf){
+        await notifyEmployees([requesterId],{type:'request',title:'נוספה עבורך בקשה במערכת',message:`${caller.employee.full_name} הזין/ה עבורך ${type==='leave'?'חופשה':type==='sick'?'מחלה':type==='day_off'?'יום חופשי':'בקשה'} (${requestRangeLabel(request)}).`,entityType:'request',entityId:request.id,actionRequired:false});
+      }
       if (type === 'swap') {
         await notifyEmployees([payload.target_employee_id],{
           type:'swap',title:'בקשת החלפה ממתינה לאישור שלך',
-          message:`${caller.employee.full_name} ביקש להחליף איתך בתאריך ${payload.request_date}.`,
+          message:`${onBehalf?'הנהלת המעון':caller.employee.full_name} ביקש/ה להחליף איתך בתאריך ${payload.request_date}.`,
           entityType:'request',entityId:request.id,actionRequired:true,
         });
-      } else {
+      } else if(!onBehalf) {
         const manualNote = type === 'leave' && inclusiveDays(payload.request_date,payload.request_end_date) > 2 ? ' נדרשת גם השלמת טופס חופשה ידני.' : '';
         await notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id);
       }
-      await audit(caller.employee.id,'create','request',request.id,{ type });
+      await audit(caller.employee.id,'create','request',request.id,{ type,on_behalf:onBehalf,requester_id:requesterId });
+      let finalRequest=request;
+      if(onBehalf&&body.apply_now===true&&['leave','day_off'].includes(type)){
+        const rpc=await db().rpc('hadas_apply_approved_request',{p_request_id:request.id,p_actor_id:caller.employee.id});
+        if(rpc.error)throw httpError(409,rpc.error.message||'הבקשה נשמרה אך לא ניתן היה להזרים אותה לשיבוץ');
+        finalRequest=await getRequest(request.id)||request;
+      }
       await emitEvent('requests');
-      return send(res,201,{ ok:true,request });
+      return send(res,201,{ ok:true,request:finalRequest });
     }
 
     const request = await getRequest(body.id);
     if (!request) throw httpError(404,'הבקשה לא נמצאה');
+
+    if(action==='comment'){
+      const allowed=isManager(caller)||request.requester_id===caller.employee.id||request.target_employee_id===caller.employee.id;if(!allowed)throw httpError(403,'אין הרשאה להגיב לבקשה זו');
+      const message=String(body.message||'').trim().slice(0,2000);if(!message)throw httpError(400,'יש לכתוב תגובה');
+      const row=assertDb(await db().from('hadas_request_messages').insert({request_id:request.id,author_id:caller.employee.id,message}).select('*').single(),'לא ניתן לשמור את התגובה');
+      const recipients=new Set();if(isManager(caller))recipients.add(request.requester_id);else{const managers=assertDb(await db().from('hadas_users').select('employee_id').in('role',['admin','scheduler']).eq('active',true),'לא ניתן לאתר הנהלה')||[];managers.forEach((m)=>recipients.add(m.employee_id));}recipients.delete(caller.employee.id);
+      if(recipients.size)await notifyEmployees([...recipients],{type:'request',title:'תגובה חדשה לבקשה',message:`${caller.employee.full_name}: ${message.slice(0,120)}`,entityType:'request',entityId:request.id,actionRequired:true});
+      await audit(caller.employee.id,'comment','request',request.id);await emitEvent('requests');return send(res,201,{ok:true,message:row});
+    }
 
     if (action === 'cancel') {
       if (request.requester_id !== caller.employee.id || request.status !== 'pending') throw httpError(403,'לא ניתן לבטל את הבקשה');

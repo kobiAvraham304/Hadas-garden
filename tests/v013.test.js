@@ -50,7 +50,7 @@ test('employee management exposes registration status only in manager payload',(
 
 test('shift roles and staffing settings use clearer language and simple controls',()=>{
   const html=read('index.html'); const app=read('app.js'); const css=read('styles.css');
-  for(const label of ['גננת/גנן — אחראי/ת כיתה','מוביל/ת כיתה — אחראי/ת כיתה','צוות כיתה','מילוי מקום / החלפה']) assert.match(html,new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
+  assert.match(html,/type="hidden" name="shift_role"/); assert.doesNotMatch(html,/תפקיד בשיבוץ הזה/); assert.match(app,/suggestedShiftRoleForEmployee/);
   assert.match(html,/standards-preset-cards/);
   assert.match(html,/data-step-field="required_staff"/);
   assert.match(app,/handleSettingsStepper/);

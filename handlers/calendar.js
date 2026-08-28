@@ -12,6 +12,10 @@ function monthRange(monthValue) {
   return { start: first.toISOString().slice(0, 10), end: last.toISOString().slice(0, 10) };
 }
 
+function addDays(dateString,days){const d=new Date(`${dateString}T12:00:00Z`);d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10);}
+function canSeeLeave(caller,employee){if(isManager(caller))return true;const title=String(caller.employee?.job_title||'');if(/(גננת|גנן)/.test(title)||['מנהלת מעון','אחות','מזכירה'].includes(title))return true;if(title==='סייעת מובילה')return employee?.primary_class_id===caller.employee.primary_class_id||employee?.id===caller.employee.id;return employee?.id===caller.employee.id;}
+async function approvedLeaveEvents(caller,range){const [requestsR,employeesR]=await Promise.all([db().from('hadas_requests').select('id,requester_id,request_date,request_end_date,request_type,status').eq('request_type','leave').in('status',['approved','applied']).lte('request_date',range.end),db().from('hadas_employees').select('id,full_name,primary_class_id,job_title,active').eq('active',true)]);const requests=assertDb(requestsR,'לא ניתן לטעון חופשות')||[],employees=assertDb(employeesR,'לא ניתן לטעון עובדים')||[],map=new Map(employees.map((e)=>[e.id,e])),out=[];for(const request of requests){const employee=map.get(request.requester_id),end=request.request_end_date||request.request_date;if(!employee||!canSeeLeave(caller,employee)||end<range.start)continue;for(let date=request.request_date;date<=end;date=addDays(date,1)){if(date<range.start||date>range.end)continue;out.push({id:`leave:${request.id}:${date}`,title:employee.id===caller.employee.id?'חופשה מאושרת':`חופשה · ${employee.full_name}`,description:'חופשה מאושרת במערכת הבקשות',event_type:'approved_leave',event_date:date,start_time:null,end_time:null,visibility:'leave_request',class_id:employee.primary_class_id,created_by:null,source:'approved_leave',request_id:request.id,employee_id:employee.id,read_only:true});}}return out;}
+
 function canSeeEvent(caller, event) {
   if (isManager(caller)) return true;
   if (event.created_by === caller.employee.id) return true;
@@ -31,6 +35,7 @@ module.exports = async function handler(req, res) {
       const range = monthRange(req.query?.month);
       let events = assertDb(await db().from('hadas_calendar_events').select('*').gte('event_date', range.start).lte('event_date', range.end).order('event_date').order('start_time'), 'לא ניתן לטעון לוח שנה') || [];
       events = events.filter((event) => canSeeEvent(caller, event));
+      events.push(...await approvedLeaveEvents(caller,range)); events.sort((a,b)=>`${a.event_date}-${a.start_time||''}-${a.title||''}`.localeCompare(`${b.event_date}-${b.start_time||''}-${b.title||''}`,'he'));
       return send(res, 200, { ok: true, events, range });
     }
 

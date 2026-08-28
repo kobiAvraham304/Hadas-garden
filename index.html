@@ -29,9 +29,9 @@
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=0220" />
+  <link rel="stylesheet" href="/styles.css?v=0230" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0220" defer></script>
+  <script src="/app.js?v=0230" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -149,7 +149,7 @@
       <section id="requestsPanel" class="panel">
         <div class="section-heading">
           <div><p class="eyebrow">חופשות, מחלה והחלפות</p><h2>בקשות</h2><p class="muted">ניהול ברור ומהיר של כל בקשה עד להזרמה בשיבוץ.</p></div>
-          <button id="newRequestBtn" class="primary-btn"><span>＋</span> בקשה חדשה</button>
+          <div class="request-heading-actions"><button id="newEmployeeRequestBtn" class="secondary-btn manager-only hidden"><span>＋</span> בקשה חדשה לעובד</button><button id="newRequestBtn" class="primary-btn"><span>＋</span> בקשה חדשה</button></div>
         </div>
         <div id="requestSummary" class="request-summary request-summary-actions"></div>
         <div id="requestWorkflow" class="request-workflow"></div>
@@ -250,7 +250,7 @@
         <label>כיתה<select name="class_id" required></select></label>
         <label>שעת התחלה<input name="start_time" type="time" value="07:30" required /></label>
         <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
-        <label class="full-field">תפקיד בשיבוץ הזה<select name="shift_role"><option value="teacher">גננת/גנן — אחראי/ת כיתה</option><option value="lead">מוביל/ת כיתה — אחראי/ת כיתה</option><option value="staff" selected>צוות כיתה</option><option value="replacement">מילוי מקום / החלפה</option></select><small>הבחירה משפיעה על מנוע ההתאמה. זהו התפקיד באותו יום בלבד.</small></label>
+        <input type="hidden" name="shift_role" value="staff" />
         <section class="full-field shift-employee-picker unified-shift-picker" aria-labelledby="shiftEmployeePickerTitle">
           <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד / מחליף</strong><small>המומלצים מופיעים ראשונים באותה רשימה, יחד עם זמינות, התאמה וסיבת חסימה.</small></div><div class="picker-status-group"><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div></div>
           <div id="shiftRecommendations" class="hidden" aria-hidden="true"></div>
@@ -262,7 +262,7 @@
         <label class="full-field">הערה גלויה<input name="public_note" placeholder="לדוגמה: עד 12:30 או ישיבה מקצועית" /></label>
       </div>
       <div class="notice soft-notice">כל שינוי נשמר כטיוטה ומופיע לצוות רק לאחר פרסום השיבוץ.</div>
-      <div class="modal-actions shift-modal-actions"><button id="deleteShiftFromDialogBtn" type="button" class="danger-btn hidden">מחיקת השיבוץ</button><span class="modal-action-spacer"></span><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת השיבוץ</button></div>
+      <div class="modal-actions shift-modal-actions"><button id="deleteShiftFromDialogBtn" type="button" class="danger-btn hidden">מחיקת השיבוץ</button><button id="addLeaveFromShiftBtn" type="button" class="secondary-btn manager-only hidden">☀ הוספת חופשה</button><span class="modal-action-spacer"></span><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת השיבוץ</button></div>
     </form>
   </dialog>
 
@@ -346,7 +346,9 @@
 
   <dialog id="requestDialog" class="modal">
     <form id="requestForm" method="dialog" class="modal-card large-modal request-modal-v18">
-      <div class="modal-heading"><div><p class="eyebrow">בקשה חדשה</p><h3>מה תרצו לבקש?</h3><p id="requestTypeHelp" class="muted">חופשה מתוכננת מראש למספר ימים.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <div class="modal-heading"><div><p class="eyebrow">בקשה חדשה</p><h3 id="requestDialogTitle">מה תרצו לבקש?</h3><p id="requestTypeHelp" class="muted">חופשה מתוכננת מראש למספר ימים.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <label id="requestRequesterField" class="request-on-behalf-field manager-only hidden"><span>הבקשה עבור</span><select name="requester_id"><option value="">בחירת עובד</option></select><small>הבקשה תתועד בכרטיס העובד ותסומן כהוזנה על ידי הנהלת המעון.</small></label>
+      <input type="hidden" name="manager_apply_now" value="false" />
       <div class="request-step"><span>1</span><div><strong>בחירת סוג הבקשה</strong><small>כל סוג מציג רק את השדות שנחוצים לו.</small></div></div>
       <fieldset class="request-type-picker"><legend class="sr-only">סוג בקשה</legend><div class="request-type-grid">
         <label class="request-type-card"><input type="radio" name="request_type" value="leave" checked /><span class="request-icon">☀</span><strong>חופשה</strong><small>יום אחד או טווח ימים מתוכנן מראש</small><b>מתאריך עד תאריך</b></label>
