@@ -1,0 +1,51 @@
+name: Apply v0.23 automatic fixes and requests
+
+on:
+  push:
+    branches:
+      - agent/v0.23.0-auto-fix-requests-calendar
+    paths:
+      - '.github/workflows/apply-v023.yml'
+      - 'scripts/apply-v023.py'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hadas-v023-release
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/v0.23.0-auto-fix-requests-calendar
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate release patch
+        run: python3 -m py_compile scripts/apply-v023.py
+      - name: Apply v0.23 changes
+        run: python3 scripts/apply-v023.py
+      - name: Full QA
+        run: |
+          npm test
+          npm run check
+          node --check app.js
+          node --check api/index.js
+          node --check lib/server.js
+          node --check lib/schedule.js
+          node --check lib/matching.js
+          node --check lib/auto-schedule.js
+          for file in handlers/*.js; do node --check "$file"; done
+      - name: Commit release candidate
+        run: |
+          rm -f scripts/apply-v023.py .github/workflows/apply-v023.yml
+          git config user.name "Hadas Release Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git commit -m "0.23.0 automatic correction requests and leave calendar"
+          git push origin HEAD:agent/v0.23.0-auto-fix-requests-calendar
