@@ -25,6 +25,16 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Align patch guards
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/apply-v022-experience.py')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace('weekStart, mode, generated: cleanGenerated, finalRows, keptCount: kept.length,','weekStart, mode, keptCount: kept.length, generated: cleanGenerated, finalRows,')
+          s=s.replace('weekStart, selectedDates:dates, mode, generated: cleanGenerated, finalRows, keptCount: kept.length,','weekStart, selectedDates:dates, mode, keptCount: kept.length, generated: cleanGenerated, finalRows,')
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Apply v0.22 changes
         run: python3 scripts/apply-v022-experience.py
       - name: Full QA
