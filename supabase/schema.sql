@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.21.0 (סכמת נתונים 0.21.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.22.0 (סכמת נתונים 0.22.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -66,7 +66,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.21.0', '0.21.0')
+values (1, '0.22.0', '0.22.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -88,6 +88,7 @@ create table if not exists public.hadas_employees (
   can_lead boolean not null default false,
   weekly_hours numeric(5,2),
   max_weekly_hours numeric(5,2) check (max_weekly_hours is null or (max_weekly_hours >= 0 and max_weekly_hours <= 80)),
+  max_work_days_per_week smallint check (max_work_days_per_week is null or max_work_days_per_week between 1 and 6),
   employment_percent numeric(5,2),
   assignment_mode text not null default 'fixed' check (assignment_mode in ('fixed','rotation','substitute','no_schedule')),
   is_schedulable boolean not null default true,
@@ -103,6 +104,7 @@ create table if not exists public.hadas_employees (
 
 alter table public.hadas_employees add column if not exists contact_phone text;
 alter table public.hadas_employees add column if not exists max_weekly_hours numeric(5,2);
+alter table public.hadas_employees add column if not exists max_work_days_per_week smallint;
 alter table public.hadas_employees add column if not exists employment_percent numeric(5,2);
 alter table public.hadas_employees add column if not exists assignment_mode text not null default 'fixed';
 alter table public.hadas_employees add column if not exists is_schedulable boolean not null default true;
@@ -170,6 +172,7 @@ create table if not exists public.hadas_employee_class_constraints (
   employee_id uuid not null references public.hadas_employees(id) on delete cascade,
   class_id uuid not null references public.hadas_classes(id) on delete cascade,
   constraint_type text not null check (constraint_type in ('preferred','avoid','forbidden')),
+  priority_rank smallint check (priority_rank is null or priority_rank between 1 and 20),
   valid_from date,
   valid_to date,
   reason text,

@@ -4,7 +4,7 @@ const fs=require('node:fs'); const path=require('node:path'); const root=path.re
 const { employeeAvailability, generateAutomaticSchedule }=require('../lib/auto-schedule');
 const { rankCandidates }=require('../lib/matching');
 
-test('0.21 metadata and migration are aligned',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.21.0'); assert.match(read('handlers/health.js'),/schema_version === '0\.21\.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\(1,'0\.21\.0','0\.21\.0'/); });
+test('0.21 migration remains compatible under current release',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.22.0'); assert.match(read('handlers/health.js'),/schema_version === '0\.22\.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\(1,'0\.21\.0','0\.21\.0'/); });
 
 test('employee day editor has exactly work, day off and as-needed semantics',()=>{ const app=read('app.js'); assert.match(app,/יום עבודה \(קבוע\)/); assert.match(app,/יום חופשי \(אסור לשבץ\)/); assert.match(app,/לפי צורך \(עדיפות נמוכה\)/); assert.doesNotMatch(app,/>לא קבוע</); const weeklySelect=app.match(/<select class=\"weekly-day-type\"[\s\S]*?<\/select>/)?.[0]||''; assert.doesNotMatch(weeklySelect,/value=\"avoid\"/); const handler=read('handlers/employees.js'); assert.match(handler,/\['work','day_off','as_needed'\]/); assert.match(handler,/seen\.size !== 6/); });
 
