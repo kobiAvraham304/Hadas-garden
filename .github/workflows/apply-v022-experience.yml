@@ -61,6 +61,11 @@ jobs:
           for path in ['tests/api.test.js','tests/router.test.js','tests/static.test.js']:
               p=Path(path); p.write_text(p.read_text(encoding='utf-8').replace('0.21.0','0.22.0'),encoding='utf-8')
 
+          p=Path('tests/static.test.js'); s=p.read_text(encoding='utf-8')
+          s=s.replace("/'0\\.21\\.0'/", "/'0\\.22\\.0'/")
+          s=s.replace('/update-v0\\.21\\.0\\.sql/', '/update-v0\\.22\\.0\\.sql/')
+          p.write_text(s,encoding='utf-8')
+
           p=Path('tests/v021.test.js'); s=p.read_text(encoding='utf-8')
           old="test('0.21 metadata and migration are aligned',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.21.0'); assert.match(read('handlers/health.js'),/schema_version === '0\\.21\\.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\\(1,'0\\.21\\.0','0\\.21\\.0'/); });"
           new="test('0.21 migration remains compatible under current release',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.22.0'); assert.match(read('handlers/health.js'),/schema_version === '0\\.22\\.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\\(1,'0\\.21\\.0','0\\.21\\.0'/); });"
