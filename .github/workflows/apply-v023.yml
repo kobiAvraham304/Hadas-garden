@@ -26,6 +26,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Align release patch with current source
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/apply-v023.py')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("insert_marker='function dailyOperationByShift(shiftId)'", "insert_marker='function dailyOperationRange(operation,shift)'")
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Validate release patch
         run: python3 -m py_compile scripts/apply-v023.py
       - name: Apply v0.23 changes
