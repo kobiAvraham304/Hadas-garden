@@ -86,7 +86,7 @@ test('0.27 general nursery day off is manager-controlled, removes only safe sche
   assert.match(shifts, /המעון מוגדר סגור בתאריך זה/);
   assert.match(shifts, /selected_dates: filtered/);
   assert.match(patch, /יום חופשי כללי/);
-  assert.match(patch, /general_day_off:true/);
+  assert.match(patch, /general_day_off\s*=\s*true/);
 });
 
 test('0.27 weekly PDF is higher resolution and week image share text carries the dates', () => {
