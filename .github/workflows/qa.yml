@@ -23,6 +23,7 @@ jobs:
       - name: Syntax check
         run: |
           node --check app.js
+          node --check patch-v025.js
           node --check api/index.js
           node --check lib/server.js
           node --check lib/schedule.js
