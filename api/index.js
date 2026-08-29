@@ -20,7 +20,7 @@ const routes = Object.freeze({
   'notifications': require('../handlers/notifications'),
   'requests': require('../handlers/requests'),
   'settings': require('../handlers/settings'),
-  'shifts': require('../handlers/shifts'),
+  'shifts': require('../handlers/shifts-v025'),
   'suggestions': require('../handlers/suggestions'),
   'tasks': require('../handlers/tasks'),
 });
