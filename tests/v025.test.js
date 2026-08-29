@@ -5,13 +5,14 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.25 fast shifts layer remains wired under current release', () => {
+test('0.25 fast shifts layer remains available under current release', () => {
   const pkg = JSON.parse(read('package.json'));
   const api = read('api/index.js');
   const version = read('VERSION.md');
-  assert.equal(pkg.version, '0.26.0');
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v025'\)/);
-  assert.match(version, /גרסה 0\.26\.0/);
+  assert.equal(pkg.version, '0.27.0');
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v027'\)/);
+  assert.match(read('lib/shifts-v027.js'), /require\('\.\/shifts-v025'\)/);
+  assert.match(version, /גרסה 0\.27\.0/);
 });
 
 test('0.25 fast scheduling keeps existing rules while parallelizing validation', () => {
