@@ -10,7 +10,7 @@ const routes = Object.freeze({
   'auth-login': require('../handlers/auth-login'),
   'auth-logout': require('../handlers/auth-logout'),
   'auth-me': require('../handlers/auth-me'),
-  'calendar': require('../handlers/calendar'),
+  'calendar': require('../lib/calendar-v027'),
   'config': require('../handlers/config'),
   'data': require('../handlers/data'),
   'daily-operations': require('../handlers/daily-operations'),
@@ -20,7 +20,7 @@ const routes = Object.freeze({
   'notifications': require('../handlers/notifications'),
   'requests': require('../lib/requests-v026'),
   'settings': require('../handlers/settings'),
-  'shifts': require('../lib/shifts-v025'),
+  'shifts': require('../lib/shifts-v027'),
   'suggestions': require('../lib/suggestions-v026'),
   'tasks': require('../handlers/tasks'),
 });
