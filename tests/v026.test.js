@@ -10,13 +10,14 @@ const { truthy, canPreApprove } = require('../lib/requests-v026');
 const employeeId = '11111111-1111-4111-8111-111111111111';
 const classId = '22222222-2222-4222-8222-222222222222';
 
-test('0.26 upgraded request and suggestion layers remain wired under current release', () => {
+test('0.26 upgraded request and suggestion layers remain available under current release', () => {
   const pkg = JSON.parse(read('package.json'));
   const api = read('api/index.js');
   const version = read('VERSION.md');
-  assert.equal(pkg.version, '0.27.0');
-  assert.match(version, /גרסה 0\.27\.0/);
-  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v026'\)/);
+  assert.equal(pkg.version, '0.28.0');
+  assert.match(version, /גרסה 0\.28\.0/);
+  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v028'\)/);
+  assert.match(read('lib/requests-v028.js'), /require\('\.\/requests-v026'\)/);
   assert.match(api, /'suggestions': require\('\.\.\/lib\/suggestions-v026'\)/);
   assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v027'\)/);
 });
@@ -103,9 +104,10 @@ test('0.26 Vercel root hardening remains while current patch advances', () => {
   const vercel = JSON.parse(read('vercel.json'));
   assert.equal(Object.hasOwn(vercel, 'installCommand'), false);
   assert.ok(vercel.rewrites.some((item) => item.source === '/' && item.destination === '/index.html'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v027.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v027.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v028.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v028.css'));
   const headerMap = new Map(vercel.headers.map((item) => [item.source, item.headers]));
   assert.ok(headerMap.has('/'));
   assert.ok(headerMap.has('/patch-v025.js'));
+  assert.ok(headerMap.has('/patch-v028.js'));
 });
