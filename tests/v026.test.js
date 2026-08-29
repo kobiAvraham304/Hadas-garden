@@ -5,7 +5,7 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const { normalizeVirtualShifts, previewCandidates } = require('../lib/suggestions-v026');
-const { truthy } = require('../lib/requests-v026');
+const { truthy, canPreApprove } = require('../lib/requests-v026');
 
 const employeeId = '11111111-1111-4111-8111-111111111111';
 const classId = '22222222-2222-4222-8222-222222222222';
@@ -83,7 +83,7 @@ test('0.26 weekly export creates a real PDF file for share or download and remov
   assert.match(patch, /%PDF-1\.4/);
 });
 
-test('0.26 manager on-behalf request has explicit pre-approved semantics', () => {
+test('0.26 manager on-behalf request has explicit pre-approved semantics without bypassing swap consent', () => {
   const patch = read('patch-v026.js');
   const requests = read('lib/requests-v026.js');
   assert.match(patch, /name=\"pre_approved\"/);
@@ -91,9 +91,14 @@ test('0.26 manager on-behalf request has explicit pre-approved semantics', () =>
   assert.match(requests, /status: 'pending'/);
   assert.match(requests, /decided_by: null/);
   assert.match(requests, /decided_at: null/);
+  assert.match(requests, /swap_target_consent_guard/);
   assert.equal(truthy(true), true);
   assert.equal(truthy('1'), true);
   assert.equal(truthy('false'), false);
+  assert.equal(canPreApprove({ request_type:'leave', pre_approved:true }), true);
+  assert.equal(canPreApprove({ request_type:'day_off', pre_approved:'1' }), true);
+  assert.equal(canPreApprove({ request_type:'swap', pre_approved:true }), false);
+  assert.equal(canPreApprove({ request_type:'swap', apply_now:true }), false);
 });
 
 test('0.26 Vercel routing restores root and removes stale install script', () => {
