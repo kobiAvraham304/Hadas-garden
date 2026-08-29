@@ -1,7 +1,6 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
-  "installCommand": "bash scripts/apply-v019-build.sh",
   "functions": {
     "api/index.js": {
       "maxDuration": 15
@@ -25,6 +24,14 @@
       "headers": [{"key":"Cache-Control","value":"no-cache, max-age=0, must-revalidate"}]
     },
     {
+      "source": "/patch-v025.js",
+      "headers": [{"key":"Cache-Control","value":"no-store, max-age=0"}]
+    },
+    {
+      "source": "/patch-v025.css",
+      "headers": [{"key":"Cache-Control","value":"no-store, max-age=0"}]
+    },
+    {
       "source": "/(.*)",
       "headers": [
         {"key":"X-Content-Type-Options","value":"nosniff"},
@@ -38,6 +45,9 @@
     }
   ],
   "rewrites": [
+    {"source":"/","destination":"/index.html"},
+    {"source":"/patch-v025.js","destination":"/patch-v026.js"},
+    {"source":"/patch-v025.css","destination":"/patch-v026.css"},
     {"source":"/health","destination":"/health.html"},
     {"source":"/api/announcements","destination":"/api/index?route=announcements"},
     {"source":"/api/attendance","destination":"/api/index?route=attendance"},

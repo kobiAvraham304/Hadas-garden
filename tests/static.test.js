@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.25.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.26.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));

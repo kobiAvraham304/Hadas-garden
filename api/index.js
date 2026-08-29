@@ -18,10 +18,10 @@ const routes = Object.freeze({
   'feedback': require('../handlers/feedback'),
   'health': require('../handlers/health'),
   'notifications': require('../handlers/notifications'),
-  'requests': require('../handlers/requests'),
+  'requests': require('../lib/requests-v026'),
   'settings': require('../handlers/settings'),
   'shifts': require('../lib/shifts-v025'),
-  'suggestions': require('../handlers/suggestions'),
+  'suggestions': require('../lib/suggestions-v026'),
   'tasks': require('../handlers/tasks'),
 });
 
