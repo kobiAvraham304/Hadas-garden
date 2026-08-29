@@ -23,7 +23,7 @@ test('public config exposes only publishable configuration', async () => {
   await handler(requestMock(),res);
   const body=JSON.parse(res.body);
   assert.equal(res.statusCode,200);
-  assert.equal(body.version,'0.26.0');
+  assert.equal(body.version,'0.27.0');
   assert.equal(body.supabasePublishableKey,'publishable-test');
   assert.doesNotMatch(res.body,/secret-test-not-returned/);
   assert.equal(body.bootstrapToken,undefined);
@@ -38,7 +38,7 @@ test('health endpoint requires only the three Supabase variables', async () => {
   await handler(requestMock(),res);
   const body=JSON.parse(res.body);
   assert.equal(res.statusCode,503);
-  assert.equal(body.version,'0.26.0');
+  assert.equal(body.version,'0.27.0');
   assert.deepEqual(body.checks.environment.missing.sort(),['SUPABASE_PUBLISHABLE_KEY','SUPABASE_SECRET_KEY','SUPABASE_URL'].sort());
   assert.doesNotMatch(res.body,/BOOTSTRAP_TOKEN|SESSION_PEPPER|APP_URL/);
 });
