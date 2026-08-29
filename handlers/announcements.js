@@ -8,6 +8,10 @@ function cleanEmployeeIds(value) {
   return [...new Set(value.map(String).filter(Boolean))].slice(0, 500);
 }
 
+function truthy(value) {
+  return value === true || String(value || '').toLowerCase() === 'true' || String(value || '') === '1' || String(value || '').toLowerCase() === 'on';
+}
+
 async function replaceRecipients(announcementId, audienceType, employeeIds) {
   assertDb(await db().from('hadas_announcement_recipients').delete().eq('announcement_id', announcementId), 'לא ניתן לעדכן את מקבלי ההודעה');
   if (audienceType !== 'employees') return;
@@ -17,7 +21,6 @@ async function replaceRecipients(announcementId, audienceType, employeeIds) {
   if (active.length !== ids.length) throw httpError(409, 'אחד העובדים שנבחרו אינו פעיל');
   assertDb(await db().from('hadas_announcement_recipients').insert(ids.map((employeeId) => ({ announcement_id: announcementId, employee_id: employeeId }))), 'לא ניתן לשמור את מקבלי ההודעה');
 }
-
 
 async function audienceEmployeeIds(audienceType, classId, employeeIds = []) {
   if (audienceType === 'employees') return cleanEmployeeIds(employeeIds);
@@ -70,6 +73,7 @@ module.exports = async function handler(req, res) {
         active: true,
         is_pinned: Boolean(body.is_pinned),
         requires_acknowledgement: body.requires_acknowledgement !== false && String(body.requires_acknowledgement) !== 'false',
+        popup_on_login: truthy(body.popup_on_login),
         created_by: caller.employee.id,
       };
       const item = assertDb(await db().from('hadas_announcements').insert(row).select('*').single(), 'לא ניתן לפרסם הודעה');
@@ -81,7 +85,7 @@ module.exports = async function handler(req, res) {
       }
       const notifyIds = (await audienceEmployeeIds(audienceType, row.class_id, body.employee_ids)).filter((id) => id !== caller.employee.id);
       await notifyEmployees(notifyIds, { type:'announcement', title:`הודעה חדשה: ${title}`, message:content.slice(0,220), entityType:'announcement', entityId:item.id });
-      await audit(caller.employee.id, 'create', 'announcement', item.id, { audienceType });
+      await audit(caller.employee.id, 'create', 'announcement', item.id, { audienceType, popupOnLogin:row.popup_on_login });
       await emitEvent('announcements');
       return send(res, 201, { ok: true, item });
     }
@@ -97,6 +101,7 @@ module.exports = async function handler(req, res) {
       for (const key of ['title', 'body', 'announcement_type', 'published_at', 'expires_at', 'active', 'is_pinned', 'requires_acknowledgement']) {
         if (body[key] !== undefined) row[key] = body[key] === '' ? null : body[key];
       }
+      if (body.popup_on_login !== undefined) row.popup_on_login = truthy(body.popup_on_login);
       if (body.audience_type !== undefined) {
         const audienceType = ['all', 'class', 'employees'].includes(body.audience_type) ? body.audience_type : 'all';
         if (audienceType === 'class' && !body.class_id) throw httpError(400, 'יש לבחור כיתה');
@@ -120,3 +125,5 @@ module.exports = async function handler(req, res) {
     return send(res, 405, { ok: false, error: 'Method not allowed' });
   } catch (error) { handleError(res, error); }
 };
+
+module.exports.truthy = truthy;
