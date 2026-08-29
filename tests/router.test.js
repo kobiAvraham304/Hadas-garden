@@ -30,7 +30,7 @@ test('unified router forwards config without exposing the secret key', async () 
   await router({method:'GET',query:{route:'config'},url:'/api/index?route=config',headers:{}},res);
   assert.equal(res.statusCode,200);
   const body=JSON.parse(res.body);
-  assert.equal(body.version,'0.24.0');
+  assert.equal(body.version,'0.25.0');
   assert.equal(body.supabasePublishableKey,'publishable-test');
   assert.doesNotMatch(res.body,/do-not-return-this/);
 });
