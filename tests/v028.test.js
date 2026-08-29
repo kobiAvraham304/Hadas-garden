@@ -6,11 +6,11 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const { validateWeek } = require('../lib/schedule');
 
-test('0.28 metadata, health and request wrapper are aligned', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.28.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.28\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.28\.0'/);
-  assert.match(read('health.js'), /update-v0\.28\.0\.sql/);
+test('0.28 metadata, health and request wrapper remain aligned under current release', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.29.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.29\.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.29\.0'/);
+  assert.match(read('health.js'), /update-v0\.29\.0\.sql/);
   assert.match(read('api/index.js'), /'requests': require\('\.\.\/lib\/requests-v028'\)/);
 });
 
@@ -100,12 +100,12 @@ test('0.28 keeps the high-quality PDF on a native A4 landscape page', () => {
 
 test('0.28 stale 0.25 client URLs are forced to the current no-store patch', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v028.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v028.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v029.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v029.css'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/', '/index.html', '/api/config', '/patch-v025.js', '/patch-v028.js']) assert.ok(headers.has(route), route);
+  for (const route of ['/', '/index.html', '/api/config', '/patch-v025.js', '/patch-v029.js']) assert.ok(headers.has(route), route);
   const apiConfig = headers.get('/api/config').map((item) => `${item.key}:${item.value}`).join('|');
   assert.match(apiConfig, /Vercel-CDN-Cache-Control:no-store/);
-  assert.match(read('patch-v028.js'), /const VERSION = '0\.28\.0'/);
-  assert.match(read('patch-v028.js'), /forceVersion/);
+  assert.match(read('patch-v029.js'), /const VERSION = '0\.29\.0'/);
+  assert.match(read('patch-v029.js'), /forceVersion/);
 });
