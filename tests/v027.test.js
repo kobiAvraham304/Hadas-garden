@@ -6,14 +6,14 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.27 release layers remain wired under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.28.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.28\.0/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.29.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.29\.0/);
   const api = read('api/index.js');
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v027'\)/);
   assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v027'\)/);
   assert.match(read('lib/shifts-v027.js'), /require\('\.\/shifts-v025'\)/);
-  assert.match(read('patch-v028.js'), /patch-v027\.js\?v=0280/);
-  assert.match(read('patch-v028.css'), /patch-v027\.css\?v=0280/);
+  assert.match(read('patch-v029.js'), /patch-v028\.js\?v=0290/);
+  assert.match(read('patch-v029.css'), /patch-v028\.css\?v=0290/);
 });
 
 test('0.27 migration adds only a general-day-off flag and index non-destructively', () => {
@@ -113,10 +113,10 @@ test('0.27 vacation-only weekly PDF is available next to team availability', () 
 
 test('0.27 assets remain directly available while current wrapper owns cache routing', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v028.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v028.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v029.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v029.css'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v027.js'));
-  assert.ok(vercel.headers.some((item) => item.source === '/patch-v028.js'));
-  assert.match(read('handlers/health.js'), /schema_version === '0\.28\.0'/);
-  assert.match(read('health.js'), /update-v0\.28\.0\.sql/);
+  assert.ok(vercel.headers.some((item) => item.source === '/patch-v029.js'));
+  assert.match(read('handlers/health.js'), /schema_version === '0\.29\.0'/);
+  assert.match(read('health.js'), /update-v0\.29\.0\.sql/);
 });
