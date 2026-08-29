@@ -5,13 +5,15 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.27 release metadata and API wrappers are wired', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.27.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.27\.0/);
+test('0.27 release layers remain wired under current release', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.28.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.28\.0/);
   const api = read('api/index.js');
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v027'\)/);
   assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v027'\)/);
   assert.match(read('lib/shifts-v027.js'), /require\('\.\/shifts-v025'\)/);
+  assert.match(read('patch-v028.js'), /patch-v027\.js\?v=0280/);
+  assert.match(read('patch-v028.css'), /patch-v027\.css\?v=0280/);
 });
 
 test('0.27 migration adds only a general-day-off flag and index non-destructively', () => {
@@ -89,11 +91,12 @@ test('0.27 general nursery day off is manager-controlled, removes only safe sche
   assert.match(patch, /general_day_off\s*=\s*true/);
 });
 
-test('0.27 weekly PDF is higher resolution and week image share text carries the dates', () => {
+test('0.27 weekly PDF is higher resolution, A4 landscape and image share text carries dates', () => {
   const patch = read('patch-v027.js');
   assert.match(patch, /highQualityWeeklyCanvas/);
   assert.match(patch, /2\.15/);
   assert.match(patch, /image\/jpeg', 0\.995/);
+  assert.match(patch, /const pageW = 841\.89, pageH = 595\.28/);
   assert.match(patch, /שיבוץ שבועי לתאריכים \$\{weekRangeLabel\(\)\}/);
   assert.match(patch, /imageButton\.classList\.remove\('hidden'\)/);
   assert.match(patch, /type:'application\/pdf'/);
@@ -108,11 +111,12 @@ test('0.27 vacation-only weekly PDF is available next to team availability', () 
   assert.match(patch, /חופשות והיעדרויות לתאריכים \$\{weekRangeLabel\(\)\}/);
 });
 
-test('0.27 Vercel serves current patch without stale cache and health points at current DB migration', () => {
+test('0.27 assets remain directly available while current wrapper owns cache routing', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v027.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v027.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v028.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v028.css'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v027.js'));
-  assert.match(read('handlers/health.js'), /schema_version === '0\.27\.0'/);
-  assert.match(read('health.js'), /update-v0\.27\.0\.sql/);
+  assert.ok(vercel.headers.some((item) => item.source === '/patch-v028.js'));
+  assert.match(read('handlers/health.js'), /schema_version === '0\.28\.0'/);
+  assert.match(read('health.js'), /update-v0\.28\.0\.sql/);
 });
