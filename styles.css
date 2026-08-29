@@ -105,7 +105,7 @@ textarea{resize:vertical;min-height:90px}.wide-btn{width:100%}
   .calendar-more{font-size:.55rem}
 }
 
-/* ========================================================================== 
+/* ==========================================================================
    גרסה 0.8.0 — שפת עיצוב חדשה: גן ילדים מודרני, צבעוני ועדין
    ========================================================================== */
 :root{
@@ -357,7 +357,7 @@ button:not(:disabled):active{transform:translateY(1px) scale(.985)}
 }
 @media(max-width:760px){.calendar-event{min-height:38px}}
 
-/* ========================================================================== 
+/* ==========================================================================
    גרסה 0.8.0 — מובייל מהיר, שיבוץ שבועי ללא גלילה הצדה ותקינה ברורה
    ========================================================================== */
 .schedule-mobile-week{display:none}
@@ -430,7 +430,7 @@ button:not(:disabled):active{transform:translateY(1px) scale(.985)}
 
 @media(prefers-reduced-motion:reduce){.schedule-loading,.loading-dot{animation:none!important}}
 
-/* ========================================================================== 
+/* ==========================================================================
    גרסה 0.8.0 — תיקוני מובייל, תקינה פעילה וייצוא מקצועי
    ========================================================================== */
 
@@ -719,7 +719,7 @@ button.is-busy::before{content:"";position:absolute;inset-inline-start:13px;top:
   .employee-form-nav button{padding-inline:9px}.employee-form-nav button span{width:22px;height:22px;flex-basis:22px}
 }
 
-/* ========================================================================== 
+/* ==========================================================================
    גרסה 0.15.0 — שיבוץ אוטומטי, בחירת עובד חכמה ומובייל קומפקטי
    ========================================================================== */
 .auto-schedule-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:10px 17px;border:0;border-radius:15px;background:linear-gradient(135deg,#675ee8,#8b6ee9 56%,#a880e8);color:#fff;font-weight:950;box-shadow:0 10px 24px rgba(103,94,232,.25);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease}
@@ -868,7 +868,7 @@ input,select,textarea,button{min-width:0;max-width:100%}
 }
 
 
-/* ========================================================================== 
+/* ==========================================================================
    v0.17.0 — Mobile-first rebuild, stable dialogs and compact work surfaces
    ========================================================================== */
 html,body{max-inline-size:100%;overflow-x:hidden!important;overscroll-behavior-x:none}
@@ -1090,7 +1090,7 @@ button,a,input,select,textarea,summary{touch-action:manipulation}
 .feedback-button{min-width:auto}.feedback-modal{max-width:840px}.feedback-topic-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:8px 0 16px}.feedback-topic-grid label{position:relative;border:1px solid #e2e4ef;border-radius:16px;padding:12px 8px;display:grid;gap:4px;text-align:center;cursor:pointer;background:#fff}.feedback-topic-grid input{position:absolute;opacity:0}.feedback-topic-grid label:has(input:checked){border-color:#7776e8;background:#f3f2ff;box-shadow:0 0 0 2px rgba(119,118,232,.12)}.feedback-topic-grid span{font-size:21px}.feedback-topic-grid strong{font-size:13px}.feedback-management,.my-feedback{margin-top:18px;border-top:1px solid #ececf4;padding-top:16px}.feedback-management-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.feedback-management-head>div{display:grid;gap:2px}.feedback-list{display:grid;gap:10px}.feedback-card{border:1px solid #e6e7f0;border-radius:18px;padding:14px;background:#fff;display:grid;gap:9px}.feedback-card header{display:flex;justify-content:space-between;gap:12px}.feedback-card header>div{display:grid;gap:2px}.feedback-card header span{font-size:12px;color:#6867c9;font-weight:800}.feedback-card header b{font-size:11px;border-radius:999px;padding:5px 8px;background:#f0f1f7;height:max-content}.feedback-card p{margin:0;white-space:pre-wrap}.feedback-card>small{color:#888b9b}.feedback-response{background:#f5f8ff;border-radius:13px;padding:10px}.feedback-response p{margin-top:4px}.feedback-actions{display:flex;flex-wrap:wrap;gap:6px}.feedback-actions button{border:1px solid #dedfea;background:#fff;border-radius:10px;padding:7px 10px;font-weight:700}.feedback-actions .danger-text{color:#b64242}.auto-week-picker{display:grid;gap:7px;background:#f7f7ff;border:1px solid #e1e1f7;padding:12px 14px;border-radius:16px;margin-bottom:12px}.auto-week-picker>span{font-weight:900}.auto-week-picker input{max-width:240px}.auto-issues>header{display:flex;align-items:center;justify-content:space-between;gap:10px}.auto-issues>header>div{display:grid;gap:2px}.auto-issue-card{border:1px solid #efcaca;background:#fffafa;border-radius:16px;padding:11px;margin-top:8px;display:grid;gap:9px}.auto-issue-card.decision-approved{border-color:#b9dfc7;background:#f5fcf7}.auto-issue-card.decision-rejected{border-color:#eca9a9;background:#fff2f2}.auto-issue-main{display:flex;gap:9px;align-items:flex-start}.auto-issue-main>span{width:28px;height:28px;border-radius:9px;background:#fde6e6;color:#a63b3b;display:grid;place-items:center;font-weight:900}.auto-issue-main>div{display:grid;gap:3px}.auto-issue-actions{display:flex;flex-wrap:wrap;gap:6px}.auto-issue-actions button{border:1px solid #dbdce8;background:#fff;border-radius:10px;padding:7px 10px;font-weight:800}.auto-issue-actions .approve{color:#17794a}.auto-issue-actions .reject{color:#b43c3c}.auto-issue-decision{font-weight:800}.auto-assignment-note{display:block;font-style:normal;color:#805a18;background:#fff6dc;border-radius:8px;padding:5px 7px;margin-top:4px}.auto-preview-review-summary{font-size:12px;color:#77798b;text-align:center;margin-top:10px}.staffing-stepper-grid.three-zones{grid-template-columns:repeat(3,minmax(0,1fr))}.staffing-stepper-card.morning{border-top-color:#f3ae4c}.standards-live-summary.four-zones{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:760px){.feedback-button .desktop-label{display:none}.feedback-topic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.feedback-modal{padding-left:12px!important;padding-right:12px!important}.auto-week-picker input{max-width:none;width:100%}.auto-issue-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}.auto-issue-actions button{padding:8px 4px;font-size:12px}.staffing-stepper-grid.three-zones{grid-template-columns:1fr}.standards-live-summary.four-zones{grid-template-columns:repeat(2,minmax(0,1fr))}.employee-sticky-heading{top:0;margin-left:-4px;margin-right:-4px}.employee-form-nav{top:78px!important}.topbar .user-area .feedback-button{display:inline-grid!important}.topbar .user-area{gap:6px!important}.topbar .icon-text-btn{width:40px!important;min-width:40px!important;height:40px!important;padding:0!important}}
 
-/* ========================================================================== 
+/* ==========================================================================
    גרסה 0.20.0 — נגישות, יציבות פריסה וביצועי ציור
    ========================================================================== */
 :where(button,[role="button"],summary,a,.calendar-day.selectable):focus-visible{
@@ -1112,7 +1112,7 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
 }
 
-/* ========================================================================== 
+/* ==========================================================================
    גרסה 0.21.0 — שיבוץ צפוף, בחירת עובדים ומשובים
    ========================================================================== */
 .schedule-table{min-width:930px;table-layout:fixed}
@@ -1209,4 +1209,78 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
  .request-heading-actions{width:100%}.request-heading-actions>*{flex:1 1 160px}
  .request-reply-row{grid-template-columns:1fr}.request-reply-row button{width:100%}
  .staffing-stepper-card .number-stepper{justify-self:stretch;width:100%}
+}
+/* ==========================================================================
+   v0.24.0 — זמינות מלאה, שיבוץ צפוף ותפעול יומי טבלאי
+   ========================================================================== */
+@media(min-width:821px){
+  .schedule-wrap.mode-week{overflow-x:auto}
+  .schedule-table{width:100%;min-width:850px;table-layout:fixed;border-spacing:2px}
+  .schedule-table thead th{min-width:0!important;width:auto;padding:5px 4px;font-size:.78rem}
+  .schedule-table thead th small{font-size:.64rem}
+  .schedule-table .class-name{width:64px!important;min-width:64px!important;padding:6px 4px;font-size:.78rem}
+  .schedule-table td{padding:3px;border-radius:8px}
+  .schedule-cell{min-height:102px;padding:2px;gap:2px}
+  .shift-item{padding:4px 5px;margin-bottom:2px;border-radius:7px;box-shadow:none!important;border-color:rgba(71,74,105,.1)!important}
+  .shift-item:hover{box-shadow:0 2px 7px rgba(60,64,100,.1)!important}
+  .shift-main{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:1px 4px;min-width:0}
+  .shift-main strong{font-size:.7rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shift-main .shift-time{font-size:.64rem;line-height:1.1;padding:1px 4px;white-space:nowrap}
+  .shift-main .shift-meta{grid-column:1/-1;font-size:.57rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .shift-edit-hint{left:3px;bottom:2px;font-size:.57rem}
+  .cell-footer{padding-top:2px;margin-top:auto}.cell-footer .cell-action{min-height:24px;padding:2px 4px;font-size:.59rem;border-radius:7px}
+}
+.absence-section-heading>div>div>small{display:block;margin-top:3px;color:var(--muted);font-size:.72rem}
+.absence-person.fixed-day-off{background:#f3f5fb;border:1px solid #dfe3ee}
+.absence-person.fixed-day-off .absence-icon{background:#e8edf8;color:#4d6194}
+.absence-person.one-time-absence{background:#fff5f3;border-color:#efd0c9}
+.absence-day-heading>div span{white-space:nowrap}
+.auto-gap-diagnostic{display:grid;gap:3px;margin-top:9px;padding:9px 10px;border-radius:11px;background:#fff8e7;border:1px solid #eed9a7;color:#70561d}
+.auto-gap-diagnostic strong{font-size:.76rem}.auto-gap-diagnostic span,.auto-gap-diagnostic small{font-size:.7rem;line-height:1.35}.auto-gap-diagnostic small{color:#88703c}
+.auto-warning-list{margin:10px 0;border:1px solid #e8d8a9;border-radius:14px;background:#fffbef;overflow:hidden}
+.auto-warning-list>summary{display:flex;align-items:center;gap:8px;padding:11px 13px;cursor:pointer;color:#755f25;list-style:none}.auto-warning-list>summary::-webkit-details-marker{display:none}.auto-warning-list>summary span{margin-inline-start:auto;font-size:.7rem}.auto-warning-list>summary i{font-style:normal}.auto-warning-list[open]>summary i{transform:rotate(180deg)}
+.auto-warning-list>div{display:grid;gap:6px;padding:0 12px 12px}.auto-warning-list p{display:grid;gap:2px;margin:0;padding:8px 9px;border-radius:10px;background:#fff;color:#5e522f}.auto-warning-list p strong{font-size:.75rem}.auto-warning-list p small{color:#88784a;font-size:.68rem}
+
+.notifications-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:2px 0 12px}
+.notifications-summary span{display:flex;align-items:baseline;justify-content:center;gap:5px;padding:9px;border-radius:13px;background:#f6f6fb;color:#676a7c;font-size:.73rem}
+.notifications-summary strong{font-size:1.15rem;color:#4f5297}
+.notifications-toolbar{align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.notification-filter-chips{display:flex;gap:5px;flex-wrap:wrap}
+.notification-filter-chips button{border:1px solid #dfe1ec;border-radius:999px;background:#fff;color:#666a7e;padding:7px 11px;font:inherit;font-size:.72rem;font-weight:850;cursor:pointer}
+.notification-filter-chips button.active{background:#ecebff;border-color:#7778da;color:#4e4fa8}
+.notification-card.read{opacity:.84}.notification-card.requires-action{background:linear-gradient(135deg,#fff,#fff8f2)}
+
+.daily-classes{grid-template-columns:1fr!important}
+.daily-schedule-source{display:inline-flex;align-items:center;align-self:flex-start;margin-top:5px;padding:5px 8px;border-radius:999px;background:#eaf4ff;color:#355f9d;font-size:.72rem;font-weight:850}
+.daily-table-wrap{width:100%;overflow-x:auto;border:1px solid #e6e6ef;border-radius:16px;background:#fff}
+.daily-operations-table{width:100%;border-collapse:collapse;table-layout:fixed}
+.daily-operations-table th{padding:9px 10px;text-align:right;background:#f5f5fa;color:#686b7d;font-size:.7rem;border-bottom:1px solid #e6e6ef}
+.daily-operations-table th:nth-child(1){width:18%}.daily-operations-table th:nth-child(2){width:13%}.daily-operations-table th:nth-child(3){width:16%}.daily-operations-table th:nth-child(4){width:28%}.daily-operations-table th:nth-child(5){width:25%}
+.daily-operations-table td{padding:9px 10px;vertical-align:middle;border-bottom:1px solid #ececf3;min-width:0}
+.daily-operations-table tr:last-child td{border-bottom:0}
+.daily-worker-row.has-operation{background:#fffaf8}.daily-worker-row.is-resolved{background:#f7fffb}
+.daily-operations-table td>small,.daily-planned-time{display:block}.daily-operations-table td>small{margin-top:3px;color:var(--muted);font-size:.68rem}
+.daily-planned-time{font-size:.8rem;white-space:nowrap}.daily-no-report{font-size:.72rem;color:#85889a}
+.daily-operations-table .daily-event-strip,.daily-operations-table .daily-resolution{padding:7px 8px;border-radius:10px;font-size:.7rem}
+.daily-operations-table .daily-event-strip>div{gap:5px}.daily-operations-table .daily-event-strip small,.daily-operations-table .daily-resolution small{font-size:.64rem}
+.daily-operations-table .actual-time-line{display:block;margin-top:5px;padding:5px 7px;font-size:.65rem}
+.daily-operations-table .daily-card-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin:0}
+.daily-operations-table .daily-card-actions button{width:100%;min-width:0;min-height:34px;padding:5px 6px;font-size:.65rem;border-radius:9px}
+.daily-no-schedule{grid-column:1/-1;display:grid;gap:7px}.daily-no-schedule button{justify-self:center}
+
+@media(max-width:760px){
+  .notifications-summary{gap:5px}.notifications-summary span{display:grid;text-align:center;gap:0;padding:7px 4px;font-size:.62rem}
+  .notifications-toolbar{align-items:stretch}.notification-filter-chips{display:grid;grid-template-columns:repeat(3,1fr);width:100%}.notification-filter-chips button{padding:7px 4px}
+  .notifications-toolbar>#markAllNotificationsBtn{width:100%}
+  .daily-table-wrap{overflow:visible;border:0;background:transparent}
+  .daily-operations-table,.daily-operations-table tbody{display:block;width:100%}
+  .daily-operations-table thead{display:none}
+  .daily-operations-table tr{display:grid;width:100%;margin-bottom:9px;padding:8px;border:1px solid #e6e6ef;border-radius:15px;background:#fff}
+  .daily-operations-table tr.has-operation{border-color:#efc8be;background:#fffaf8}.daily-operations-table tr.is-resolved{border-color:#bfe4d6;background:#f7fffb}
+  .daily-operations-table td{display:grid;grid-template-columns:82px minmax(0,1fr);align-items:center;gap:7px;width:100%;padding:7px 3px;border-bottom:1px dashed #e5e5ed}
+  .daily-operations-table td:last-child{border-bottom:0}
+  .daily-operations-table td::before{content:attr(data-label);color:#7b7e8e;font-size:.62rem;font-weight:850}
+  .daily-operations-table .daily-worker-main{min-width:0}.daily-operations-table .daily-worker-main strong{white-space:normal}
+  .daily-operations-table .daily-card-actions{grid-template-columns:1fr 1fr}
+  .daily-operations-table .daily-card-actions button{min-height:40px;font-size:.68rem}
 }

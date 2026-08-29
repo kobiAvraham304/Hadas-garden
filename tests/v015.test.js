@@ -106,5 +106,5 @@ test('0.15 interface bundles automatic scheduling, custom worker search and comp
   assert.match(css, /@media\(max-width:760px\)[\s\S]*\.main-nav/);
   assert.match(handler, /action === 'auto_preview'/);
   assert.match(handler, /action === 'auto_apply'/);
-  assert.match(handler, /restoreAutomaticSchedule/);
+  assert.match(handler, /hadas_apply_automatic_schedule/);
 });

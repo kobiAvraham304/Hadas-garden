@@ -19,6 +19,11 @@ function requestRangeLabel(request) {
 async function getRequest(id) {
   return assertDb(await db().from('hadas_requests').select('*').eq('id',id).maybeSingle(),'הבקשה לא נמצאה');
 }
+async function clearRequestActionNotifications(requestId,employeeId=null) {
+  const query=db().from('hadas_notifications').update({action_required:false}).eq('entity_type','request').eq('entity_id',String(requestId));
+  if(employeeId)query.eq('employee_id',employeeId);
+  assertDb(await query,'לא ניתן לעדכן את מצב ההתראות');
+}
 
 async function swapCandidates(date, requesterId) {
   if (!validDate(date)) throw httpError(400,'יש לבחור תאריך תקין');
@@ -179,25 +184,28 @@ module.exports = async function handler(req,res) {
       const message=String(body.message||'').trim().slice(0,2000);if(!message)throw httpError(400,'יש לכתוב תגובה');
       const row=assertDb(await db().from('hadas_request_messages').insert({request_id:request.id,author_id:caller.employee.id,message}).select('*').single(),'לא ניתן לשמור את התגובה');
       const recipients=new Set();if(isManager(caller))recipients.add(request.requester_id);else{const managers=assertDb(await db().from('hadas_users').select('employee_id').in('role',['admin','scheduler']).eq('active',true),'לא ניתן לאתר הנהלה')||[];managers.forEach((m)=>recipients.add(m.employee_id));}recipients.delete(caller.employee.id);
-      if(recipients.size)await notifyEmployees([...recipients],{type:'request',title:'תגובה חדשה לבקשה',message:`${caller.employee.full_name}: ${message.slice(0,120)}`,entityType:'request',entityId:request.id,actionRequired:true});
+      if(recipients.size)await notifyEmployees([...recipients],{type:'request',title:'תגובה חדשה לבקשה',message:`${caller.employee.full_name}: ${message.slice(0,120)}`,entityType:'request',entityId:request.id,actionRequired:false});
       await audit(caller.employee.id,'comment','request',request.id);await emitEvent('requests');return send(res,201,{ok:true,message:row});
     }
 
     if (action === 'cancel') {
       if (request.requester_id !== caller.employee.id || request.status !== 'pending') throw httpError(403,'לא ניתן לבטל את הבקשה');
       assertDb(await db().from('hadas_requests').update({ status:'cancelled' }).eq('id',request.id),'לא ניתן לבטל את הבקשה');
+      await clearRequestActionNotifications(request.id);
       if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{ type:'swap',title:'בקשת ההחלפה בוטלה',message:`${caller.employee.full_name} ביטל את בקשת ההחלפה.`,entityType:'request',entityId:request.id });
     } else if (action === 'target_accept') {
       if (request.target_employee_id !== caller.employee.id) throw httpError(403,'רק העובד שקיבל את ההצעה יכול לאשר');
       if (request.status !== 'pending') throw httpError(409,'הבקשה כבר טופלה');
       if (request.target_approved) throw httpError(409,'ההחלפה כבר אושרה על ידך');
       assertDb(await db().from('hadas_requests').update({ target_approved:true }).eq('id',request.id),'לא ניתן לאשר את ההחלפה');
+      await clearRequestActionNotifications(request.id,caller.employee.id);
       await notifyEmployees([request.requester_id],{ type:'swap',title:'בקשת ההחלפה אושרה על ידי העובד',message:`${caller.employee.full_name} אישר את ההחלפה. הבקשה הועברה לאישור מנהלת המעון או אחראית השיבוץ.`,entityType:'request',entityId:request.id });
       await notifyManagers({ type:'swap',title:'החלפה ממתינה לאישור הנהלה',message:`${caller.employee.full_name} אישר את בקשת ההחלפה לתאריך ${request.request_date}.`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id);
     } else if (action === 'target_reject') {
       if (request.target_employee_id !== caller.employee.id) throw httpError(403,'רק העובד שקיבל את ההצעה יכול לדחות');
       if (request.status !== 'pending' || request.target_approved) throw httpError(409,'הבקשה כבר טופלה');
       assertDb(await db().from('hadas_requests').update({ status:'rejected',manager_note:'העובד שנבחר דחה את בקשת ההחלפה',decided_by:caller.employee.id,decided_at:new Date().toISOString() }).eq('id',request.id),'לא ניתן לדחות את ההחלפה');
+      await clearRequestActionNotifications(request.id);
       await notifyEmployees([request.requester_id],{ type:'swap',title:'בקשת ההחלפה נדחתה',message:`${caller.employee.full_name} לא אישר את בקשת ההחלפה לתאריך ${request.request_date}.`,entityType:'request',entityId:request.id });
     } else if (action === 'decide') {
       if (!isManager(caller)) throw httpError(403,'אין הרשאה לטפל בבקשה');
@@ -205,6 +213,8 @@ module.exports = async function handler(req,res) {
       if (request.request_type === 'swap' && body.status === 'approved' && !request.target_approved) throw httpError(409,'העובד שנבחר עדיין לא אישר את ההחלפה');
       const managerNote = String(body.manager_note || '').trim() || null;
       assertDb(await db().from('hadas_requests').update({ status:body.status,manager_note:managerNote,decided_by:caller.employee.id,decided_at:new Date().toISOString() }).eq('id',request.id),'לא ניתן לעדכן את הבקשה');
+      await clearRequestActionNotifications(request.id);
+      if(body.status==='approved')await notifyManagers({type:'request',title:'בקשה אושרה ומוכנה להזרמה',message:`הבקשה לתאריך ${requestRangeLabel(request)} אושרה. יש להזרים אותה לטיוטת השיבוץ.`,entityType:'request',entityId:request.id,actionRequired:true});
       const statusText = body.status === 'approved' ? 'אושרה' : 'נדחתה';
       await notifyEmployees([request.requester_id],{ type:'request',title:`הבקשה שלך ${statusText}`,message:managerNote || `בקשתך לתאריך ${requestRangeLabel(request)} ${statusText}.`,entityType:'request',entityId:request.id,actionRequired:false });
       if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{ type:'swap',title:`בקשת ההחלפה ${statusText}`,message:`הבקשה לתאריך ${request.request_date} ${statusText} על ידי מנהלת המעון או אחראית השיבוץ.`,entityType:'request',entityId:request.id });
@@ -212,6 +222,7 @@ module.exports = async function handler(req,res) {
       if (!isManager(caller)) throw httpError(403,'אין הרשאה להזרים בקשה');
       if (request.status !== 'approved') throw httpError(409,'יש לאשר את הבקשה לפני הזרמתה');
       assertDb(await db().rpc('hadas_apply_approved_request',{ p_request_id:request.id,p_actor_id:caller.employee.id }),'לא ניתן להזרים את הבקשה לשיבוץ');
+      await clearRequestActionNotifications(request.id);
       await notifyEmployees([request.requester_id],{ type:'request',title:'הבקשה הוזרמה לשיבוץ',message:`הבקשה לתאריך ${requestRangeLabel(request)} עודכנה בטיוטת השיבוץ.`,entityType:'request',entityId:request.id });
       if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{ type:'swap',title:'ההחלפה הוזרמה לשיבוץ',message:`השיבוץ לתאריך ${request.request_date} הועבר אליך בטיוטת השיבוץ.`,entityType:'request',entityId:request.id });
     } else {

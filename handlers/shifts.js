@@ -2,8 +2,8 @@ const {
   requireSession, parseBody, db, assertDb, emitEvent, audit, isManager, scheduleScope, canViewFullSchedule, notifyEmployees,
   send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
-const { validateWeek, timeToMinutes, closingTimeForDate, requiredStaffAt, leaderRequiredAt } = require('../lib/schedule');
-const { generateAutomaticSchedule } = require('../lib/auto-schedule');
+const { validateWeek, timeToMinutes, closingTimeForDate, requiredStaffAt, leaderRequiredAt, buildScheduleAvailability } = require('../lib/schedule');
+const { generateAutomaticSchedule, employeeAvailability, partialAsNeededIssue } = require('../lib/auto-schedule');
 const dailyOperations = require('./daily-operations');
 const { employeeCanLead, sourceClassCanRelease, loadContext: loadDailyContext } = dailyOperations;
 
@@ -45,6 +45,19 @@ async function recordChange(caller, type, before, after) {
     after_data: shiftSnapshot(after),
     created_by: caller.employee.id,
   }), 'לא ניתן לתעד את שינוי השיבוץ');
+}
+
+async function assertShiftsSafeToDelete(shifts) {
+  const ids=[...new Set((Array.isArray(shifts)?shifts:[shifts]).map((row)=>typeof row==='string'?row:row?.id).filter(Boolean))];
+  if(!ids.length)return;
+  const [attendanceR,operationsR,sourceRequestsR,targetRequestsR]=await Promise.all([
+    db().from('hadas_attendance').select('id').in('shift_id',ids).limit(1),
+    db().from('hadas_daily_operations').select('id').in('shift_id',ids).limit(1),
+    db().from('hadas_requests').select('id').in('shift_id',ids).in('status',['pending','approved']).limit(1),
+    db().from('hadas_requests').select('id').in('target_shift_id',ids).in('status',['pending','approved']).limit(1),
+  ]);
+  if((assertDb(attendanceR,'לא ניתן לבדוק דיווחי נוכחות')||[]).length||(assertDb(operationsR,'לא ניתן לבדוק דיווחים תפעוליים')||[]).length)throw httpError(409,'לא ניתן למחוק שיבוץ שכבר כולל דיווח נוכחות או תפעול יומי. יש לעדכן את הדיווח במקום למחוק את השיבוץ.');
+  if((assertDb(sourceRequestsR,'לא ניתן לבדוק בקשות מקושרות')||[]).length||(assertDb(targetRequestsR,'לא ניתן לבדוק בקשות מקושרות')||[]).length)throw httpError(409,'לא ניתן למחוק שיבוץ שמקושר לבקשה פתוחה. יש לטפל בבקשה תחילה.');
 }
 
 async function validateShift(payload, id, overrideDayOff = false, overrideRules = false) {
@@ -129,6 +142,7 @@ function publicAutomaticPreview(plan) {
     employeeHours: plan.employeeHours,
     assignmentNotes: plan.assignmentNotes || [],
     excluded: plan.excluded || [],
+    coverageGaps: plan.coverageGaps || [],
     metrics: plan.metrics,
     signature: plan.signature,
   };
@@ -148,25 +162,19 @@ function buildManualAutomaticPlan(base,data,{weekStart,mode,selectedDates,manual
   const generated=sanitizeManualGenerated(manualGenerated,data,selectedDates,callerId);if(!generated)return base;const selectedSet=new Set(selectedDates);const kept=mode==='fill'?data.existingShifts.map((r)=>({...r})):data.existingShifts.filter((r)=>!selectedSet.has(r.shift_date)).map((r)=>({...r}));const finalRows=[...kept,...generated];
   const validation=validateWeek({shifts:finalRows,classes:data.classes,employees:data.employees,settings:data.settings,constraints:data.constraints,weeklyPatterns:data.patterns,requests:data.requests,weekStart});
   validation.errors=validation.errors.filter((item)=>!item.date||selectedSet.has(item.date));validation.warnings=validation.warnings.filter((item)=>!item.date||selectedSet.has(item.date));
-  for(const row of generated){const employee=data.employees.find((e)=>e.id===row.employee_id),pattern=autoPattern(data.patterns,row.employee_id,row.shift_date);if(!employee||pattern?.day_type!=='as_needed')continue;const open=shortTime(employee.default_start)||shortTime(data.settings.opening_time)||'07:30',close=shortTime(employee.default_end)||closingTimeForDate(data.settings,row.shift_date);if(shortTime(row.start_time)!==open||shortTime(row.end_time)!==close)validation.errors.push({code:'short_nonfixed_shift',date:row.shift_date,class_id:row.class_id,employee_id:row.employee_id,start_time:row.start_time,end_time:row.end_time,message:`${employee.full_name}: מוצעת משמרת קצרה ${row.start_time}-${row.end_time} ביום לפי צורך — נדרש אישור או תיקון`});}
+  for(const row of generated){const employee=data.employees.find((e)=>e.id===row.employee_id),pattern=autoPattern(data.patterns,row.employee_id,row.shift_date);if(!employee||pattern?.day_type!=='as_needed')continue;const availability=employeeAvailability({employee,date:row.shift_date,patterns:data.patterns,requests:data.requests,settings:data.settings});const issue=partialAsNeededIssue({row,employee,availability});if(!issue)continue;const {severity,...publicIssue}=issue;(severity==='error'?validation.errors:validation.warnings).push(publicIssue);}
   for(const date of selectedDates){for(const employee of data.employees.filter((e)=>e.active&&e.is_schedulable!==false&&e.assignment_mode!=='no_schedule')){const pattern=autoPattern(data.patterns,employee.id,date);if(pattern?.day_type!=='work'||autoAbsent(data.requests,employee.id,date))continue;if(!finalRows.some((row)=>row.employee_id===employee.id&&row.shift_date===date))validation.errors.push({code:'work_day_unscheduled',date,employee_id:employee.id,message:`${employee.full_name}: יום עבודה קבוע לא שובץ — יש לתקן לפני החלה`});}}
   const dedupe=(items)=>{const seen=new Set();return items.filter((item)=>{const key=[item.code,item.date||'',item.class_id||'',item.employee_id||'',item.start_time||item.time||'',item.message||''].join('|');if(seen.has(key))return false;seen.add(key);return true;});};validation.errors=dedupe(validation.errors);validation.warnings=dedupe(validation.warnings);
-  return {...base,generated,finalRows,keptCount:kept.length,validation,metrics:{...(base.metrics||{}),generatedCount:generated.length,unresolvedErrors:validation.errors.length,warnings:validation.warnings.length}};
+  const coverageGaps=(base.coverageGaps||[]).filter((gap)=>validation.errors.some((item)=>item.code===gap.code&&item.date===gap.date&&item.class_id===gap.class_id&&(!item.time||shortTime(item.time)===shortTime(gap.start_time))));
+  return {...base,generated,finalRows,keptCount:kept.length,validation,coverageGaps,metrics:{...(base.metrics||{}),generatedCount:generated.length,unresolvedErrors:validation.errors.length,warnings:validation.warnings.length}};
 }
 
-async function recordAutomaticChanges(caller, weekStart, deletedRows, insertedRows) {
-  const rows = [];
-  for (const shift of deletedRows) rows.push({
-    week_start: weekStart, shift_id: shift.id || null, change_type: 'delete',
-    before_data: shiftSnapshot(shift), after_data: null, created_by: caller.employee.id,
-  });
-  for (const shift of insertedRows) rows.push({
-    week_start: weekStart, shift_id: shift.id || null, change_type: 'create',
-    before_data: null, after_data: shiftSnapshot(shift), created_by: caller.employee.id,
-  });
-  if (rows.length) assertDb(await db().from('hadas_schedule_changes').insert(rows), 'לא ניתן לתעד את השיבוץ האוטומטי');
+function automaticComparableRows(rows) {
+  return rows.map((row)=>({shift_date:row.shift_date,class_id:row.class_id,employee_id:row.employee_id,start_time:shortTime(row.start_time),end_time:shortTime(row.end_time),shift_role:row.shift_role||'staff'})).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
 }
-
+function automaticSchedulesMatch(existingRows,generatedRows,selectedDates) {
+  const selected=new Set(selectedDates);return JSON.stringify(automaticComparableRows(existingRows.filter((row)=>selected.has(row.shift_date))))===JSON.stringify(automaticComparableRows(generatedRows));
+}
 
 function autoShiftRestoreRow(shift) {
   return {
@@ -185,20 +193,6 @@ function autoShiftRestoreRow(shift) {
     created_at: shift.created_at,
     updated_at: shift.updated_at,
   };
-}
-
-async function restoreAutomaticSchedule(deletedRows, insertedRows) {
-  const insertedIds = (insertedRows || []).map((row) => row.id).filter(Boolean);
-  if (insertedIds.length) {
-    const removeResult = await db().from('hadas_shifts').delete().in('id', insertedIds);
-    if (removeResult.error) return { ok:false, message:`מחיקת הטיוטה החדשה נכשלה: ${removeResult.error.message}` };
-  }
-  if (deletedRows?.length) {
-    const restoreRows = deletedRows.map(autoShiftRestoreRow);
-    const restoreResult = await db().from('hadas_shifts').insert(restoreRows);
-    if (restoreResult.error) return { ok:false, message:`שחזור השיבוץ הקודם נכשל: ${restoreResult.error.message}` };
-  }
-  return { ok:true };
 }
 
 async function getWeekValidation(weekStart) {
@@ -245,37 +239,6 @@ function restoreLastPublished(currentRows, pendingChanges) {
   return [...result.values()].sort((a, b) => `${a.shift_date}-${a.start_time}`.localeCompare(`${b.shift_date}-${b.start_time}`));
 }
 
-function buildScheduleAbsences(requests, employees, weeklyPatterns, shifts, weekStart) {
-  const dates=Array.from({length:6},(_,index)=>addDays(weekStart,index));
-  const absenceMap=new Map();
-  for(const request of requests){
-    if(!['approved','applied'].includes(request.status)||!['leave','day_off','sick'].includes(request.request_type))continue;
-    const endDate=request.request_end_date||request.request_date;
-    for(const cursor of dates){
-      if(cursor<request.request_date||cursor>endDate)continue;
-      absenceMap.set(`${request.requester_id}:${cursor}`,{employee_id:request.requester_id,absence_date:cursor,absence_type:request.request_type,absence_kind:'one_time_absence'});
-    }
-  }
-  const employeesWithPatterns=new Set(weeklyPatterns.map((row)=>row.employee_id));
-  for(const pattern of weeklyPatterns.filter((row)=>row.day_type==='day_off')){
-    for(const date of dates){
-      if(new Date(`${date}T12:00:00Z`).getUTCDay()!==Number(pattern.weekday))continue;
-      if(!shifts.some((shift)=>shift.employee_id===pattern.employee_id&&shift.shift_date===date))continue;
-      const key=`${pattern.employee_id}:${date}`;
-      if(!absenceMap.has(key))absenceMap.set(key,{employee_id:pattern.employee_id,absence_date:date,absence_type:'day_off_worked',absence_kind:'worked_day_off'});
-    }
-  }
-  for(const employee of employees.filter((row)=>row.active&&row.fixed_day_off!==null&&row.fixed_day_off!==undefined&&!employeesWithPatterns.has(row.id))){
-    for(const date of dates){
-      if(new Date(`${date}T12:00:00Z`).getUTCDay()!==Number(employee.fixed_day_off))continue;
-      if(!shifts.some((shift)=>shift.employee_id===employee.id&&shift.shift_date===date))continue;
-      const key=`${employee.id}:${date}`;
-      if(!absenceMap.has(key))absenceMap.set(key,{employee_id:employee.id,absence_date:date,absence_type:'day_off_worked',absence_kind:'worked_day_off'});
-    }
-  }
-  return [...absenceMap.values()].sort((a,b)=>`${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`));
-}
-
 module.exports = async function handler(req, res) {
   try {
     const parsed = parseBody(req);
@@ -292,7 +255,7 @@ module.exports = async function handler(req, res) {
         db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
         db().from('hadas_schedule_acknowledgements').select('*').eq('week_start', weekStart),
         db().from('hadas_requests').select('requester_id,request_date,request_end_date,request_type,status').lte('request_date', weekEnd),
-        db().from('hadas_employees').select('id,active,fixed_day_off,is_schedulable'),
+        db().from('hadas_employees').select('id,full_name,active,fixed_day_off,is_schedulable,primary_class_id'),
         db().from('hadas_employee_weekly_patterns').select('*'),
         db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
       ]);
@@ -312,7 +275,7 @@ module.exports = async function handler(req, res) {
         else if (!fullScheduleViewer) shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
         acknowledgements = acknowledgements.filter((row) => row.employee_id === caller.employee.id);
       }
-      let scheduleAbsences = buildScheduleAbsences(requests, employees, weeklyPatterns, shifts, weekStart);
+      let scheduleAbsences = buildScheduleAvailability({ requests, employees, weeklyPatterns, shifts, weekStart });
       if (scope === 'class') {
         const classEmployeeIds = new Set(employees.filter((row) => row.primary_class_id === caller.employee.primary_class_id).map((row) => row.id));
         scheduleAbsences = scheduleAbsences.filter((row) => classEmployeeIds.has(row.employee_id));
@@ -362,22 +325,12 @@ module.exports = async function handler(req, res) {
       if (hardErrors.length) throw httpError(409, 'נשארו נקודות שחייבות תיקון לפני החלת השיבוץ. פתחו את הנקודה ובצעו תיקון בתצוגה המקדימה.', { errors:hardErrors, warnings:plan.validation.warnings });
       if (plan.validation.errors.length && !body.allow_incomplete) throw httpError(409, 'נשארו חוסרים בשיבוץ האוטומטי. ניתן לחזור לתצוגה המקדימה או לאשר יצירת טיוטה חלקית.', plan.validation);
       if (!plan.generated.length) throw httpError(409, mode === 'fill' ? 'לא נמצאו חוסרים שניתן למלא אוטומטית' : 'לא ניתן היה ליצור שיבוצים מהנתונים הקיימים');
-      const deletedRows = mode === 'rebuild' ? data.existingShifts.filter((row)=>selectedDates.includes(row.shift_date)) : [];
+      if(mode==='rebuild'&&automaticSchedulesMatch(data.existingShifts,plan.generated,selectedDates))return send(res,200,{ok:true,count:0,mode,unchanged:true,metrics:plan.metrics,validation:plan.validation});
       const rows = plan.generated.map((row) => ({ ...row, status: 'draft', created_by: caller.employee.id }));
-      let inserted = [];
-      try {
-        if (deletedRows.length) assertDb(await db().from('hadas_shifts').delete().in('shift_date', selectedDates), 'לא ניתן לנקות את הימים שנבחרו לפני השיבוץ האוטומטי');
-        inserted = assertDb(await db().from('hadas_shifts').insert(rows).select('*'), 'לא ניתן לשמור את השיבוץ האוטומטי') || [];
-        await recordAutomaticChanges(caller, weekStart, deletedRows, inserted);
-      } catch (error) {
-        const restored = await restoreAutomaticSchedule(deletedRows, inserted);
-        if (!restored.ok) throw httpError(500, `${error.message}. בנוסף, ${restored.message}. אין לבצע ניסיון נוסף לפני בדיקת השבוע.`);
-        throw error;
-      }
-      await audit(caller.employee.id, 'automatic_schedule', 'schedule', weekStart, {
-        mode, selected_dates:selectedDates, generated: inserted.length, quality: plan.metrics.quality,
-        errors: plan.validation.errors.length, warnings: plan.validation.warnings.length,
-      });
+      const applied = assertDb(await db().rpc('hadas_apply_automatic_schedule',{
+        p_week_start:weekStart,p_selected_dates:selectedDates,p_rows:rows,p_actor_id:caller.employee.id,p_mode:mode,
+      }),'לא ניתן להחיל את השיבוץ האוטומטי כעסקה אחת') || {};
+      const inserted=Array.isArray(applied.inserted)?applied.inserted:[];
       await emitEvent('shifts');
       return send(res, 201, { ok: true, count: inserted.length, mode, metrics: plan.metrics, validation: plan.validation });
     }
@@ -533,6 +486,7 @@ module.exports = async function handler(req, res) {
       if (!previous.length) throw httpError(409, 'לא נמצאו שיבוצים בשבוע הקודם');
       let existing = assertDb(await db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', addDays(weekStart, 5)), 'לא ניתן לבדוק את השבוע') || [];
       if (mode === 'replace' && existing.length) {
+        await assertShiftsSafeToDelete(existing);
         for (const shift of existing) await recordChange(caller, 'delete', shift, null);
         assertDb(await db().from('hadas_shifts').delete().gte('shift_date', weekStart).lte('shift_date', addDays(weekStart, 5)), 'לא ניתן לנקות את השבוע');
         existing = [];
@@ -616,6 +570,7 @@ module.exports = async function handler(req, res) {
       if (!id) throw httpError(400, 'חסר מזהה שיבוץ');
       const current = assertDb(await db().from('hadas_shifts').select('*').eq('id', id).maybeSingle(), 'השיבוץ לא נמצא');
       if (!current) throw httpError(404, 'השיבוץ לא נמצא');
+      await assertShiftsSafeToDelete(current);
       await recordChange(caller, 'delete', current, null);
       assertDb(await db().from('hadas_shifts').delete().eq('id', id), 'לא ניתן למחוק שיבוץ');
       await audit(caller.employee.id, 'delete', 'shift', id, current);

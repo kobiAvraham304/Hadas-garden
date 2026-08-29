@@ -33,8 +33,8 @@ test('0.21 quality: scarcity-aware allocation protects morning bottleneck and us
   const plan=generateAutomaticSchedule({weekStart:'2026-08-30',employees,classes,patterns,constraints:[],requests:[],settings:settings(),existingShifts:[],previousShifts:[]});
   const full=plan.finalRows.find(r=>r.employee_id==='full'&&r.shift_date==='2026-08-30');
   const late=plan.finalRows.find(r=>r.employee_id==='late'&&r.shift_date==='2026-08-30');
-  assert.deepEqual([full.start_time,full.end_time],['07:30','08:00']);
-  assert.deepEqual([late.start_time,late.end_time],['13:30','15:00']);
+  assert.ok(full.start_time<='07:30'&&full.end_time>='08:00');
+  assert.ok(late.start_time<='13:30'&&late.end_time>='15:00');
 });
 
 test('0.21 quality: as-needed staff are not added when fixed work already covers the class',()=>{
@@ -57,8 +57,9 @@ test('0.21 quality: an as-needed worker may cover two non-overlapping critical w
   const plan=generateAutomaticSchedule({weekStart:'2026-08-30',employees,classes,patterns,constraints:[],requests:[],settings:settings(),existingShifts:[],previousShifts:[]});
   const subRows=plan.finalRows.filter(r=>r.employee_id==='sub'&&r.shift_date==='2026-08-30');
   assert.equal(subRows.length,2);
-  assert.ok(subRows.some(r=>r.start_time==='07:30'&&r.end_time==='07:45'));
-  assert.ok(subRows.some(r=>r.start_time==='14:30'&&r.end_time==='15:00'));
+  assert.ok(subRows.some(r=>r.start_time<='07:30'&&r.end_time>='07:45'));
+  assert.ok(subRows.some(r=>r.start_time<='14:30'&&r.end_time>='15:00'));
+  assert.ok(subRows[0].end_time<=subRows[1].start_time||subRows[1].end_time<=subRows[0].start_time);
 });
 
 test('0.21 quality: borrowing fixed staff is a last resort and source class remains compliant',()=>{

@@ -5,8 +5,8 @@ const {generateAutomaticSchedule}=require('../lib/auto-schedule');
 const {validateWeek}=require('../lib/schedule');
 
 test('0.22 metadata and migration align',()=>{
-  assert.equal(JSON.parse(read('package.json')).version,'0.23.0');
-  assert.match(read('handlers/health.js'),/schema_version === '0\.23\.0'/);
+  assert.equal(JSON.parse(read('package.json')).version,'0.24.0');
+  assert.match(read('handlers/health.js'),/schema_version === '0\.24\.0'/);
   const sql=read('supabase/update-v0.22.0.sql');
   assert.match(sql,/max_work_days_per_week/);assert.match(sql,/priority_rank/);assert.doesNotMatch(sql,/drop table/i);
 });
@@ -52,11 +52,12 @@ test('auto decisions show current staffing and flag short non-fixed shifts',()=>
   assert.match(auto,/short_nonfixed_shift/);assert.match(read('handlers/shifts.js'),/selectedDatesForWeek/);
 });
 
-test('absence list shows only one-time absence or worked fixed day off special states',()=>{
-  const handler=read('handlers/shifts.js'),app=read('app.js'),css=read('styles.css');
-  assert.match(handler,/absence_type:'day_off_worked'/);
-  assert.match(handler,/shifts\.some\(\(shift\)=>shift\.employee_id===pattern\.employee_id/);
-  assert.match(app,/worked-day-off/);assert.match(css,/one-time-absence/);assert.match(css,/worked-day-off/);
+test('availability list shows fixed days off, approved absences and worked-day-off exceptions',()=>{
+  const handler=read('handlers/shifts.js'),schedule=read('lib/schedule.js'),app=read('app.js'),css=read('styles.css');
+  assert.match(handler,/buildScheduleAvailability/);
+  assert.match(schedule,/worked \? 'day_off_worked' : 'fixed_day_off'/);
+  assert.match(schedule,/absence_kind: worked \? 'worked_day_off' : 'fixed_day_off'/);
+  assert.match(app,/day_off_worked/);assert.match(app,/fixed_day_off/);assert.match(css,/one-time-absence/);assert.match(css,/worked-day-off/);assert.match(css,/fixed-day-off/);
 });
 
 test('times are force-isolated LTR in RTL schedule',()=>{assert.match(read('styles.css'),/\.time-value.*direction:ltr/s);});

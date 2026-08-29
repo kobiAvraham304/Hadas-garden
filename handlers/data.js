@@ -1,7 +1,7 @@
 const {
   requireSession, isManager, scheduleScope, canViewFullSchedule, canCreateContent, db, assertDb, displayPhone, israelDateISO, send, handleError,
 } = require('../lib/server');
-const { dateRange } = require('../lib/schedule');
+const { dateRange, buildScheduleAvailability } = require('../lib/schedule');
 
 function plusDays(dateString, days) {
   const d = new Date(`${dateString}T12:00:00Z`);
@@ -154,23 +154,9 @@ module.exports = async function handler(req, res) {
     }
     const employees = employeeRows.map((row) => sanitizeEmployee(row, manager, usersByEmployee, privateByEmployee, patternsByEmployee));
 
-    // רשימה מצומצמת ובטוחה להצגת חופשות/היעדרויות לצד השיבוץ לכל הצוות.
-    // לא נשלחים נימוקים, הערות מנהלת או מידע אישי אחר.
-    const absenceMap = new Map();
-    const absenceDates = new Set([...dateRange(weekStart, 6), today]);
-    for (const request of requests) {
-      if (!['approved', 'applied'].includes(request.status)) continue;
-      if (!['leave', 'day_off', 'sick'].includes(request.request_type)) continue;
-      const endDate = request.request_end_date || request.request_date;
-      for (const cursor of absenceDates) {
-        if (cursor < request.request_date || cursor > endDate) continue;
-        absenceMap.set(`${request.requester_id}:${cursor}`, {
-          employee_id: request.requester_id,
-          absence_date: cursor,
-          absence_type: request.request_type,
-        });
-      }
-    }
+    // רשימה מצומצמת ובטוחה להצגת זמינות לצד השיבוץ. לא נשלחים נימוקים
+    // או פרטים אישיים, אך כן מוצגים ימי חופש קבועים גם כשאין חריגה.
+    const absenceDates = [...new Set([...dateRange(weekStart, 6), today])];
     if (!manager) {
       shifts = restoreLastPublished(shifts, scheduleChanges);
       todayShifts = restoreLastPublished(todayShifts, todayChanges);
@@ -200,7 +186,7 @@ module.exports = async function handler(req, res) {
 
     const visibleRequestIds=new Set(requests.map((row)=>row.id));requestMessages=requestMessages.filter((row)=>visibleRequestIds.has(row.request_id));
     const visibleShiftPool=[...shifts,...todayShifts];
-    for(const shift of visibleShiftPool){const pattern=(patternsByEmployee.get(shift.employee_id)||[]).find((row)=>Number(row.weekday)===new Date(`${shift.shift_date}T12:00:00Z`).getUTCDay());const employee=employeeRows.find((row)=>row.id===shift.employee_id);const fixedOff=pattern?pattern.day_type==='day_off':Number(employee?.fixed_day_off)===new Date(`${shift.shift_date}T12:00:00Z`).getUTCDay();if(fixedOff){const key=`${shift.employee_id}:${shift.shift_date}`;if(!absenceMap.has(key))absenceMap.set(key,{employee_id:shift.employee_id,absence_date:shift.shift_date,absence_type:'day_off_worked'});}}
+    const absenceMap = new Map(buildScheduleAvailability({ requests:allRequestsForCalendar, employees:employeeRows, weeklyPatterns, shifts:visibleShiftPool, weekStart, dates:absenceDates }).map((row)=>[`${row.employee_id}:${row.absence_date}`,row]));
     const calendarVisibleLeave=(employee)=>manager||fullScheduleViewer||(classScheduleViewer&&employee?.primary_class_id===caller.employee.primary_class_id)||employee?.id===caller.employee.id;
     for(const request of allRequestsForCalendar){if(!['approved','applied'].includes(request.status)||request.request_type!=='leave')continue;const employee=employeeRows.find((row)=>row.id===request.requester_id);if(!employee||!calendarVisibleLeave(employee))continue;const end=request.request_end_date||request.request_date;for(const date of dateRange(request.request_date,Math.floor((new Date(`${end}T12:00:00Z`)-new Date(`${request.request_date}T12:00:00Z`))/86400000)+1)){if(date<calRange.start||date>calRange.end)continue;calendar.push({id:`leave:${request.id}:${date}`,title:employee.id===caller.employee.id?'חופשה מאושרת':`חופשה · ${employee.full_name}`,description:'חופשה מאושרת במערכת הבקשות',event_type:'approved_leave',event_date:date,start_time:null,end_time:null,visibility:'leave_request',class_id:employee.primary_class_id,created_by:null,source:'approved_leave',request_id:request.id,employee_id:employee.id,read_only:true});}}
     calendar.sort((a,b)=>`${a.event_date}-${a.start_time||''}-${a.title||''}`.localeCompare(`${b.event_date}-${b.start_time||''}-${b.title||''}`,'he'));

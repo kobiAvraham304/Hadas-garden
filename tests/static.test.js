@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.23.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.24.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
@@ -50,7 +50,7 @@ test('initial accounts and schema version are present in clean installer', () =>
   const schema=read('supabase/schema.sql');
   assert.match(schema,/אילנית זאדייב/); assert.match(schema,/\+972544594513/); assert.match(schema,/'admin'/);
   assert.match(schema,/לינור אברהם/); assert.match(schema,/\+972542521780/); assert.match(schema,/'scheduler'/);
-  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.23\.0'/);
+  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.24\.0'/);
   assert.match(schema,/ENABLE ROW LEVEL SECURITY/i); assert.match(schema,/REVOKE ALL ON TABLE/i);
   assert.match(schema,/hadas_realtime_public_read/); assert.match(schema,/ALTER PUBLICATION supabase_realtime ADD TABLE/i);
 });
@@ -133,7 +133,7 @@ test('non-manager employee payload excludes private employment fields', () => {
 test('health page is CSP-compatible and references current migration', () => {
   const html=read('health.html'); const js=read('health.js');
   assert.match(html,/src="\/health\.js"/); assert.doesNotMatch(html,/<script>[^<]/);
-  assert.match(js,/update-v0\.23\.0\.sql/);
+  assert.match(js,/update-v0\.24\.0\.sql/);
 });
 
 test('runtime avoids unsafe dynamic JavaScript and inline DOM handlers', () => {
@@ -158,11 +158,11 @@ test('nursery-friendly visual system uses varied nursery-friendly colors and mob
   assert.match(app,/openMobileMore/); assert.match(app,/secondaryTabs/);
 });
 
-test('schedule shows a safe vacation and absence table for every day', () => {
-  const html=read('index.html'); const app=read('app.js'); const data=read('handlers/data.js');
+test('schedule shows a safe vacation and availability table for every day', () => {
+  const html=read('index.html'); const app=read('app.js'); const data=read('handlers/data.js'); const schedule=read('lib/schedule.js');
   assert.match(html,/id="scheduleAbsences"/);
   assert.match(app,/renderScheduleAbsences/); assert.match(app,/renderAbsenceDay/);
-  assert.match(data,/scheduleAbsences/); assert.match(data,/absence_type/);
+  assert.match(data,/scheduleAbsences/); assert.match(data,/buildScheduleAvailability/); assert.match(schedule,/absence_type/); assert.match(schedule,/fixed_day_off/);
   assert.doesNotMatch(data,/scheduleAbsences[\s\S]{0,180}reason/);
 });
 
@@ -194,7 +194,7 @@ test('week navigation uses lightweight endpoint, cache and adjacent prefetching'
   assert.match(app,/prefetchAdjacentWeeks/); assert.match(app,/renderAll\(\); prefetchAdjacentWeeks\(\)/); assert.match(app,/refreshScheduleWeek/);
   assert.match(app,/\/api\/shifts\?week_start=/);
   assert.match(shifts,/if \(req\.method === 'GET'\)/);
-  assert.match(shifts,/let scheduleAbsences = buildScheduleAbsences/);
+  assert.match(shifts,/let scheduleAbsences = buildScheduleAvailability/);
   assert.match(shifts,/scheduleAbsences,/);
 });
 

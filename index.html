@@ -415,7 +415,8 @@
   <dialog id="notificationsDialog" class="modal notifications-modal">
     <div class="modal-card large-modal">
       <div class="modal-heading"><div><p class="eyebrow">עדכונים אישיים</p><h3>התראות ועדכונים</h3><p class="muted">בקשות, שיבוצים ופעולות שקשורות אליך.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <div class="notifications-toolbar"><button id="markAllNotificationsBtn" type="button" class="ghost-btn">סימון הכול כנקרא</button></div>
+      <div id="notificationsSummary" class="notifications-summary"></div>
+      <div class="notifications-toolbar"><div id="notificationFilterChips" class="notification-filter-chips" role="group" aria-label="סינון התראות"><button type="button" data-notification-filter="action">דורש טיפול</button><button type="button" data-notification-filter="unread">לא נקרא</button><button type="button" data-notification-filter="all">הכול</button></div><button id="markAllNotificationsBtn" type="button" class="ghost-btn">סימון הכול כנקרא</button></div>
       <div id="notificationsList" class="notifications-list"></div>
     </div>
   </dialog>

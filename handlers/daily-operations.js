@@ -114,12 +114,17 @@ module.exports = async function handler(req, res) {
     const body = parseBody(req);
     if (req.method === 'GET') {
       const date = String(req.query?.date || israelDateISO());
-      const [rowsR, shiftsR, attendanceR] = await Promise.all([
+      const weekStart=sunday(date);
+      const [rowsR, shiftsR, attendanceR,publicationR] = await Promise.all([
         db().from('hadas_daily_operations').select('*').eq('operation_date', date).order('created_at', { ascending: false }),
         db().from('hadas_shifts').select('*').eq('shift_date', date).order('start_time'),
         db().from('hadas_attendance').select('*').eq('attendance_date', date),
+        db().from('hadas_schedule_publications').select('week_start,revision,published_at,updated_at').eq('week_start',weekStart).maybeSingle(),
       ]);
-      return send(res, 200, { ok: true, operations: assertDb(rowsR, 'לא ניתן לטעון תפעול יומי') || [], shifts: assertDb(shiftsR, 'לא ניתן לטעון את שיבוץ היום') || [], attendance: assertDb(attendanceR, 'לא ניתן לטעון נוכחות') || [], date });
+      const shifts=assertDb(shiftsR, 'לא ניתן לטעון את שיבוץ היום') || [];
+      const publication=assertDb(publicationR,'לא ניתן לטעון את מצב פרסום השיבוץ')||null;
+      const scheduleMeta={week_start:weekStart,shift_count:shifts.length,draft_count:shifts.filter((row)=>row.status==='draft').length,published_count:shifts.filter((row)=>row.status==='published').length,latest_shift_update:shifts.reduce((latest,row)=>row.updated_at&&(!latest||String(row.updated_at)>latest)?String(row.updated_at):latest,null),publication_revision:publication?.revision||0,published_at:publication?.published_at||null};
+      return send(res, 200, { ok: true, operations: assertDb(rowsR, 'לא ניתן לטעון תפעול יומי') || [], shifts, attendance: assertDb(attendanceR, 'לא ניתן לטעון נוכחות') || [], scheduleMeta, date });
     }
     if (req.method !== 'POST') return send(res, 405, { ok: false, error: 'Method not allowed' });
     const action = String(body.action || 'report');
@@ -166,7 +171,7 @@ module.exports = async function handler(req, res) {
       if (!chosen) throw httpError(409, 'העובד כבר אינו זמין להחלפה זו');
       const update = { replacement_employee_id: employeeId, replacement_from_class_id: chosen.from_class_id, replacement_type: replacementType, replacement_start: chosen.start_time, replacement_end: chosen.end_time, status: 'resolved', resolved_by: caller.employee.id, resolved_at: new Date().toISOString() };
       assertDb(await db().from('hadas_daily_operations').update(update).eq('id', operation.id), 'לא ניתן לשמור את ההחלפה');
-      await notifyEmployees([employeeId], { type: 'daily_operation', title: 'שינוי תפעולי להיום', message: `נקבע עבורך ${replacementType === 'transfer' ? 'מעבר זמני' : 'שיבוץ החלפה'} לכיתה אחרת בין ${chosen.start_time}–${chosen.end_time}.`, entityType: 'daily_operation', entityId: operation.id, actionRequired: true });
+      await notifyEmployees([employeeId], { type: 'daily_operation', title: 'שינוי תפעולי להיום', message: `נקבע עבורך ${replacementType === 'transfer' ? 'מעבר זמני' : 'שיבוץ החלפה'} לכיתה אחרת בין ${chosen.start_time}–${chosen.end_time}.`, entityType: 'daily_operation', entityId: operation.id, actionRequired: false });
       await audit(caller.employee.id, 'assign', 'daily_operation', operation.id, update); await emitEvent('daily_operations');
       return send(res, 200, { ok: true });
     }
