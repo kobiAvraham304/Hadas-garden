@@ -5,17 +5,17 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.25 release wires the fast shifts handler and version', () => {
+test('0.25 release wires the fast shifts layer and version', () => {
   const pkg = JSON.parse(read('package.json'));
   const api = read('api/index.js');
   const version = read('VERSION.md');
   assert.equal(pkg.version, '0.25.0');
-  assert.match(api, /'shifts': require\('\.\.\/handlers\/shifts-v025'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v025'\)/);
   assert.match(version, /גרסה 0\.25\.0/);
 });
 
 test('0.25 fast scheduling keeps existing rules while parallelizing validation', () => {
-  const source = read('handlers/shifts-v025.js');
+  const source = read('lib/shifts-v025.js');
   assert.match(source, /Promise\.all\(/);
   assert.match(source, /hadas_employee_weekly_patterns/);
   assert.match(source, /hadas_requests/);
@@ -29,6 +29,7 @@ test('0.25 fast scheduling keeps existing rules while parallelizing validation',
   assert.match(source, /action === 'clear_week'/);
   assert.match(source, /hadas_save_shift_v025/);
   assert.match(source, /hadas_clear_schedule_week_v025/);
+  assert.match(source, /rawWeekStart/);
 });
 
 test('0.25 UI adds double-confirm week reset, drag move and immediate save refresh', () => {
