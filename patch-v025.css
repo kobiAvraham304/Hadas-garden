@@ -1,0 +1,32 @@
+/* מערכת ניהול שיבוצים מעון הדס — התאמות גרסה 0.25.0 */
+.v025-draggable-shift[draggable="true"] { cursor: grab; }
+.v025-draggable-shift[draggable="true"]:active { cursor: grabbing; }
+.v025-drag-source { opacity: .45; transform: scale(.98); }
+body.v025-shift-dragging [data-v025-drop-date][data-v025-drop-class] { transition: background-color .12s ease, box-shadow .12s ease, transform .12s ease; }
+body.v025-shift-dragging [data-v025-drop-date][data-v025-drop-class]:not(.v025-drag-source) { outline: 1px dashed rgba(98,103,187,.28); outline-offset: -3px; }
+[data-v025-drop-date][data-v025-drop-class].v025-drop-active { background: rgba(111,114,217,.10) !important; box-shadow: inset 0 0 0 2px rgba(98,103,187,.48); }
+.v025-clear-week { margin-inline-start: auto; }
+.v025-leave-owner span { font-weight: 800; color: #34384f; }
+.calendar-event.approved_leave b, .agenda-event.approved_leave strong { font-weight: 850; }
+
+@media (max-width: 760px) {
+  #appVersionBadge.app-version-badge.v025-mobile-visible {
+    display: inline-flex !important;
+    position: fixed !important;
+    left: 8px !important;
+    right: auto !important;
+    top: calc(env(safe-area-inset-top, 0px) + 6px) !important;
+    z-index: 130 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: 22px !important;
+    padding: 2px 7px !important;
+    border-radius: 999px !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    opacity: .82 !important;
+    pointer-events: none !important;
+    box-shadow: 0 2px 8px rgba(40,43,70,.10) !important;
+  }
+  .v025-clear-week { width: 100%; justify-content: center; margin-inline-start: 0; }
+}
