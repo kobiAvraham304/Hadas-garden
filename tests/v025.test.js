@@ -9,10 +9,11 @@ test('0.25 fast shifts layer remains available under current release', () => {
   const pkg = JSON.parse(read('package.json'));
   const api = read('api/index.js');
   const version = read('VERSION.md');
-  assert.equal(pkg.version, '0.29.0');
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v027'\)/);
+  assert.equal(pkg.version, '0.30.0');
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v030'\)/);
+  assert.match(read('lib/shifts-v030.js'), /require\('\.\/shifts-v027'\)/);
   assert.match(read('lib/shifts-v027.js'), /require\('\.\/shifts-v025'\)/);
-  assert.match(version, /גרסה 0\.29\.0/);
+  assert.match(version, /גרסה 0\.30\.0/);
 });
 
 test('0.25 fast scheduling keeps existing rules while parallelizing validation', () => {

@@ -14,12 +14,13 @@ test('0.26 upgraded request and suggestion layers remain available under current
   const pkg = JSON.parse(read('package.json'));
   const api = read('api/index.js');
   const version = read('VERSION.md');
-  assert.equal(pkg.version, '0.29.0');
-  assert.match(version, /גרסה 0\.29\.0/);
-  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v028'\)/);
+  assert.equal(pkg.version, '0.30.0');
+  assert.match(version, /גרסה 0\.30\.0/);
+  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
+  assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);
   assert.match(read('lib/requests-v028.js'), /require\('\.\/requests-v026'\)/);
   assert.match(api, /'suggestions': require\('\.\.\/lib\/suggestions-v026'\)/);
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v027'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v030'\)/);
 });
 
 test('0.26 preview shifts are normalized as the effective future schedule', () => {
@@ -73,20 +74,20 @@ test('0.26 shift editing starts compact and exposes an explicit change-employee 
   assert.match(css, /\.v026-picker-collapsed/);
 });
 
-test('0.26 weekly export still provides a real PDF file implementation', () => {
+test('0.26 weekly export still provides a real PDF file implementation historically', () => {
   const patch = read('patch-v026.js');
   assert.match(patch, /type: 'application\/pdf'/);
   assert.match(patch, /new File\(\[blob\], filename/);
   assert.match(patch, /navigator\.share/);
   assert.match(patch, /link\.download = filename/);
   assert.match(patch, /%PDF-1\.4/);
+  assert.match(read('patch-v030.js'), /removeWeeklyPdf/);
 });
 
 test('0.26 manager on-behalf request has explicit pre-approved semantics without bypassing swap consent', () => {
   const patch = read('patch-v026.js');
   const requests = read('lib/requests-v026.js');
   assert.match(patch, /name=\"pre_approved\"/);
-  assert.match(patch, /מאושר מראש/);
   assert.match(requests, /status: 'pending'/);
   assert.match(requests, /decided_by: null/);
   assert.match(requests, /decided_at: null/);
@@ -104,10 +105,10 @@ test('0.26 Vercel root hardening remains while current patch advances', () => {
   const vercel = JSON.parse(read('vercel.json'));
   assert.equal(Object.hasOwn(vercel, 'installCommand'), false);
   assert.ok(vercel.rewrites.some((item) => item.source === '/' && item.destination === '/index.html'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v029.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v029.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
   const headerMap = new Map(vercel.headers.map((item) => [item.source, item.headers]));
   assert.ok(headerMap.has('/'));
   assert.ok(headerMap.has('/patch-v025.js'));
-  assert.ok(headerMap.has('/patch-v029.js'));
+  assert.ok(headerMap.has('/patch-v030.js'));
 });

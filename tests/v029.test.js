@@ -7,11 +7,11 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 const announcements = require('../handlers/announcements');
 
-test('0.29 release metadata and migration are aligned', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.29.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.29\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.29\.0'/);
-  assert.match(read('health.js'), /update-v0\.29\.0\.sql/);
+test('0.29 migration remains aligned under current release', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.30.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.30\.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
+  assert.match(read('health.js'), /update-v0\.30\.0\.sql/);
   const sql = read('supabase/update-v0.29.0.sql');
   assert.match(sql, /add column if not exists popup_on_login boolean not null default false/i);
   assert.match(sql, /hadas_announcements_popup_login_idx/);
@@ -77,11 +77,12 @@ test('0.29 clicking a populated calendar day opens day events and creation uses 
 
 test('0.29 stale client entrypoints resolve to the current no-store patch', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v029.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v029.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/patch-v025.js','/patch-v029.js','/patch-v029.css']) assert.ok(headers.has(route), route);
+  for (const route of ['/patch-v025.js','/patch-v029.js','/patch-v030.js','/patch-v030.css']) assert.ok(headers.has(route), route);
   assert.match(read('patch-v029.js'), /const VERSION = '0\.29\.0'/);
   assert.match(read('patch-v029.js'), /PREVIOUS_PATCH = '\/patch-v028\.js\?v=0290'/);
-  assert.match(read('patch-v029.css'), /@import url\('\/patch-v028\.css\?v=0290'\)/);
+  assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
+  assert.match(read('patch-v030.css'), /@import url\('\/patch-v029\.css\?v=0300'\)/);
 });

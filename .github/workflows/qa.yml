@@ -26,13 +26,20 @@ jobs:
           node --check patch-v025.js
           node --check patch-v026.js
           node --check patch-v027.js
+          node --check patch-v028.js
+          node --check patch-v029.js
+          node --check patch-v030.js
           node --check api/index.js
           node --check lib/server.js
           node --check lib/schedule.js
           node --check lib/matching.js
           node --check lib/auto-schedule.js
           node --check lib/requests-v026.js
+          node --check lib/requests-v028.js
+          node --check lib/requests-v030.js
           node --check lib/suggestions-v026.js
           node --check lib/calendar-v027.js
+          node --check lib/calendar-v030.js
           node --check lib/shifts-v027.js
+          node --check lib/shifts-v030.js
           for file in handlers/*.js; do node --check "$file"; done
