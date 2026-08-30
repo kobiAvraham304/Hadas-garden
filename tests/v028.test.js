@@ -7,11 +7,12 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const { validateWeek } = require('../lib/schedule');
 
 test('0.28 metadata, health and request wrapper remain aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.29.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.29\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.29\.0'/);
-  assert.match(read('health.js'), /update-v0\.29\.0\.sql/);
-  assert.match(read('api/index.js'), /'requests': require\('\.\.\/lib\/requests-v028'\)/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.30.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.30\.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
+  assert.match(read('health.js'), /update-v0\.30\.0\.sql/);
+  assert.match(read('api/index.js'), /'requests': require\('\.\.\/lib\/requests-v030'\)/);
+  assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);
 });
 
 test('0.28 migration adds optional maximum daily staffing non-destructively', () => {
@@ -74,6 +75,7 @@ test('0.28 managers can delete approved but unapplied requests safely', () => {
   assert.match(requests, /emitEvent\('calendar'\)/);
   assert.match(requests, /emitEvent\('shifts'\)/);
   assert.match(patch, /data-v028-delete-approved/);
+  assert.match(read('lib/requests-v030.js'), /hadas_delete_request_v030/);
 });
 
 test('0.28 schedule employee search highlights existing table rows and calculates weekly shifts and hours', () => {
@@ -89,23 +91,24 @@ test('0.28 schedule employee search highlights existing table rows and calculate
   assert.match(css, /v028-employee-focus::after/);
 });
 
-test('0.28 keeps the high-quality PDF on a native A4 landscape page', () => {
+test('0.28 high-quality A4 implementation remains historical while v0.30 removes weekly PDF button', () => {
   const current = read('patch-v028.js');
   const pdf = read('patch-v027.js');
   assert.match(current, /PDF שבועי A4/);
   assert.match(current, /PDF חופשות A4/);
   assert.match(pdf, /const pageW = 841\.89, pageH = 595\.28/);
   assert.match(pdf, /image\/jpeg', 0\.995/);
+  assert.match(read('patch-v030.js'), /removeWeeklyPdf/);
 });
 
 test('0.28 stale 0.25 client URLs are forced to the current no-store patch', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v029.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v029.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/', '/index.html', '/api/config', '/patch-v025.js', '/patch-v029.js']) assert.ok(headers.has(route), route);
+  for (const route of ['/', '/index.html', '/api/config', '/patch-v025.js', '/patch-v030.js']) assert.ok(headers.has(route), route);
   const apiConfig = headers.get('/api/config').map((item) => `${item.key}:${item.value}`).join('|');
   assert.match(apiConfig, /Vercel-CDN-Cache-Control:no-store/);
-  assert.match(read('patch-v029.js'), /const VERSION = '0\.29\.0'/);
-  assert.match(read('patch-v029.js'), /forceVersion/);
+  assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
+  assert.match(read('patch-v030.js'), /forceVersion/);
 });
