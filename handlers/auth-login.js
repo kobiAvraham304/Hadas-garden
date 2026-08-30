@@ -46,6 +46,10 @@ module.exports = async function handler(req, res) {
     const csrfToken = await createSession(req, res, user.id);
     await db().from('hadas_users').update({ last_login_at:new Date().toISOString() }).eq('id', user.id);
     await audit(employee.id, 'login', 'user', user.id);
-    send(res, 200, { ok:true, csrfToken, profile:publicProfile({ user, employee }) });
+    send(res, 200, {
+      ok:true,
+      csrfToken,
+      profile:{ ...publicProfile({ user, employee }), onboarding_completed:Boolean(user.onboarding_completed_at) },
+    });
   } catch (error) { handleError(res, error); }
 };
