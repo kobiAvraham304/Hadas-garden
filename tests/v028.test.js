@@ -103,12 +103,12 @@ test('0.28 high-quality A4 implementation remains historical while v0.30 removes
 
 test('0.28 stale 0.25 client URLs are forced to the current no-store patch', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v031.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v031.css'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/', '/index.html', '/api/config', '/patch-v025.js', '/patch-v030.js']) assert.ok(headers.has(route), route);
+  for (const route of ['/', '/index.html', '/api/config', '/patch-v025.js', '/patch-v031.js']) assert.ok(headers.has(route), route);
   const apiConfig = headers.get('/api/config').map((item) => `${item.key}:${item.value}`).join('|');
   assert.match(apiConfig, /Vercel-CDN-Cache-Control:no-store/);
-  assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
-  assert.match(read('patch-v030.js'), /forceVersion/);
+  assert.match(read('patch-v031.js'), /const VERSION = '0\.31\.0'/);
+  assert.match(read('patch-v031.js'), /pinVersion/);
 });
