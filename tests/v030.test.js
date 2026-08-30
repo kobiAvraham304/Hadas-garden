@@ -92,23 +92,23 @@ test('0.30 calendar deletion and request list deletion both refresh schedule and
   assert.match(patch, /action:'delete_request'/);
 });
 
-test('0.30 physical legacy entrypoints bootstrap cumulative 0.26 then current 0.30 with no-store', () => {
+test('0.30 runtime stays intact while physical legacy entrypoints can advance to v0.31', () => {
   const entry = read('patch-v025.js');
   const cssEntry = read('patch-v025.css');
-  assert.match(entry, /const VERSION = '0\.30\.0'/);
-  assert.match(entry, /V026 = '\/patch-v026\.js\?v=0300'/);
-  assert.match(entry, /V030 = '\/patch-v030\.js\?v=0300'/);
-  assert.match(entry, /await loadScript\(V026, 'v026'\)/);
-  assert.match(entry, /await loadScript\(V030, 'v030'\)/);
-  assert.ok(entry.indexOf("await loadScript(V026, 'v026')") < entry.indexOf("await loadScript(V030, 'v030')"));
-  assert.match(cssEntry, /patch-v026\.css\?v=0300/);
-  assert.match(cssEntry, /patch-v030\.css\?v=0300/);
-  assert.ok(cssEntry.indexOf('patch-v026.css') < cssEntry.indexOf('patch-v030.css'));
-
-  const vercel = JSON.parse(read('vercel.json'));
-  const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/patch-v025.js','/patch-v025.css','/patch-v030.js','/patch-v030.css']) assert.ok(headers.has(route), route);
   assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
+  assert.match(entry, /const VERSION = '0\.31\.0'/);
+  assert.match(entry, /V026 = '\/patch-v026\.js\?v=0310'/);
+  assert.match(entry, /V031 = '\/patch-v031\.js\?v=0310'/);
+  assert.match(entry, /await loadScript\(V026, 'v026'\)/);
+  assert.match(entry, /await loadScript\(V031, 'v031'\)/);
+  assert.ok(entry.indexOf("await loadScript(V026, 'v026')") < entry.indexOf("await loadScript(V031, 'v031')"));
+  assert.match(cssEntry, /patch-v026\.css\?v=0310/);
+  assert.match(cssEntry, /patch-v031\.css\?v=0310/);
+  assert.ok(cssEntry.indexOf('patch-v026.css') < cssEntry.indexOf('patch-v031.css'));
+
+  const vercel = JSON.parse(read('vercel.json'));
+  const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
+  for (const route of ['/patch-v025.js','/patch-v025.css','/patch-v030.js','/patch-v030.css','/patch-v031.js','/patch-v031.css']) assert.ok(headers.has(route), route);
 });
