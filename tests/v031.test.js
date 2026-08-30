@@ -5,10 +5,11 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.31 candidate keeps production runtime metadata untouched until release approval', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.30.0');
+test('0.31 release metadata and compatibility entrypoint are aligned', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.31.0');
   assert.match(read('VERSION.md'), /גרסה 0\.31\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.31\.0'/);
+  assert.match(read('handlers/health.js'), /databaseVersion:'0\.31\.0'/);
   const entry = read('patch-v025.js');
   const cssEntry = read('patch-v025.css');
   assert.match(entry, /const VERSION = '0\.31\.0'/);
@@ -16,8 +17,11 @@ test('0.31 candidate keeps production runtime metadata untouched until release a
   assert.match(entry, /await loadScript\(V031, 'v031'\)/);
   assert.match(cssEntry, /patch-v031\.css\?v=0310/);
   assert.match(read('patch-v031.css'), /content:'v0\.31\.0'/);
-  assert.match(read('patch-v031.js'), /MutationObserver/);
-  assert.match(read('patch-v031.js'), /__HADAS_RELEASE_VERSION/);
+  const patch = read('patch-v031.js');
+  assert.match(patch, /MutationObserver/);
+  assert.match(patch, /__HADAS_RELEASE_VERSION/);
+  assert.match(patch, /observer\.observe\(node/);
+  assert.doesNotMatch(patch, /observer\.observe\(document\.documentElement/);
 });
 
 test('0.31 guided tour is short, skippable and persisted per user', () => {
@@ -83,7 +87,7 @@ test('0.31 shift picker uses available leave all filters and ranks available can
   assert.match(patch, /data-manual-override/);
 });
 
-test('0.31 Vercel routing is prepared but agent branches stay deployment-disabled', () => {
+test('0.31 Vercel routing is prepared and agent branches stay deployment-disabled', () => {
   const vercel = JSON.parse(read('vercel.json'));
   assert.equal(vercel.git.deploymentEnabled['agent/**'], false);
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v031.js'));
