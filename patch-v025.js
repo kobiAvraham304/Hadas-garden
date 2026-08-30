@@ -1,10 +1,11 @@
-/* מערכת ניהול שיבוצים מעון הדס — נקודת כניסה תואמת לאחור לגרסה 0.30.0 */
+/* מערכת ניהול שיבוצים מעון הדס — נקודת כניסה תואמת לאחור לגרסה 0.31.0 */
 (() => {
-  const VERSION = '0.30.0';
-  const V026 = '/patch-v026.js?v=0300';
-  const V030 = '/patch-v030.js?v=0300';
+  const VERSION = '0.31.0';
+  const V026 = '/patch-v026.js?v=0310';
+  const V031 = '/patch-v031.js?v=0310';
 
   function forceVersion() {
+    window.__HADAS_RELEASE_VERSION = VERSION;
     const badge = document.querySelector('#appVersionBadge');
     if (badge) {
       badge.textContent = `v${VERSION}`;
@@ -39,14 +40,14 @@
     window.__hadasCurrentBootstrapStarted = true;
     forceVersion();
     try {
-      // 0.26 is cumulative over 0.25 and must load before the 0.27→0.30 wrapper chain.
+      // 0.26 is cumulative over the original fast layer and must load before the 0.27→0.31 wrapper chain.
       await loadScript(V026, 'v026');
-      await loadScript(V030, 'v030');
+      await loadScript(V031, 'v031');
       forceVersion();
       window.__hadasCurrentBootstrapReady = true;
     } catch (error) {
       window.__hadasCurrentBootstrapStarted = false;
-      console.error('Hadas v0.30 bootstrap failed', error);
+      console.error('Hadas v0.31 bootstrap failed', error);
       const toast = document.querySelector('#toast');
       if (toast) {
         toast.textContent = 'טעינת עדכון המערכת נכשלה. יש לרענן את הדף.';
