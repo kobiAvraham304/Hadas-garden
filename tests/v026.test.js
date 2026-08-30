@@ -105,10 +105,10 @@ test('0.26 Vercel root hardening remains while current patch advances', () => {
   const vercel = JSON.parse(read('vercel.json'));
   assert.equal(Object.hasOwn(vercel, 'installCommand'), false);
   assert.ok(vercel.rewrites.some((item) => item.source === '/' && item.destination === '/index.html'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v031.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v031.css'));
   const headerMap = new Map(vercel.headers.map((item) => [item.source, item.headers]));
   assert.ok(headerMap.has('/'));
   assert.ok(headerMap.has('/patch-v025.js'));
-  assert.ok(headerMap.has('/patch-v030.js'));
+  assert.ok(headerMap.has('/patch-v031.js'));
 });
