@@ -34,8 +34,8 @@ test('0.25 fast scheduling keeps existing rules while parallelizing validation',
   assert.match(source, /rawWeekStart/);
 });
 
-test('0.25 UI adds double-confirm week reset, drag move and immediate save refresh', () => {
-  const source = read('patch-v025.js');
+test('0.25 UI behavior remains inside the cumulative 0.26 layer', () => {
+  const source = read('patch-v026.js');
   assert.match(source, /clearWeekBtn/);
   assert.match(source, /firstApproval = confirm/);
   assert.match(source, /secondApproval = confirm/);
@@ -47,8 +47,8 @@ test('0.25 UI adds double-confirm week reset, drag move and immediate save refre
   assert.match(source, /originalRefreshScheduleWeek\(\{ force: true \}\)/);
 });
 
-test('0.25 PDF distinguishes fixed days off and calendar shows leave owner', () => {
-  const source = read('patch-v025.js');
+test('0.25 PDF and calendar compatibility behavior remains inside 0.26', () => {
+  const source = read('patch-v026.js');
   assert.match(source, /type === 'fixed_day_off'/);
   assert.match(source, /type === 'day_off'/);
   assert.match(source, /item\.absence_type === 'fixed_day_off' \? name/);
@@ -73,8 +73,8 @@ test('0.25 database writes are atomic, locked and service-role only', () => {
   assert.doesNotMatch(sql, /drop table|truncate table/i);
 });
 
-test('0.25 mobile version styles are explicit', () => {
-  const css = read('patch-v025.css');
+test('0.25 mobile version styles remain available through cumulative 0.26 CSS', () => {
+  const css = read('patch-v026.css');
   assert.match(css, /@media \(max-width: 760px\)/);
   assert.match(css, /#appVersionBadge\.app-version-badge\.v025-mobile-visible/);
   assert.match(css, /display: inline-flex !important/);
