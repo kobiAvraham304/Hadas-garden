@@ -2348,4 +2348,28 @@ async function saveSettings(event) {
   try { const result=await apiFetch('/api/settings', { method: 'PATCH', body: data }); state.settings = { ...state.settings, ...(result.settings||data) }; state.weekCache.clear(); state.scheduleValidationCache={key:'',value:null}; $('#settingsDialog').close(); await refreshScheduleWeek({ force: true }); showToast('הגדרות התקינה נשמרו', 'success'); }
   catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); }
 }
-init();
+let startupPromise = null;
+function startApplication() {
+  if (startupPromise) return startupPromise;
+  startupPromise = init().catch((error) => {
+    console.error('Hadas application startup failed', error);
+    try { setScreen('loginScreen'); } catch {}
+    try { showToast(error?.message || 'טעינת המערכת נכשלה. יש לרענן ולנסות שוב.', 'error'); } catch {}
+    throw error;
+  });
+  return startupPromise;
+}
+
+window.__hadasStartApplication = startApplication;
+if (window.__hadasCurrentBootstrapReady) {
+  startApplication().catch(() => {});
+} else {
+  window.addEventListener('hadas:bootstrap-ready', () => startApplication().catch(() => {}), { once:true });
+  /* A broken optional patch must never strand users on the loading screen. */
+  setTimeout(() => {
+    if (!startupPromise) {
+      console.error('Hadas bootstrap timed out; starting the base interface');
+      startApplication().catch(() => {});
+    }
+  }, 20000);
+}

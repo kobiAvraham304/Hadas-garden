@@ -33,6 +33,7 @@
     {"source":"/patch-v032-core.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {"source":"/patch-v032-exports.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {"source":"/patch-v032-ux.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
+    {"source":"/patch-v032-stability.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {"source":"/patch-v032.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {
       "source": "/(.*)",

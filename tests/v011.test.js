@@ -175,7 +175,9 @@ test('clean schema creates manager account as non schedulable without a class',(
 
 test('application initializes after all runtime functions are defined',()=>{
   const app=read('app.js').trim();
-  assert.match(app,/init\(\);$/);
+  assert.match(app,/function startApplication\(\)/);
+  assert.match(app,/window\.addEventListener\('hadas:bootstrap-ready'/);
+  assert.ok(app.lastIndexOf('function startApplication()') > app.indexOf('function init()'));
 });
 
 test('saving a daily absence immediately opens safe coverage suggestions',()=>{

@@ -9,10 +9,10 @@ const announcements = require('../handlers/announcements');
 const legacyPatch = () => read('patch-v029-legacy.js');
 
 test('0.29 migration remains aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.31.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.31\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.31\.0'/);
-  assert.match(read('health.js'), /update-v0\.31\.0\.sql/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.32.1');
+  assert.match(read('VERSION.md'), /גרסה 0\.32\.1/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.32\.0'/);
+  assert.match(read('health.js'), /update-v0\.32\.0\.sql/);
   const sql = read('supabase/update-v0.29.0.sql');
   assert.match(sql, /add column if not exists popup_on_login boolean not null default false/i);
   assert.match(sql, /hadas_announcements_popup_login_idx/);
@@ -78,8 +78,8 @@ test('0.29 clicking a populated calendar day opens day events and creation uses 
 
 test('0.29 stale client entrypoints resolve through legacy behavior into the current no-store patch', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v031.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v031.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v032.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v032.css'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
   for (const route of ['/patch-v025.js','/patch-v029.js','/patch-v030.js','/patch-v031.js','/patch-v031.css']) assert.ok(headers.has(route), route);
   assert.match(read('patch-v029.js'), /patch-v029-legacy\.js/);

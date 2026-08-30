@@ -2,7 +2,7 @@
 (() => {
   if (window.__hadasV032CoreInstalled) return;
   window.__hadasV032CoreInstalled = true;
-  const VERSION='0.32.0';
+  const VERSION='0.32.1';
   const unique=(a)=>[...new Set(a.filter(Boolean))];
   const dateOf=(i)=>String(i?.date||i?.shift_date||'');
   const classOf=(i)=>i?.classId||i?.class_id||null;

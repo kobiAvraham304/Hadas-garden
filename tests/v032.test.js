@@ -5,19 +5,30 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.32 release metadata, API routing and compatibility bootstrap are aligned', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.32.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.32\.0/);
+test('0.32.1 release metadata, API routing and compatibility bootstrap are aligned', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.32.1');
+  assert.match(read('VERSION.md'), /גרסה 0\.32\.1/);
   assert.match(read('handlers/health.js'), /schema_version === '0\.32\.0'/);
   assert.match(read('handlers/health.js'), /databaseVersion:'0\.32\.0'/);
   const api = read('api/index.js');
   assert.match(api, /calendar-v032/);
   assert.match(api, /shifts-v032/);
   const entry = read('patch-v025.js');
-  assert.match(entry, /const VERSION = '0\.32\.0'/);
-  assert.match(entry, /V032 = '\/patch-v032\.js\?v=0320'/);
+  assert.match(entry, /const VERSION = '0\.32\.1'/);
+  assert.match(entry, /V032 = '\/patch-v032\.js\?v=0321'/);
   assert.match(entry, /await loadScript\(V032, 'v032'\)/);
-  assert.match(read('patch-v025.css'), /patch-v032\.css\?v=0320/);
+  assert.match(entry, /await window\.__hadasV032BootstrapPromise/);
+  assert.match(entry, /hadas:bootstrap-ready/);
+  assert.match(read('patch-v025.css'), /patch-v032\.css\?v=0321/);
+  const app = read('app.js');
+  assert.match(app, /window\.addEventListener\('hadas:bootstrap-ready'/);
+  assert.match(app, /if \(startupPromise\) return startupPromise/);
+  assert.doesNotMatch(app, /\ninit\(\);\s*$/);
+  const bootstrap = read('patch-v032.js');
+  assert.match(bootstrap, /await waitForFlag\('__hadasV031Installed'\)/);
+  assert.match(bootstrap, /__hadasV031VersionObservers/);
+  assert.match(bootstrap, /observer\?\.disconnect\(\)/);
+  assert.ok(bootstrap.indexOf("await waitForFlag('__hadasV031Installed')") < bootstrap.indexOf('CURRENT_FILES.length'));
 });
 
 test('0.32 validation consolidates empty day/class alerts and fast-approves exact issue keys', () => {
@@ -83,7 +94,7 @@ test('0.32 week arrows and Vercel cache routing are aligned', () => {
   assert.match(core, /n\.textContent='›'/);
   const vercel = JSON.parse(read('vercel.json'));
   assert.equal(vercel.git.deploymentEnabled['agent/**'], false);
-  for (const file of ['/patch-v032.js','/patch-v032-core.js','/patch-v032-exports.js','/patch-v032-ux.js','/patch-v032.css']) {
+  for (const file of ['/patch-v032.js','/patch-v032-core.js','/patch-v032-exports.js','/patch-v032-ux.js','/patch-v032-stability.js','/patch-v032.css']) {
     assert.ok(vercel.headers.some((item) => item.source === file), file);
   }
   assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v032.js'));
