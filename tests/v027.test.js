@@ -6,11 +6,11 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.27 release layers remain wired under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.31.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.31\.0/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.32.1');
+  assert.match(read('VERSION.md'), /גרסה 0\.32\.1/);
   const api = read('api/index.js');
-  assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v030'\)/);
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v030'\)/);
+  assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v032'\)/);
   assert.match(read('lib/calendar-v030.js'), /require\('\.\/calendar-v027'\)/);
   assert.match(read('lib/shifts-v030.js'), /require\('\.\/shifts-v027'\)/);
   assert.match(read('lib/shifts-v027.js'), /require\('\.\/shifts-v025'\)/);
@@ -115,10 +115,10 @@ test('0.27 vacation-only weekly PDF is available next to team availability', () 
 
 test('0.27 assets remain directly available while current wrapper owns cache routing', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v031.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v031.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v032.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v032.css'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v027.js'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v031.js'));
-  assert.match(read('handlers/health.js'), /schema_version === '0\.31\.0'/);
-  assert.match(read('health.js'), /update-v0\.31\.0\.sql/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.32\.0'/);
+  assert.match(read('health.js'), /update-v0\.32\.0\.sql/);
 });
