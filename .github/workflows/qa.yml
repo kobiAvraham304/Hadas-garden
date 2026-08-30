@@ -29,6 +29,7 @@ jobs:
           node --check patch-v028.js
           node --check patch-v029.js
           node --check patch-v030.js
+          node --check patch-v031.js
           node --check api/index.js
           node --check lib/server.js
           node --check lib/schedule.js

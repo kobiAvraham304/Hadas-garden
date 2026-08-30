@@ -6,12 +6,13 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 const announcements = require('../handlers/announcements');
+const legacyPatch = () => read('patch-v029-legacy.js');
 
 test('0.29 migration remains aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.30.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.30\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
-  assert.match(read('health.js'), /update-v0\.30\.0\.sql/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.31.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.31\.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.31\.0'/);
+  assert.match(read('health.js'), /update-v0\.31\.0\.sql/);
   const sql = read('supabase/update-v0.29.0.sql');
   assert.match(sql, /add column if not exists popup_on_login boolean not null default false/i);
   assert.match(sql, /hadas_announcements_popup_login_idx/);
@@ -31,7 +32,7 @@ test('0.29 announcement API persists login push without changing importance type
 });
 
 test('0.29 login push is one-per-session until explicit read and respects audience', () => {
-  const patch = read('patch-v029.js');
+  const patch = legacyPatch();
   assert.match(patch, /popup_on_login/);
   assert.match(patch, /announcementIsForCurrentUser/);
   assert.match(patch, /audience_type === 'employees'/);
@@ -44,7 +45,7 @@ test('0.29 login push is one-per-session until explicit read and respects audien
 });
 
 test('0.29 announcement composer exposes explicit Push-on-login option', () => {
-  const patch = read('patch-v029.js');
+  const patch = legacyPatch();
   assert.match(patch, /name=\"popup_on_login\"/);
   assert.match(patch, /Push בכניסה למערכת/);
   assert.match(read('patch-v029.css'), /v029-push-toggle/);
@@ -52,7 +53,7 @@ test('0.29 announcement composer exposes explicit Push-on-login option', () => {
 });
 
 test('0.29 calendar has personal general and combined scopes', () => {
-  const patch = read('patch-v029.js');
+  const patch = legacyPatch();
   assert.match(patch, /data-v029-calendar-filter=\"personal\"/);
   assert.match(patch, /data-v029-calendar-filter=\"general\"/);
   assert.match(patch, /data-v029-calendar-filter=\"combined\"/);
@@ -64,7 +65,7 @@ test('0.29 calendar has personal general and combined scopes', () => {
 });
 
 test('0.29 clicking a populated calendar day opens day events and creation uses a dedicated plus', () => {
-  const patch = read('patch-v029.js');
+  const patch = legacyPatch();
   assert.match(patch, /openCalendarDay/);
   assert.match(patch, /data-v029-add-day/);
   assert.match(patch, /stopImmediatePropagation/);
@@ -75,14 +76,15 @@ test('0.29 clicking a populated calendar day opens day events and creation uses 
   assert.match(read('patch-v029.css'), /calendar-day-tools>i\{display:none!important\}/);
 });
 
-test('0.29 stale client entrypoints resolve to the current no-store patch', () => {
+test('0.29 stale client entrypoints resolve through legacy behavior into the current no-store patch', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v031.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v031.css'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/patch-v025.js','/patch-v029.js','/patch-v030.js','/patch-v030.css']) assert.ok(headers.has(route), route);
-  assert.match(read('patch-v029.js'), /const VERSION = '0\.29\.0'/);
-  assert.match(read('patch-v029.js'), /PREVIOUS_PATCH = '\/patch-v028\.js\?v=0290'/);
+  for (const route of ['/patch-v025.js','/patch-v029.js','/patch-v030.js','/patch-v031.js','/patch-v031.css']) assert.ok(headers.has(route), route);
+  assert.match(read('patch-v029.js'), /patch-v029-legacy\.js/);
+  assert.match(legacyPatch(), /const VERSION = '0\.29\.0'/);
+  assert.match(legacyPatch(), /PREVIOUS_PATCH = '\/patch-v028\.js\?v=0290'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
-  assert.match(read('patch-v030.css'), /@import url\('\/patch-v029\.css\?v=0300'\)/);
+  assert.match(read('patch-v031.js'), /PREVIOUS_PATCH = '\/patch-v030\.js\?v=0310'/);
 });
