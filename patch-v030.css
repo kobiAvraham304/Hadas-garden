@@ -1,0 +1,12 @@
+@import url('/patch-v029.css?v=0300');
+
+/* מערכת ניהול שיבוצים מעון הדס — שכבת עיצוב 0.30.0 */
+.v030-validation-action{margin-inline-start:auto;display:grid;gap:2px;min-width:142px;padding:8px 11px;border-radius:12px;background:#fff3d8;border:1px solid #e6c56d;color:#705214;text-align:center;cursor:pointer;box-shadow:0 2px 8px rgba(80,65,25,.08)}
+.v030-validation-action b{font-size:.78rem}.v030-validation-action em{font-size:.7rem;font-style:normal;text-decoration:underline}
+.v030-validation-action.approved{background:#e9f7ee;border-color:#9fd0af;color:#246b42}
+.v027-validation-item.v030-approved-issue{border-color:#acd7ba!important;background:#f1fbf4!important;color:#2c6241!important}
+.v027-validation-item.v030-approved-issue>span:first-child{background:#dff3e6!important;color:#267047!important}
+.v030-delete-request{margin-inline-start:auto}
+#v026PreApprovedField:not(.hidden){border-color:rgba(67,142,91,.35);background:linear-gradient(135deg,rgba(67,142,91,.08),rgba(111,114,217,.06))}
+#v026PreApprovedField:not(.hidden) strong{color:#286d44}
+@media(max-width:760px){.v030-validation-action{min-width:112px;padding:7px 8px}.v027-validation-item{grid-template-columns:auto minmax(0,1fr)!important}.v030-validation-action{grid-column:1/-1;width:100%;margin:4px 0 0}}
