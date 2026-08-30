@@ -1,0 +1,32 @@
+name: v0.32 Release Check
+
+on:
+  push:
+    branches:
+      - agent/v0.32.0-validation-exports-calendar-ux
+
+permissions:
+  contents: read
+
+jobs:
+  release-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Focused v0.32 tests
+        run: node --test tests/v032.test.js
+      - name: Security and consistency
+        run: npm run check
+      - name: Syntax
+        run: |
+          node --check patch-v032.js
+          node --check patch-v032-core.js
+          node --check patch-v032-exports.js
+          node --check patch-v032-ux.js
+          node --check lib/shifts-v032.js
+          node --check lib/calendar-v032.js
+          node --check api/index.js
+          node --check handlers/health.js

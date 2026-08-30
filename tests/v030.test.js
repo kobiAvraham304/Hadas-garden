@@ -8,15 +8,17 @@ const { validationIssueKey } = require('../lib/shifts-v030');
 const { truthy } = require('../lib/requests-v030');
 const { syntheticLeaveRequestId } = require('../lib/calendar-v030');
 
-test('0.30 release layers and migration remain aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.31.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.31\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.31\.0'/);
-  assert.match(read('health.js'), /update-v0\.31\.0\.sql/);
+test('0.30 release layers remain available under the current release', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.32.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.32\.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.32\.0'/);
+  assert.match(read('health.js'), /update-v0\.32\.0\.sql/);
   const api = read('api/index.js');
   assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
-  assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v030'\)/);
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v030'\)/);
+  assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v032'\)/);
+  assert.match(read('lib/calendar-v032.js'), /require\('\.\/calendar-v030'\)/);
+  assert.match(read('lib/shifts-v032.js'), /require\('\.\/shifts-v030'\)/);
   assert.match(read('supabase/update-v0.30.0.sql'), /schema_version='0\.30\.0'/);
 });
 
@@ -93,23 +95,23 @@ test('0.30 calendar deletion and request list deletion both refresh schedule and
   assert.match(patch, /action:'delete_request'/);
 });
 
-test('0.30 runtime stays intact while physical legacy entrypoints can advance to v0.31', () => {
+test('0.30 runtime stays intact while physical legacy entrypoints advance to v0.32', () => {
   const entry = read('patch-v025.js');
   const cssEntry = read('patch-v025.css');
   assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
-  assert.match(entry, /const VERSION = '0\.31\.0'/);
-  assert.match(entry, /V026 = '\/patch-v026\.js\?v=0310'/);
-  assert.match(entry, /V031 = '\/patch-v031\.js\?v=0310'/);
+  assert.match(entry, /const VERSION = '0\.32\.0'/);
+  assert.match(entry, /V026 = '\/patch-v026\.js\?v=0320'/);
+  assert.match(entry, /V032 = '\/patch-v032\.js\?v=0320'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
-  assert.match(entry, /await loadScript\(V031, 'v031'\)/);
-  assert.ok(entry.indexOf("await loadScript(V026, 'v026')") < entry.indexOf("await loadScript(V031, 'v031')"));
-  assert.match(cssEntry, /patch-v026\.css\?v=0310/);
-  assert.match(cssEntry, /patch-v031\.css\?v=0310/);
-  assert.ok(cssEntry.indexOf('patch-v026.css') < cssEntry.indexOf('patch-v031.css'));
+  assert.match(entry, /await loadScript\(V032, 'v032'\)/);
+  assert.ok(entry.indexOf("await loadScript(V026, 'v026')") < entry.indexOf("await loadScript(V032, 'v032')"));
+  assert.match(cssEntry, /patch-v026\.css\?v=0320/);
+  assert.match(cssEntry, /patch-v032\.css\?v=0320/);
+  assert.ok(cssEntry.indexOf('patch-v026.css') < cssEntry.indexOf('patch-v032.css'));
 
   const vercel = JSON.parse(read('vercel.json'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/patch-v025.js','/patch-v025.css','/patch-v030.js','/patch-v030.css','/patch-v031.js','/patch-v031.css']) assert.ok(headers.has(route), route);
+  for (const route of ['/patch-v025.js','/patch-v025.css','/patch-v030.js','/patch-v030.css','/patch-v031.js','/patch-v031.css','/patch-v032.js','/patch-v032.css']) assert.ok(headers.has(route), route);
 });
