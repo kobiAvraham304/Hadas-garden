@@ -115,10 +115,10 @@ test('0.27 vacation-only weekly PDF is available next to team availability', () 
 
 test('0.27 assets remain directly available while current wrapper owns cache routing', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v031.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v031.css'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v027.js'));
-  assert.ok(vercel.headers.some((item) => item.source === '/patch-v030.js'));
+  assert.ok(vercel.headers.some((item) => item.source === '/patch-v031.js'));
   assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
   assert.match(read('health.js'), /update-v0\.30\.0\.sql/);
 });
