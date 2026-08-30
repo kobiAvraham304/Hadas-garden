@@ -16,6 +16,10 @@ set onboarding_completed_at = last_login_at
 where onboarding_completed_at is null
   and last_login_at is not null;
 
+-- Supabase advisor: cover the approved_by foreign key used by validation approval management.
+create index if not exists hadas_schedule_issue_approvals_approved_by_idx
+  on public.hadas_schedule_issue_approvals(approved_by);
+
 update public.hadas_app_meta
 set schema_version = '0.31.0',
     app_version = '0.31.0',
