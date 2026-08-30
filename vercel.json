@@ -1,6 +1,11 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "git": {
+    "deploymentEnabled": {
+      "agent/**": false
+    }
+  },
   "functions": {
     "api/index.js": {
       "maxDuration": 15
