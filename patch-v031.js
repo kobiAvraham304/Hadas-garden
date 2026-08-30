@@ -21,14 +21,18 @@
     if (window.__hadasV031VersionGuard) return;
     window.__hadasV031VersionGuard = true;
     pinVersion();
-    const observer = new MutationObserver(() => {
-      const badge = document.querySelector('#appVersionBadge');
-      const login = document.querySelector('#loginVersion');
-      if (badge && badge.textContent !== `v${VERSION}`) badge.textContent = `v${VERSION}`;
-      if (login && login.textContent !== `גרסה ${VERSION}`) login.textContent = `גרסה ${VERSION}`;
-      if (document.documentElement.dataset.hadasVersion !== VERSION) document.documentElement.dataset.hadasVersion = VERSION;
-    });
-    observer.observe(document.documentElement, { subtree:true, childList:true, characterData:true });
+    const watchText = (node, expected) => {
+      if (!node) return null;
+      const observer = new MutationObserver(() => {
+        if (node.textContent !== expected) node.textContent = expected;
+      });
+      observer.observe(node, { subtree:true, childList:true, characterData:true });
+      return observer;
+    };
+    window.__hadasV031VersionObservers = [
+      watchText(document.querySelector('#appVersionBadge'), `v${VERSION}`),
+      watchText(document.querySelector('#loginVersion'), `גרסה ${VERSION}`),
+    ].filter(Boolean);
   }
 
   function loadPreviousPatch() {
