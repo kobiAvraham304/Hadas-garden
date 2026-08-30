@@ -6,14 +6,16 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.27 release layers remain wired under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.29.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.29\.0/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.30.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.30\.0/);
   const api = read('api/index.js');
-  assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v027'\)/);
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v027'\)/);
+  assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v030'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v030'\)/);
+  assert.match(read('lib/calendar-v030.js'), /require\('\.\/calendar-v027'\)/);
+  assert.match(read('lib/shifts-v030.js'), /require\('\.\/shifts-v027'\)/);
   assert.match(read('lib/shifts-v027.js'), /require\('\.\/shifts-v025'\)/);
-  assert.match(read('patch-v029.js'), /patch-v028\.js\?v=0290/);
-  assert.match(read('patch-v029.css'), /patch-v028\.css\?v=0290/);
+  assert.match(read('patch-v030.js'), /patch-v029\.js\?v=0300/);
+  assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
 });
 
 test('0.27 migration adds only a general-day-off flag and index non-destructively', () => {
@@ -91,15 +93,15 @@ test('0.27 general nursery day off is manager-controlled, removes only safe sche
   assert.match(patch, /general_day_off\s*=\s*true/);
 });
 
-test('0.27 weekly PDF is higher resolution, A4 landscape and image share text carries dates', () => {
+test('0.27 weekly PDF implementation remains available historically while v0.30 removes its button', () => {
   const patch = read('patch-v027.js');
   assert.match(patch, /highQualityWeeklyCanvas/);
   assert.match(patch, /2\.15/);
   assert.match(patch, /image\/jpeg', 0\.995/);
   assert.match(patch, /const pageW = 841\.89, pageH = 595\.28/);
   assert.match(patch, /שיבוץ שבועי לתאריכים \$\{weekRangeLabel\(\)\}/);
-  assert.match(patch, /imageButton\.classList\.remove\('hidden'\)/);
   assert.match(patch, /type:'application\/pdf'/);
+  assert.match(read('patch-v030.js'), /removeWeeklyPdf/);
 });
 
 test('0.27 vacation-only weekly PDF is available next to team availability', () => {
@@ -113,10 +115,10 @@ test('0.27 vacation-only weekly PDF is available next to team availability', () 
 
 test('0.27 assets remain directly available while current wrapper owns cache routing', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v029.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v029.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v030.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v030.css'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v027.js'));
-  assert.ok(vercel.headers.some((item) => item.source === '/patch-v029.js'));
-  assert.match(read('handlers/health.js'), /schema_version === '0\.29\.0'/);
-  assert.match(read('health.js'), /update-v0\.29\.0\.sql/);
+  assert.ok(vercel.headers.some((item) => item.source === '/patch-v030.js'));
+  assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
+  assert.match(read('health.js'), /update-v0\.30\.0\.sql/);
 });
