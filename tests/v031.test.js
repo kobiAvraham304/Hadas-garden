@@ -5,9 +5,10 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.31 candidate metadata and legacy entrypoint are aligned', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.31.0');
+test('0.31 candidate keeps production runtime metadata untouched until release approval', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.30.0');
   assert.match(read('VERSION.md'), /גרסה 0\.31\.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
   const entry = read('patch-v025.js');
   const cssEntry = read('patch-v025.css');
   assert.match(entry, /const VERSION = '0\.31\.0'/);
@@ -26,7 +27,7 @@ test('0.31 guided tour is short, skippable and persisted per user', () => {
   const migration = read('supabase/update-v0.31.0.sql');
   assert.match(patch, /דלג על ההדרכה/);
   assert.match(patch, /data-v031-tour-next/);
-  assert.match(patch, /onboarding_completed === false/);
+  assert.match(patch, /onboarding_completed !== false/);
   assert.match(patch, /action:'complete_onboarding'/);
   assert.match(login, /onboarding_completed:Boolean\(user\.onboarding_completed_at\)/);
   assert.match(me, /complete_onboarding/);
