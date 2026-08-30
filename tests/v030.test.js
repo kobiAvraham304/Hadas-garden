@@ -8,15 +8,16 @@ const { validationIssueKey } = require('../lib/shifts-v030');
 const { truthy } = require('../lib/requests-v030');
 const { syntheticLeaveRequestId } = require('../lib/calendar-v030');
 
-test('0.30 release metadata, routes and migration are aligned', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.30.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.30\.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.30\.0'/);
-  assert.match(read('health.js'), /update-v0\.30\.0\.sql/);
+test('0.30 release layers and migration remain aligned under current release', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.31.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.31\.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0\.31\.0'/);
+  assert.match(read('health.js'), /update-v0\.31\.0\.sql/);
   const api = read('api/index.js');
   assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v030'\)/);
   assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v030'\)/);
+  assert.match(read('supabase/update-v0.30.0.sql'), /schema_version='0\.30\.0'/);
 });
 
 test('0.30 manager preapproval is explicit and self requests remain server-guarded', () => {
