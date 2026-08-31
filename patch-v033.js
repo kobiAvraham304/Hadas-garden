@@ -15,6 +15,29 @@
     if (login) login.textContent = 'גרסה ' + VERSION;
   }
 
+  function installVersionGuard() {
+    for (const key of ['__hadasV031VersionObservers', '__hadasV032VersionObservers', '__hadasV033VersionObservers']) {
+      (window[key] || []).forEach((observer) => {
+        try { observer?.disconnect(); } catch {}
+      });
+      window[key] = [];
+    }
+    const observers = [];
+    for (const [node, text] of [
+      [document.querySelector('#appVersionBadge'), 'v' + VERSION],
+      [document.querySelector('#loginVersion'), 'גרסה ' + VERSION],
+    ]) {
+      if (!node) continue;
+      const observer = new MutationObserver(() => {
+        if (node.textContent !== text) node.textContent = text;
+      });
+      observer.observe(node, { subtree:true, childList:true, characterData:true });
+      observers.push(observer);
+    }
+    window.__hadasV033VersionObservers = observers;
+    pinVersion();
+  }
+
   function loadPrevious() {
     return new Promise((resolve, reject) => {
       const existing = document.querySelector('script[data-hadas-v033="previous"]');
@@ -795,7 +818,7 @@
 
     installEmployeeTourAction();
     installPasswordReveal();
-    pinVersion();
+    installVersionGuard();
   }
 
   async function boot() {
