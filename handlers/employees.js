@@ -156,7 +156,7 @@ async function upsertPrivate(employeeId, notes) {
 async function employeeResult(employeeId) {
   const [employeeR,userR,patternsR,constraintsR,privateR] = await Promise.all([
     db().from('hadas_employees').select('*').eq('id',employeeId).single(),
-    db().from('hadas_users').select('id,phone,role,active,must_change_password,last_login_at').eq('employee_id',employeeId).single(),
+    db().from('hadas_users').select('id,phone,role,active,must_change_password,last_login_at,onboarding_completed_at').eq('employee_id',employeeId).single(),
     db().from('hadas_employee_weekly_patterns').select('*').eq('employee_id',employeeId).order('weekday'),
     db().from('hadas_employee_class_constraints').select('*').eq('employee_id',employeeId),
     db().from('hadas_employee_private').select('*').eq('employee_id',employeeId).maybeSingle(),
@@ -174,6 +174,7 @@ async function employeeResult(employeeId) {
       user_active:user.active,
       must_change_password:user.must_change_password,
       last_login_at:user.last_login_at || null,
+      onboarding_completed:Boolean(user.onboarding_completed_at),
       admin_notes:privateRow?.admin_notes || '',
       weekly_patterns:patterns,
     },
@@ -256,6 +257,7 @@ module.exports = async function handler(req,res) {
         userUpdate.must_change_password = true;
         userUpdate.password_changed_at = null;
       }
+      if (body.restart_onboarding) userUpdate.onboarding_completed_at = null;
 
       const [, , savedPatterns, savedConstraints] = await Promise.all([
         Object.keys(employeeUpdate).length ? db().from('hadas_employees').update(employeeUpdate).eq('id',employeeId).then((r)=>assertDb(r,'לא ניתן לעדכן עובד')) : Promise.resolve(),
@@ -266,7 +268,7 @@ module.exports = async function handler(req,res) {
       ]);
       if (body.reset_password || body.active === false) await revokeUserSessions(user.id);
       await Promise.all([audit(caller.employee.id,'update','employee',employeeId,{ fields:Object.keys(body) }),emitEvent('employees')]);
-      const mergedEmployee={ ...employee, ...employeeUpdate, id:employeeId, phone:displayPhone(userUpdate.phone || user.phone || employeeUpdate.contact_phone || employee.contact_phone), role:userUpdate.role || user.role, user_active:userUpdate.active ?? user.active, must_change_password:userUpdate.must_change_password ?? user.must_change_password, last_login_at:user.last_login_at || null, admin_notes:body.admin_notes === undefined ? '' : String(body.admin_notes || ''), weekly_patterns:savedPatterns || body.weekly_patterns || [] };
+      const mergedEmployee={ ...employee, ...employeeUpdate, id:employeeId, phone:displayPhone(userUpdate.phone || user.phone || employeeUpdate.contact_phone || employee.contact_phone), role:userUpdate.role || user.role, user_active:userUpdate.active ?? user.active, must_change_password:userUpdate.must_change_password ?? user.must_change_password, last_login_at:user.last_login_at || null, onboarding_completed:body.restart_onboarding ? false : Boolean(user.onboarding_completed_at), admin_notes:body.admin_notes === undefined ? '' : String(body.admin_notes || ''), weekly_patterns:savedPatterns || body.weekly_patterns || [] };
       return send(res,200,{ ok:true,employee:mergedEmployee,constraints:savedConstraints || body.constraints || [] });
     }
 

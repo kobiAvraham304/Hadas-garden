@@ -52,6 +52,7 @@ function sanitizeEmployee(employee, manager, usersByEmployee, privateByEmployee,
     user_active: user?.active ?? false,
     must_change_password: user?.must_change_password ?? true,
     last_login_at: user?.last_login_at || null,
+    onboarding_completed: Boolean(user?.onboarding_completed_at),
     admin_notes: privateByEmployee.get(employee.id)?.admin_notes || '',
     weekly_patterns: patternsByEmployee.get(employee.id) || [],
   };
@@ -90,7 +91,7 @@ module.exports = async function handler(req, res) {
     const results = await Promise.all([
       db().from('hadas_classes').select('*').order('sort_order'),
       db().from('hadas_employees').select('*').order('full_name'),
-      manager ? db().from('hadas_users').select('employee_id,phone,role,active,must_change_password,last_login_at') : Promise.resolve({ data: [], error: null }),
+      manager ? db().from('hadas_users').select('employee_id,phone,role,active,must_change_password,last_login_at,onboarding_completed_at') : Promise.resolve({ data: [], error: null }),
       manager ? db().from('hadas_employee_private').select('*') : Promise.resolve({ data: [], error: null }),
       manager ? db().from('hadas_employee_class_constraints').select('*') : Promise.resolve({ data: [], error: null }),
       db().from('hadas_employee_weekly_patterns').select('*').order('weekday'),
@@ -103,11 +104,11 @@ module.exports = async function handler(req, res) {
       db().from('hadas_announcements').select('*').order('published_at', { ascending: false }).limit(200),
       db().from('hadas_announcement_recipients').select('*'),
       db().from('hadas_announcement_reads').select('*'),
-      db().from('hadas_tasks').select('*').order('created_at', { ascending: false }).limit(300),
-      db().from('hadas_task_assignees').select('*'),
+      Promise.resolve({ data: [], error: null }),
+      Promise.resolve({ data: [], error: null }),
       db().from('hadas_calendar_events').select('*').gte('event_date', calRange.start).lte('event_date', calRange.end).order('event_date').order('start_time'),
       todayInSelectedWeek ? Promise.resolve({ data: [], error: null }) : db().from('hadas_shifts').select('*').eq('shift_date', today).order('start_time'),
-      db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle(),
+      manager ? db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle() : Promise.resolve({ data:null, error:null }),
       db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
       todayInSelectedWeek ? Promise.resolve({ data: [], error: null }) : db().from('hadas_schedule_changes').select('*').eq('week_start', todayWeekStart).is('published_revision', 'null').order('created_at'),
       manager ? db().from('hadas_daily_operations').select('*').eq('operation_date', dailyDate).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
@@ -186,18 +187,14 @@ module.exports = async function handler(req, res) {
 
     const visibleRequestIds=new Set(requests.map((row)=>row.id));requestMessages=requestMessages.filter((row)=>visibleRequestIds.has(row.request_id));
     const visibleShiftPool=[...shifts,...todayShifts];
-    const absenceMap = new Map(buildScheduleAvailability({ requests:allRequestsForCalendar, employees:employeeRows, weeklyPatterns, shifts:visibleShiftPool, weekStart, dates:absenceDates }).map((row)=>[`${row.employee_id}:${row.absence_date}`,row]));
+    const absenceMap = new Map((fullScheduleViewer ? buildScheduleAvailability({ requests:allRequestsForCalendar, employees:employeeRows, weeklyPatterns, shifts:visibleShiftPool, weekStart, dates:absenceDates }) : []).map((row)=>[`${row.employee_id}:${row.absence_date}`,row]));
     const calendarVisibleLeave=(employee)=>manager||fullScheduleViewer||(classScheduleViewer&&employee?.primary_class_id===caller.employee.primary_class_id)||employee?.id===caller.employee.id;
     for(const request of allRequestsForCalendar){if(!['approved','applied'].includes(request.status)||request.request_type!=='leave')continue;const employee=employeeRows.find((row)=>row.id===request.requester_id);if(!employee||!calendarVisibleLeave(employee))continue;const end=request.request_end_date||request.request_date;for(const date of dateRange(request.request_date,Math.floor((new Date(`${end}T12:00:00Z`)-new Date(`${request.request_date}T12:00:00Z`))/86400000)+1)){if(date<calRange.start||date>calRange.end)continue;calendar.push({id:`leave:${request.id}:${date}`,title:employee.id===caller.employee.id?'חופשה מאושרת':`חופשה · ${employee.full_name}`,description:'חופשה מאושרת במערכת הבקשות',event_type:'approved_leave',event_date:date,start_time:null,end_time:null,visibility:'leave_request',class_id:employee.primary_class_id,created_by:null,source:'approved_leave',request_id:request.id,employee_id:employee.id,read_only:true});}}
     calendar.sort((a,b)=>`${a.event_date}-${a.start_time||''}-${a.title||''}`.localeCompare(`${b.event_date}-${b.start_time||''}-${b.title||''}`,'he'));
 
-    if (classScheduleViewer) {
-      const visibleIds = new Set(employeeRows.filter((row) => row.primary_class_id === caller.employee.primary_class_id).map((row) => row.id));
-      for (const [key, value] of [...absenceMap.entries()]) if (!visibleIds.has(value.employee_id)) absenceMap.delete(key);
-    } else if (!fullScheduleViewer) {
-      for (const [key, value] of [...absenceMap.entries()]) if (value.employee_id !== caller.employee.id) absenceMap.delete(key);
-    }
-    const visibleScheduleAbsences = [...absenceMap.values()].sort((a, b) => `${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`));
+    const visibleScheduleAbsences = fullScheduleViewer
+      ? [...absenceMap.values()].sort((a, b) => `${a.absence_date}-${a.employee_id}`.localeCompare(`${b.absence_date}-${b.employee_id}`))
+      : [];
     requests = requests.map((request) => ({
       ...request,
       has_attachment: Boolean(request.attachment_path),
@@ -228,6 +225,8 @@ module.exports = async function handler(req, res) {
         can_view_full_schedule: fullScheduleViewer,
         fixed_day_off: caller.employee.fixed_day_off,
         weekly_patterns: patternsByEmployee.get(caller.employee.id) || [],
+        onboarding_completed: Boolean(caller.user.onboarding_completed_at),
+        onboarding_required: !caller.user.onboarding_completed_at,
       },
       classes,
       employees,
@@ -245,7 +244,7 @@ module.exports = async function handler(req, res) {
       tasks,
       taskAssignees: assignees,
       calendarEvents: calendar,
-      publication,
+      publication: manager ? publication : null,
       scheduleChanges: manager ? scheduleChanges : [],
       scheduleAbsences: visibleScheduleAbsences,
       dailyOperations: manager ? dailyOperations : [],

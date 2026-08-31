@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.32.1'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.33.0'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
@@ -50,7 +50,7 @@ test('initial accounts and schema version are present in clean installer', () =>
   const schema=read('supabase/schema.sql');
   assert.match(schema,/אילנית זאדייב/); assert.match(schema,/\+972544594513/); assert.match(schema,/'admin'/);
   assert.match(schema,/לינור אברהם/); assert.match(schema,/\+972542521780/); assert.match(schema,/'scheduler'/);
-  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.24\.0'/);
+  assert.match(schema,/v_initial_hash/); assert.match(schema,/'0\.33\.0'/);
   assert.match(schema,/ENABLE ROW LEVEL SECURITY/i); assert.match(schema,/REVOKE ALL ON TABLE/i);
   assert.match(schema,/hadas_realtime_public_read/); assert.match(schema,/ALTER PUBLICATION supabase_realtime ADD TABLE/i);
 });
@@ -194,7 +194,7 @@ test('week navigation uses lightweight endpoint, cache and adjacent prefetching'
   assert.match(app,/prefetchAdjacentWeeks/); assert.match(app,/renderAll\(\); prefetchAdjacentWeeks\(\)/); assert.match(app,/refreshScheduleWeek/);
   assert.match(app,/\/api\/shifts\?week_start=/);
   assert.match(shifts,/if \(req\.method === 'GET'\)/);
-  assert.match(shifts,/let scheduleAbsences = buildScheduleAvailability/);
+  assert.match(shifts,/const scheduleAbsences = fullScheduleViewer/);
   assert.match(shifts,/scheduleAbsences,/);
 });
 
@@ -294,12 +294,13 @@ test('0.9 employee management supports exact roles, multiple fixed days and per-
   assert.match(schema,/max_weekly_hours/);
 });
 
-test('0.9 nurse and secretary content permissions and version badge are wired', () => {
-  const html=read('index.html'); const app=read('app.js'); const server=read('lib/server.js'); const calendar=read('handlers/calendar.js');
+test('0.9 nurse and secretary content permissions and the 0.33 calendar policy are wired', () => {
+  const html=read('index.html'); const app=read('app.js'); const server=read('lib/server.js'); const calendar=read('handlers/calendar.js'); const patch=read('patch-v033.js');
   assert.match(html,/id="appVersionBadge"/);
   assert.match(app,/\['אחות','מזכירה'\]/);
   assert.match(server,/\['אחות','מזכירה'\]/);
-  assert.match(calendar,/canCreateContent/);
+  assert.match(calendar,/new Set\(\['private'\]\)/);
+  assert.match(patch,/setHidden\('#newCalendarBtn', false\)/);
   assert.match(html,/id="newCalendarBtn" class="primary-btn content-creator-only"/);
 });
 

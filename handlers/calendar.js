@@ -1,5 +1,5 @@
 const {
-  requireSession, parseBody, db, assertDb, isManager, canCreateContent,
+  requireSession, parseBody, db, assertDb, isManager, isTeacher,
   emitEvent, audit, send, handleError, httpError,
 } = require('../lib/server');
 
@@ -19,13 +19,50 @@ async function approvedLeaveEvents(caller,range){const [requestsR,employeesR]=aw
 function canSeeEvent(caller, event) {
   if (isManager(caller)) return true;
   if (event.created_by === caller.employee.id) return true;
+  if (event.visibility === 'private') return false;
   if (event.visibility === 'managers') return false;
   if (event.visibility === 'class') return event.class_id === caller.employee.primary_class_id;
-  return true;
+  return event.visibility === 'all';
 }
 
 function canManageEvent(caller, event) {
   return isManager(caller) || event?.created_by === caller.employee.id;
+}
+
+function canCreateClassEvent(caller) {
+  const title = String(caller?.employee?.job_title || '');
+  return (isTeacher(caller) || title === 'סייעת מובילה') && Boolean(caller?.employee?.primary_class_id);
+}
+
+function normalizeEventRow(caller, body, current = {}) {
+  const visibility = String(body.visibility ?? current.visibility ?? (isManager(caller) ? 'all' : 'private'));
+  const allowedVisibility = isManager(caller)
+    ? new Set(['all', 'managers', 'class', 'private'])
+    : canCreateClassEvent(caller)
+      ? new Set(['class', 'private'])
+      : new Set(['private']);
+  if (!allowedVisibility.has(visibility)) throw httpError(403, 'אין הרשאה ליצור אירוע עם נראות זו');
+  const title = String(body.title ?? current.title ?? '').trim();
+  const eventDate = String(body.event_date ?? current.event_date ?? '');
+  if (!title || !/^\d{4}-\d{2}-\d{2}$/.test(eventDate)) throw httpError(400, 'יש להזין כותרת ותאריך תקינים');
+  const eventType = String(body.event_type ?? current.event_type ?? 'other');
+  if (!['holiday', 'meeting', 'training', 'birthday', 'activity', 'other'].includes(eventType)) throw httpError(400, 'סוג האירוע אינו תקין');
+  let classId = visibility === 'class' ? String(body.class_id ?? current.class_id ?? '') : null;
+  if (visibility === 'class' && !classId) throw httpError(400, 'יש לבחור כיתה');
+  if (!isManager(caller) && visibility === 'class') {
+    classId = String(caller.employee.primary_class_id || '');
+    if (!classId) throw httpError(403, 'לא מוגדרת עבורך כיתה קבועה');
+  }
+  return {
+    title,
+    description: String(body.description ?? current.description ?? '').trim() || null,
+    event_type:eventType,
+    event_date:eventDate,
+    start_time:(body.start_time ?? current.start_time) || null,
+    end_time:(body.end_time ?? current.end_time) || null,
+    visibility,
+    class_id:classId,
+  };
 }
 
 module.exports = async function handler(req, res) {
@@ -40,22 +77,9 @@ module.exports = async function handler(req, res) {
     }
 
     const caller = await requireSession(req);
-    if (!canCreateContent(caller)) throw httpError(403, 'אין הרשאה ליצור או לערוך אירועים');
     const body = parseBody(req);
     if (req.method === 'POST') {
-      if (!String(body.title || '').trim() || !body.event_date) throw httpError(400, 'יש להזין כותרת ותאריך');
-      const row = {
-        title: String(body.title).trim(),
-        description: String(body.description || '').trim() || null,
-        event_type: ['holiday', 'meeting', 'training', 'birthday', 'activity', 'other'].includes(body.event_type) ? body.event_type : 'other',
-        event_date: body.event_date,
-        start_time: body.start_time || null,
-        end_time: body.end_time || null,
-        visibility: ['all', 'managers', 'class'].includes(body.visibility) ? body.visibility : 'all',
-        class_id: body.visibility === 'class' ? body.class_id || null : null,
-        created_by: caller.employee.id,
-      };
-      if (row.visibility === 'class' && !row.class_id) throw httpError(400, 'יש לבחור כיתה');
+      const row = { ...normalizeEventRow(caller, body), created_by:caller.employee.id };
       const item = assertDb(await db().from('hadas_calendar_events').insert(row).select('*').single(), 'לא ניתן ליצור אירוע');
       await audit(caller.employee.id, 'create', 'calendar_event', item.id);
       await emitEvent('calendar');
@@ -66,15 +90,11 @@ module.exports = async function handler(req, res) {
       const current = assertDb(await db().from('hadas_calendar_events').select('*').eq('id', body.id).maybeSingle(), 'האירוע לא נמצא');
       if (!current) throw httpError(404, 'האירוע לא נמצא');
       if (!canManageEvent(caller, current)) throw httpError(403, 'ניתן לערוך רק אירוע שיצרת');
-      const row = {};
-      for (const key of ['title', 'description', 'event_type', 'event_date', 'start_time', 'end_time', 'visibility', 'class_id']) {
-        if (body[key] !== undefined) row[key] = body[key] === '' ? null : body[key];
-      }
-      if (row.visibility && row.visibility !== 'class') row.class_id = null;
-      assertDb(await db().from('hadas_calendar_events').update(row).eq('id', body.id), 'לא ניתן לעדכן אירוע');
+      const row = normalizeEventRow(caller, body, current);
+      const item = assertDb(await db().from('hadas_calendar_events').update(row).eq('id', body.id).select('*').single(), 'לא ניתן לעדכן אירוע');
       await audit(caller.employee.id, 'update', 'calendar_event', body.id);
       await emitEvent('calendar');
-      return send(res, 200, { ok: true });
+      return send(res, 200, { ok: true, item });
     }
     if (req.method === 'DELETE') {
       const id = body.id || req.query?.id;
@@ -89,3 +109,6 @@ module.exports = async function handler(req, res) {
     return send(res, 405, { ok: false, error: 'Method not allowed' });
   } catch (error) { handleError(res, error); }
 };
+
+module.exports.canSeeEvent = canSeeEvent;
+module.exports.normalizeEventRow = normalizeEventRow;

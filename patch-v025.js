@@ -1,8 +1,8 @@
-/* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.32.1 */
+/* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.33.0 */
 (() => {
-  const VERSION = '0.32.1';
+  const VERSION = '0.33.0';
   const V026 = '/patch-v026.js?v=0321';
-  const V032 = '/patch-v032.js?v=0321';
+  const V033 = '/patch-v033.js?v=0330';
 
   let releaseApiGate;
   let gateReleased = false;
@@ -120,14 +120,14 @@
 
     try {
       await loadScript(V026, 'v026');
-      await loadScript(V032, 'v032');
-      if (window.__hadasV032BootstrapPromise) {
-        const currentReady = await window.__hadasV032BootstrapPromise;
+      await loadScript(V033, 'v033');
+      if (window.__hadasV033BootstrapPromise) {
+        const currentReady = await window.__hadasV033BootstrapPromise;
         if (!currentReady) throw new Error('שכבות הממשק לא סיימו להיטען');
       }
       forceVersion();
     } catch (error) {
-      console.error('Hadas v0.32.1 bootstrap failed', error);
+      console.error('Hadas v0.33.0 bootstrap failed', error);
       const toast = document.querySelector('#toast');
       if (toast) {
         toast.textContent = 'טעינת עדכון המערכת נכשלה. המערכת תמשיך במצב בסיסי; מומלץ לרענן.';

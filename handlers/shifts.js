@@ -249,14 +249,16 @@ module.exports = async function handler(req, res) {
     if (req.method === 'GET') {
       const weekStart = getSunday(String(req.query?.week_start || israelDateISO()));
       const weekEnd = addDays(weekStart, 5);
+      const scope = scheduleScope(caller);
+      const fullScheduleViewer = scope === 'full';
       const [shiftsR, publicationR, changesR, ackR, requestsR, employeesR, patternsR, settingsR] = await Promise.all([
         db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd).order('shift_date').order('start_time'),
-        db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle(),
+        isManager(caller) ? db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle() : Promise.resolve({ data:null, error:null }),
         db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
         db().from('hadas_schedule_acknowledgements').select('*').eq('week_start', weekStart),
-        db().from('hadas_requests').select('requester_id,request_date,request_end_date,request_type,status').lte('request_date', weekEnd),
-        db().from('hadas_employees').select('id,full_name,active,fixed_day_off,is_schedulable,primary_class_id'),
-        db().from('hadas_employee_weekly_patterns').select('*'),
+        fullScheduleViewer ? db().from('hadas_requests').select('requester_id,request_date,request_end_date,request_type,status').lte('request_date', weekEnd) : Promise.resolve({ data:[], error:null }),
+        fullScheduleViewer ? db().from('hadas_employees').select('id,full_name,active,fixed_day_off,is_schedulable,primary_class_id') : Promise.resolve({ data:[], error:null }),
+        fullScheduleViewer ? db().from('hadas_employee_weekly_patterns').select('*') : Promise.resolve({ data:[], error:null }),
         db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
       ]);
       let shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
@@ -267,24 +269,20 @@ module.exports = async function handler(req, res) {
       const employees = assertDb(employeesR, 'לא ניתן לטעון ימי חופש') || [];
       const weeklyPatterns = assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [];
       const settings = assertDb(settingsR, 'לא ניתן לטעון הגדרות תקינה') || {};
-      const scope = scheduleScope(caller);
-      const fullScheduleViewer = scope === 'full';
       if (!isManager(caller)) {
         shifts = restoreLastPublished(shifts, scheduleChanges);
         if (scope === 'class') shifts = shifts.filter((row) => row.class_id === caller.employee.primary_class_id);
         else if (!fullScheduleViewer) shifts = shifts.filter((row) => row.employee_id === caller.employee.id);
         acknowledgements = acknowledgements.filter((row) => row.employee_id === caller.employee.id);
       }
-      let scheduleAbsences = buildScheduleAvailability({ requests, employees, weeklyPatterns, shifts, weekStart });
-      if (scope === 'class') {
-        const classEmployeeIds = new Set(employees.filter((row) => row.primary_class_id === caller.employee.primary_class_id).map((row) => row.id));
-        scheduleAbsences = scheduleAbsences.filter((row) => classEmployeeIds.has(row.employee_id));
-      } else if (!fullScheduleViewer) scheduleAbsences = scheduleAbsences.filter((row) => row.employee_id === caller.employee.id);
+      const scheduleAbsences = fullScheduleViewer
+        ? buildScheduleAvailability({ requests, employees, weeklyPatterns, shifts, weekStart })
+        : [];
       return send(res, 200, {
         ok: true,
         weekStart,
         shifts,
-        publication,
+        publication: isManager(caller) ? publication : null,
         scheduleChanges: isManager(caller) ? scheduleChanges : [],
         scheduleAbsences,
         acknowledgements,

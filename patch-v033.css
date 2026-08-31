@@ -1,0 +1,327 @@
+/* מערכת ניהול שיבוצים מעון הדס — עיצוב 0.33.0 */
+@import url('/patch-v032.css?v=0321');
+
+#appVersionBadge,
+#loginVersion {
+  font-size:12px !important;
+}
+#appVersionBadge::after,
+#loginVersion::after {
+  content:none !important;
+  display:none !important;
+}
+
+[data-tab="tasks"],
+[data-more-tab="tasks"],
+#tasksPanel,
+#taskDialog {
+  display:none !important;
+}
+
+.v033-personal-schedule-wrap {
+  overflow-x:auto;
+  padding-bottom:8px;
+  scrollbar-gutter:stable;
+}
+.v033-personal-week {
+  display:grid;
+  grid-template-columns:repeat(6,minmax(178px,1fr));
+  gap:10px;
+  min-width:1120px;
+}
+.v033-personal-week.compact {
+  min-width:960px;
+  grid-template-columns:repeat(6,minmax(150px,1fr));
+}
+.v033-personal-day {
+  min-width:0;
+  overflow:hidden;
+  border:1px solid #e2e3ee;
+  border-radius:18px;
+  background:#fff;
+  box-shadow:0 7px 20px rgba(56,58,100,.05);
+}
+.v033-personal-day > header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+  padding:11px 12px;
+  color:#5458bc;
+  background:#f2f1ff;
+  border-bottom:1px solid #e4e3f4;
+}
+.v033-personal-day > header span {
+  color:#7e8195;
+  font-size:.72rem;
+}
+.v033-personal-shift {
+  display:grid;
+  gap:3px;
+  margin:8px;
+  padding:10px;
+  border:1px solid #e7e7f0;
+  border-right:4px solid #7477da;
+  border-radius:13px;
+  background:#fbfbff;
+}
+.v033-personal-shift b {
+  direction:ltr;
+  unicode-bidi:isolate;
+  text-align:right;
+  color:#44475b;
+  font-size:.8rem;
+}
+.v033-personal-shift small,
+.v033-personal-empty {
+  color:#85889a;
+  font-size:.7rem;
+}
+.v033-personal-empty {
+  padding:24px 9px;
+  text-align:center;
+}
+.v033-dashboard-week {
+  margin-top:20px;
+  overflow:hidden;
+}
+.v033-dashboard-week .v033-personal-week {
+  overflow-x:auto;
+  padding-bottom:8px;
+}
+
+.calendar-event.meeting { border-right-color:#6670df; background:#f0f1ff; }
+.calendar-event.training { border-right-color:#9a67d7; background:#f7efff; }
+.calendar-event.holiday,
+.calendar-event.approved_leave { border-right-color:#dfa527; background:#fff8df; }
+.calendar-event.birthday { border-right-color:#e66f83; background:#fff0f3; }
+.calendar-event.activity { border-right-color:#3ba987; background:#eafaf4; }
+.calendar-event.other { border-right-color:#748096; background:#f1f4f7; }
+
+.announcement-grid {
+  grid-template-columns:repeat(auto-fit,minmax(310px,1fr));
+  align-items:start;
+}
+.announcement-card {
+  min-width:0;
+  gap:12px;
+  padding:18px;
+}
+.announcement-card .announcement-body {
+  font-size:.96rem;
+  line-height:1.75;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.announcement-card .card-actions {
+  padding-top:10px;
+  border-top:1px solid #ececf3;
+}
+.announcement-compose .compose-options {
+  display:grid !important;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  align-items:stretch;
+  gap:10px;
+}
+.announcement-compose .toggle-field {
+  min-width:0;
+  height:100%;
+  align-items:flex-start;
+}
+.announcement-compose .toggle-field > span {
+  min-width:0;
+}
+.announcement-compose .toggle-field strong,
+.announcement-compose .toggle-field small {
+  display:block;
+  line-height:1.4;
+  overflow-wrap:anywhere;
+}
+.tracking-row small {
+  line-height:1.45;
+}
+
+.v033-password-field {
+  position:relative;
+  display:block;
+  width:100%;
+}
+.v033-password-field input {
+  padding-left:52px !important;
+}
+.v033-password-toggle {
+  position:absolute;
+  left:7px;
+  top:50%;
+  transform:translateY(-50%);
+  display:grid;
+  place-items:center;
+  width:40px;
+  height:40px;
+  min-height:40px;
+  padding:0;
+  border:0;
+  border-radius:11px;
+  background:#f2f1ff;
+  color:#585bc1;
+  font-size:1rem;
+  z-index:2;
+}
+
+.v033-tour-dialog {
+  width:min(520px,calc(100% - 24px));
+  padding:0;
+  border:0;
+  border-radius:26px;
+  overflow:visible;
+  box-shadow:0 28px 80px rgba(39,41,82,.28);
+}
+.v033-tour-dialog::backdrop {
+  background:rgba(31,33,61,.55);
+  backdrop-filter:blur(4px);
+}
+.v033-tour-card {
+  position:relative;
+  padding:24px;
+  border-radius:26px;
+  background:#fff;
+}
+.v033-tour-close {
+  position:absolute;
+  left:14px;
+  top:14px;
+  display:grid;
+  place-items:center;
+  width:38px;
+  height:38px;
+  min-height:38px;
+  padding:0;
+  border:1px solid #e1e2ee;
+  border-radius:12px;
+  background:#fff;
+  color:#64677c;
+  font-size:1.25rem;
+}
+.v033-tour-heading {
+  display:flex;
+  align-items:center;
+  gap:13px;
+  padding-left:38px;
+}
+.v033-tour-heading > span {
+  display:grid;
+  place-items:center;
+  width:58px;
+  height:58px;
+  flex:0 0 auto;
+  border-radius:19px;
+  background:#efefff;
+  color:#5f63cb;
+  font-size:1.55rem;
+}
+.v033-tour-heading small,
+.v033-tour-heading h3 {
+  display:block;
+  margin:0;
+}
+.v033-tour-heading small {
+  color:#777a92;
+}
+.v033-tour-heading h3 {
+  margin-top:3px;
+  font-size:1.35rem;
+}
+.v033-tour-card > p {
+  margin:18px 0;
+  color:#5f6276;
+  line-height:1.7;
+}
+.v033-tour-dots {
+  display:flex;
+  justify-content:center;
+  gap:6px;
+  margin:8px 0 18px;
+}
+.v033-tour-dots i {
+  width:8px;
+  height:8px;
+  border-radius:999px;
+  background:#d8d9e5;
+  transition:.18s;
+}
+.v033-tour-dots i.active {
+  width:24px;
+  background:#7174d9;
+}
+.v033-tour-actions {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.v033-tour-focus {
+  position:relative;
+  z-index:30 !important;
+  outline:4px solid rgba(111,114,217,.7) !important;
+  outline-offset:4px;
+  border-radius:18px;
+  box-shadow:0 0 0 9px rgba(111,114,217,.13) !important;
+}
+.v033-tour-reset {
+  flex:1 1 190px;
+}
+
+@media(max-width:760px) {
+  input,
+  select,
+  textarea {
+    font-size:16px !important;
+  }
+  #appVersionBadge,
+  #loginVersion {
+    font-size:11px !important;
+  }
+  .v033-personal-week,
+  .v033-personal-week.compact {
+    grid-template-columns:repeat(6,minmax(156px,1fr));
+    min-width:996px;
+    gap:8px;
+  }
+  .announcement-grid {
+    grid-template-columns:1fr;
+  }
+  .announcement-card {
+    padding:14px;
+  }
+  .announcement-compose .compose-options {
+    grid-template-columns:1fr;
+  }
+  .announcement-compose .toggle-field {
+    display:grid;
+    grid-template-columns:auto minmax(0,1fr);
+  }
+  .v033-tour-card {
+    padding:20px 16px 16px;
+  }
+  .v033-tour-heading {
+    padding-left:32px;
+  }
+  .v033-tour-heading > span {
+    width:50px;
+    height:50px;
+  }
+  .v033-tour-actions {
+    grid-template-columns:1fr;
+  }
+  .v033-tour-actions .primary-btn {
+    grid-row:1;
+  }
+  .calendar-type-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(prefers-reduced-motion:reduce) {
+  .v033-tour-focus {
+    scroll-behavior:auto;
+  }
+}

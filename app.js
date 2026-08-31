@@ -268,9 +268,9 @@ function bindEvents() {
   $('#ackScheduleBtn').addEventListener('click', acknowledgeSchedule);
   $('#settingsBtn').addEventListener('click', openSettings);
   $('#scheduleIssuesToggle').addEventListener('click', toggleScheduleIssues);
-  $('#printBtn').addEventListener('click', printWeeklySchedule);
-  $('#imageBtn').addEventListener('click', downloadScheduleImage);
-  $('#monthImageBtn').addEventListener('click', downloadMonthlyScheduleImage);
+  $('#printBtn')?.addEventListener('click', printWeeklySchedule);
+  $('#imageBtn')?.addEventListener('click', downloadScheduleImage);
+  $('#monthImageBtn')?.addEventListener('click', downloadMonthlyScheduleImage);
   $('#scheduleMode').addEventListener('click', (event) => { const button = event.target.closest('[data-mode]'); if (!button) return; state.scheduleMode = button.dataset.mode; storageSet('localStorage', 'hadas-schedule-mode', state.scheduleMode); renderSchedule(); });
   $('#scheduleDaySelect').addEventListener('change', (event) => { state.scheduleDay = Number(event.target.value); storageSet('localStorage', 'hadas-schedule-day', state.scheduleDay); renderSchedule(); });
 

@@ -4,7 +4,7 @@ const {
 } = require('../lib/server');
 
 const LINOR_PHONE = '+972542521780';
-const TOPICS = new Set(['שיבוצים','בקשות','תפעול יומי','עובדים','הודעות ומשימות','לוח שנה','תקלה/באג','שיפור/רעיון','אחר']);
+const TOPICS = new Set(['שיבוצים','בקשות','תפעול יומי','עובדים','הודעות','הודעות ומשימות','לוח שנה','תקלה/באג','שיפור/רעיון','אחר']);
 function isFeedbackManager(caller) { return String(caller?.user?.phone || '') === LINOR_PHONE; }
 
 async function loadFeedback(caller) {

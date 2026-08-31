@@ -1,4 +1,4 @@
--- מערכת ניהול שיבוצים מעון הדס — גרסה 0.24.0 (סכמת נתונים 0.24.0)
+-- מערכת ניהול שיבוצים מעון הדס — גרסה 0.33.0 (סכמת נתונים 0.33.0)
 -- אין שימוש ב-Supabase Auth. ההתחברות מתבצעת בשרת Vercel באמצעות טלפון + סיסמה מוצפנת.
 -- התקנה נקייה ויציבה לגרסת ההקמה הראשונית.
 -- הקובץ מוחק ומקים מחדש רק אובייקטים שמתחילים ב-hadas_.
@@ -68,7 +68,7 @@ create table if not exists public.hadas_app_meta (
   updated_at timestamptz not null default now()
 );
 insert into public.hadas_app_meta(id, schema_version, app_version)
-values (1, '0.24.0', '0.24.0')
+values (1, '0.33.0', '0.33.0')
 on conflict (id) do update set schema_version=excluded.schema_version, app_version=excluded.app_version, updated_at=now();
 
 create table if not exists public.hadas_classes (
@@ -429,7 +429,7 @@ create table if not exists public.hadas_calendar_events (
   event_date date not null,
   start_time time,
   end_time time,
-  visibility text not null default 'all' check (visibility in ('all','managers','class')),
+  visibility text not null default 'all' check (visibility in ('all','managers','class','private')),
   class_id uuid references public.hadas_classes(id) on delete set null,
   created_by uuid references public.hadas_employees(id) on delete set null,
   created_at timestamptz not null default now(),
