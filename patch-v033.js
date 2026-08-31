@@ -608,7 +608,15 @@
       if (input.closest('.v033-password-field')) return;
       const wrap = document.createElement('span');
       wrap.className = 'v033-password-field';
-      input.before(wrap);
+      const label = input.closest('label');
+      if (label) {
+        const group = document.createElement('div');
+        group.className = 'v033-password-group';
+        input.id ||= (input.form?.id || 'password') + '-' + (input.name || 'field');
+        label.htmlFor = input.id;
+        label.before(group);
+        group.append(label, wrap);
+      } else input.before(wrap);
       wrap.append(input);
       const button = document.createElement('button');
       button.type = 'button';
