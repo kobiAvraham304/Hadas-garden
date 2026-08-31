@@ -15,11 +15,11 @@ test('0.32.1 layers remain available under the 0.33 release bootstrap', () => {
   assert.match(api, /shifts-v032/);
   const entry = read('patch-v025.js');
   assert.match(entry, /const VERSION = '0\.33\.0'/);
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0330'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0331'/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await window\.__hadasV033BootstrapPromise/);
   assert.match(entry, /hadas:bootstrap-ready/);
-  assert.match(read('patch-v025.css'), /patch-v033\.css\?v=0330/);
+  assert.match(read('patch-v025.css'), /patch-v033\.css\?v=0331/);
   const app = read('app.js');
   assert.match(app, /window\.addEventListener\('hadas:bootstrap-ready'/);
   assert.match(app, /if \(startupPromise\) return startupPromise/);

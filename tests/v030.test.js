@@ -103,12 +103,12 @@ test('0.30 runtime stays intact while physical legacy entrypoints advance to v0.
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
   assert.match(entry, /const VERSION = '0\.33\.0'/);
   assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321'/);
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0330'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0331'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.ok(entry.indexOf("await loadScript(V026, 'v026')") < entry.indexOf("await loadScript(V033, 'v033')"));
   assert.match(cssEntry, /patch-v026\.css\?v=0321/);
-  assert.match(cssEntry, /patch-v033\.css\?v=0330/);
+  assert.match(cssEntry, /patch-v033\.css\?v=0331/);
   assert.ok(cssEntry.indexOf('patch-v026.css') < cssEntry.indexOf('patch-v033.css'));
 
   const vercel = JSON.parse(read('vercel.json'));
