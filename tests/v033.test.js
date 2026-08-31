@@ -6,11 +6,11 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.33 release bootstrap is current and preserves the 0.32 compatibility chain', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.33.0');
+  assert.equal(JSON.parse(read('package.json')).version, '0.33.1');
   const entry = read('patch-v025.js');
   const patch = read('patch-v033.js');
   const vercel = JSON.parse(read('vercel.json'));
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0332'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
   assert.match(entry, /__hadasV033BootstrapPromise/);
   assert.match(patch, /PREVIOUS = '\/patch-v032\.js\?v=0321'/);
   assert.match(patch, /releaseBootstrap/);
@@ -48,6 +48,22 @@ test('0.33 schedule scope hides publication and availability data at the server 
   assert.match(patch, /v033-personal-week/);
   assert.match(patch, /installLeadExports/);
   assert.match(patch, /drawLeadSchedule/);
+  assert.match(data, /employees: visibleEmployees/);
+  assert.match(data, /classScheduleViewer[\s\S]*visibleEmployeeIds\.add/);
+});
+
+test('0.33.1 regular assistant controls stay hidden after legacy rerenders', () => {
+  const patch = read('patch-v033.js');
+  const css = read('patch-v033.css');
+  assert.match(patch, /dataset\.hadasRole = kind/);
+  assert.match(patch, /setHidden\('#v028ScheduleEmployeeSearch', kind === 'regular'\)/);
+  assert.match(patch, /setHidden\('#scheduleDayField', kind === 'regular'\)/);
+  assert.match(patch, /installRoleGuard/);
+  assert.match(css, /data-hadas-role="regular"\]\s+#v028ScheduleEmployeeSearch/);
+  assert.match(css, /data-hadas-role="regular"\]\s+#publishScheduleBtn/);
+  assert.match(css, /data-hadas-role="regular"\]\s+\.schedule-command-bar/);
+  assert.match(patch, /השבוע מוצג לרוחב · החליקו לצדדים/);
+  assert.match(css, /scroll-snap-type:x mandatory/);
 });
 
 test('0.33 calendar supports private self events, own-class events and editing', () => {
@@ -65,6 +81,9 @@ test('0.33 calendar supports private self events, own-class events and editing',
   assert.match(migration, /drop constraint if exists hadas_calendar_events_visibility_check/i);
   assert.match(migration, /'private'/);
   assert.match(migration, /schema_version = '0\.33\.0'/);
+  assert.match(patch, /mobileCalendarMarkup/);
+  assert.match(patch, /matchMedia\('\(max-width:760px\)'\)/);
+  assert.match(patch, /calendarTypeClass/);
 });
 
 test('0.33 removes tasks from runtime data and restricts teacher announcements to own class', () => {
@@ -93,5 +112,25 @@ test('0.33 onboarding is server-authoritative and can be queued from an employee
   assert.match(patch, /profile\.onboarding_required !== true/);
   assert.match(patch, /דלג על הסיור/);
   assert.match(patch, /data-v033-tour-next/);
+  assert.match(patch, /v033TourSpotlight/);
+  assert.match(patch, /dialog\.show\(\)/);
+  assert.doesNotMatch(patch, /if \(!dialog\.open\) dialog\.showModal\(\);/);
   assert.doesNotMatch(patch, /localStorage\.getItem/);
+});
+
+test('0.33.1 mobile request and announcement presentation follows worker permissions', () => {
+  const patch = read('patch-v033.js');
+  const css = read('patch-v033.css');
+  assert.match(patch, /dataset\.hadasCanCreate = canCreateContent\(\)/);
+  assert.match(css, /data-hadas-can-create="false"[\s\S]*\.audience-label[\s\S]*display:none !important/);
+  assert.match(css, /#leaveDayOffField \.compact-radio-row input\[type="radio"\][\s\S]*width:21px !important/);
+});
+
+test('0.33.1 managers can inspect schedule acknowledgements by week and timestamp', () => {
+  const patch = read('patch-v033.js');
+  assert.match(patch, /v033ScheduleAckViewerBtn/);
+  assert.match(patch, /אישורי קריאה ·/);
+  assert.match(patch, /acknowledged_at/);
+  assert.match(patch, /שיבוץ שבוע/);
+  assert.match(patch, /state\.publication\?\.revision/);
 });

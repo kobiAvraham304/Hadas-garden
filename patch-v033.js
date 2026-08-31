@@ -1,6 +1,6 @@
-/* מערכת ניהול שיבוצים מעון הדס — הרשאות וחוויית משתמש 0.33.0 */
+/* מערכת ניהול שיבוצים מעון הדס — הרשאות וחוויית משתמש 0.33.1 */
 (() => {
-  const VERSION = '0.33.0';
+  const VERSION = '0.33.1';
   const PREVIOUS = '/patch-v032.js?v=0321';
 
   function pinVersion() {
@@ -69,9 +69,10 @@
   function roleKind() {
     if (!state || !state.profile) return 'guest';
     if (isManager()) return 'manager';
-    const title = String(state.profile.job_title || '');
+    const title = String(state.profile.job_title || '').trim();
     if (/גנ(?:נ|ן)/.test(title)) return 'teacher';
-    if (title === 'סייעת מובילה') return 'lead';
+    if (state.profile.schedule_scope === 'class' || /סייעת\s+מובילה/.test(title)) return 'lead';
+    if (state.profile.schedule_scope === 'full' || state.profile.can_view_full_schedule) return 'full';
     return 'regular';
   }
 
@@ -99,14 +100,18 @@
         : '<div class="v033-personal-empty">אין שיבוץ</div>';
       return '<article class="v033-personal-day"><header><strong>' + escapeHtml(DAY_NAMES[date.getDay()]) + '</strong><span>' + escapeHtml(formatDate(iso, { day:'numeric', month:'numeric' })) + '</span></header>' + shifts + '</article>';
     }).join('');
-    return '<div class="v033-personal-week ' + (compact ? 'compact' : '') + '" role="region" aria-label="השיבוץ האישי השבועי">' + cards + '</div>';
+    return '<div class="v033-week-scroll-shell"><div class="v033-week-swipe-hint"><span>השבוע מוצג לרוחב · החליקו לצדדים</span><span class="v033-week-scroll-actions"><button type="button" data-v033-week-scroll="right" aria-label="הצגת הימים הקודמים">›</button><button type="button" data-v033-week-scroll="left" aria-label="הצגת הימים הבאים">‹</button></span></div><div class="v033-personal-week ' + (compact ? 'compact' : '') + '" role="region" tabindex="0" aria-label="השיבוץ האישי השבועי, ניתן לגלול לרוחב">' + cards + '</div></div>';
   }
 
   function renderRegularHorizontalSchedule() {
     const target = document.querySelector('#scheduleExport');
     if (!target || roleKind() !== 'regular') return;
+    const rows = ownWeekRows();
+    const renderKey = dateISO(state.weekStart) + ':' + rows.map((row) => [row.id, row.shift_date, row.start_time, row.end_time, row.class_id].join('-')).join('|');
+    if (target.dataset.v033PersonalKey === renderKey && target.querySelector('.v033-personal-week')) return;
     target.className = 'schedule-wrap v033-personal-schedule-wrap';
-    target.innerHTML = personalWeekMarkup(ownWeekRows(), false);
+    target.dataset.v033PersonalKey = renderKey;
+    target.innerHTML = personalWeekMarkup(rows, false);
   }
 
   function enhanceDashboard() {
@@ -134,7 +139,10 @@
   function applyRoleUi() {
     if (!state?.profile) return;
     const kind = roleKind();
-    const fullViewer = kind === 'manager' || kind === 'teacher';
+    const fullViewer = kind === 'manager' || kind === 'teacher' || kind === 'full';
+
+    document.documentElement.dataset.hadasRole = kind;
+    document.documentElement.dataset.hadasCanCreate = canCreateContent() ? 'true' : 'false';
 
     document.querySelectorAll('[data-tab="tasks"],[data-more-tab="tasks"],#tasksPanel,#taskDialog,#newTaskBtn').forEach((element) => element.classList.add('hidden'));
     setHidden('#newCalendarBtn', false);
@@ -143,6 +151,10 @@
     setHidden('#schedulePublicationState', kind !== 'manager');
     setHidden('#scheduleAbsences', !fullViewer);
     setHidden('#scheduleMode', kind === 'regular');
+    setHidden('#scheduleDayField', kind === 'regular');
+    setHidden('#v028ScheduleEmployeeSearch', kind === 'regular');
+    setHidden('#publishScheduleBtn', kind !== 'manager');
+    setHidden('#scheduleIssuesToggle', kind !== 'manager');
     setHidden('#scheduleMode [data-mode="mine"]', kind === 'lead');
     setHidden('#printBtn', kind === 'regular' || kind === 'lead');
     setHidden('#imageBtn', kind === 'regular');
@@ -164,6 +176,66 @@
     }
     pinVersion();
     if (kind === 'lead') installLeadExports();
+    installScheduleAcknowledgementViewer();
+  }
+
+  function scheduleAcknowledgementRecipients() {
+    const ids = new Set((state.shifts || []).map((row) => row.employee_id).filter(Boolean));
+    return (state.employees || []).filter((employee) => ids.has(employee.id) && employee.active !== false && !['admin', 'scheduler'].includes(employee.role));
+  }
+
+  function ensureScheduleAcknowledgementDialog() {
+    let dialog = document.querySelector('#v033ScheduleAckDialog');
+    if (dialog) return dialog;
+    dialog = document.createElement('dialog');
+    dialog.id = 'v033ScheduleAckDialog';
+    dialog.className = 'modal v033-schedule-ack-dialog';
+    dialog.innerHTML = '<section class="modal-card"><div class="modal-heading"><div><p class="eyebrow">מעקב קריאת שיבוץ</p><h3 id="v033ScheduleAckTitle">אישורי קריאה</h3><p id="v033ScheduleAckSummary" class="muted"></p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="v033ScheduleAckList" class="v033-schedule-ack-list"></div><div class="modal-actions"><button type="button" class="ghost-btn close-dialog">סגירה</button></div></section>';
+    document.body.append(dialog);
+    dialog.querySelectorAll('.close-dialog').forEach((button) => button.addEventListener('click', () => dialog.close()));
+    return dialog;
+  }
+
+  function openScheduleAcknowledgementViewer() {
+    if (!isManager()) return;
+    const dialog = ensureScheduleAcknowledgementDialog();
+    const recipients = scheduleAcknowledgementRecipients();
+    const acknowledgements = new Map((state.acknowledgements || []).map((row) => [row.employee_id, row]));
+    const acknowledgedCount = recipients.filter((employee) => acknowledgements.has(employee.id)).length;
+    const weekText = formatDate(state.weekStart, { day:'2-digit', month:'2-digit', year:'numeric' }) + '–' + formatDate(addDays(state.weekStart, 5), { day:'2-digit', month:'2-digit', year:'numeric' });
+    const revisionText = state.publication?.revision ? ' · גרסת פרסום ' + state.publication.revision : '';
+    document.querySelector('#v033ScheduleAckTitle').textContent = 'אישורי קריאה · ' + weekText;
+    document.querySelector('#v033ScheduleAckSummary').textContent = acknowledgedCount + ' מתוך ' + recipients.length + ' עובדים משובצים אישרו' + revisionText;
+    document.querySelector('#v033ScheduleAckList').innerHTML = recipients.length
+      ? recipients.map((employee) => {
+          const row = acknowledgements.get(employee.id);
+          const status = row?.acknowledged_at
+            ? 'אושר ב־' + formatDate(row.acknowledged_at, { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+            : 'טרם אושר';
+          return '<article class="tracking-row ' + (row ? 'done' : 'pending') + '"><span class="employee-avatar small">' + escapeHtml(initials(employee.full_name)) + '</span><div><strong>' + escapeHtml(employee.full_name || '') + '</strong><small>' + escapeHtml(status) + '<br>שיבוץ שבוע ' + escapeHtml(weekText) + escapeHtml(revisionText) + '</small></div><b>' + (row ? '✓' : '…') + '</b></article>';
+        }).join('')
+      : '<div class="empty-state">אין עובדים משובצים בשבוע הזה.</div>';
+    dialog.showModal();
+  }
+
+  function installScheduleAcknowledgementViewer() {
+    const health = document.querySelector('.schedule-health-row');
+    if (!health) return;
+    let button = document.querySelector('#v033ScheduleAckViewerBtn');
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'v033ScheduleAckViewerBtn';
+      button.type = 'button';
+      button.className = 'secondary-btn';
+      button.addEventListener('click', openScheduleAcknowledgementViewer);
+      health.prepend(button);
+    }
+    const recipients = scheduleAcknowledgementRecipients();
+    const acknowledged = new Set((state.acknowledgements || []).map((row) => row.employee_id));
+    const count = recipients.filter((employee) => acknowledged.has(employee.id)).length;
+    const label = 'אישורי קריאה · ' + count + '/' + recipients.length;
+    if (button.textContent !== label) button.textContent = label;
+    button.classList.toggle('hidden', !isManager());
   }
 
   function configureCalendarVisibility(selected) {
@@ -207,20 +279,54 @@
     return 'כיתת ' + (classById(item.class_id)?.name || '');
   }
 
+  function calendarTypeClass(item) {
+    const type = String(item?.event_type || 'other');
+    if (item?.source === 'approved_leave' || type === 'approved_leave') return 'approved_leave';
+    if (item?.is_general_day_off || type === 'general_day_off') return 'holiday general_day_off';
+    return ['meeting', 'training', 'holiday', 'birthday', 'activity', 'other'].includes(type) ? type : 'other';
+  }
+
+  function mobileCalendarMarkup(monthEvents) {
+    if (!monthEvents.length) return '<div class="v033-calendar-empty"><span>◫</span><strong>אין אירועים בחודש הזה</strong><small>אפשר ליצור אירוע חדש מהכפתור למעלה.</small></div>';
+    const grouped = new Map();
+    for (const item of monthEvents) {
+      if (!grouped.has(item.event_date)) grouped.set(item.event_date, []);
+      grouped.get(item.event_date).push(item);
+    }
+    return '<div class="v033-calendar-mobile-list" aria-label="אירועי לוח השנה">' + [...grouped.entries()].map(([date, items]) => {
+      const day = parseDateValue(date);
+      const cards = items.map((item) => {
+        const classes = calendarTypeClass(item);
+        const time = item.start_time ? trimTime(item.start_time) + (item.end_time ? '–' + trimTime(item.end_time) : '') : 'כל היום';
+        return '<button type="button" class="v033-mobile-calendar-event ' + escapeHtml(classes) + '" data-event-id="' + escapeHtml(item.id) + '"><span class="v033-event-icon">' + calendarEventIcon(item) + '</span><span><strong>' + escapeHtml(item.title || calendarEventLabel(item)) + '</strong><small>' + escapeHtml(calendarEventLabel(item)) + ' · ' + escapeHtml(time) + '</small></span><i aria-hidden="true">‹</i></button>';
+      }).join('');
+      return '<section class="v033-calendar-date-group"><header><span>' + day.getDate() + '</span><div><strong>' + escapeHtml(DAY_NAMES[day.getDay()]) + '</strong><small>' + escapeHtml(formatDate(date, { day:'numeric', month:'long' })) + '</small></div><button type="button" data-calendar-date="' + escapeHtml(date) + '" aria-label="הוספת אירוע בתאריך ' + escapeHtml(formatDate(date)) + '">＋</button></header><div>' + cards + '</div></section>';
+    }).join('') + '</div>';
+  }
+
   function renderCalendarV033() {
     const label = document.querySelector('#calendarMonthLabel');
     if (label) label.textContent = formatDate(state.calendarMonth, { month:'long', year:'numeric' });
+    const monthPrefix = monthParam(state.calendarMonth);
+    const monthEvents = (state.calendarEvents || []).filter((item) => String(item.event_date || '').startsWith(monthPrefix)).sort((a, b) => String(a.event_date + '-' + (a.start_time || '')).localeCompare(String(b.event_date + '-' + (b.start_time || ''))));
+    const grid = document.querySelector('#calendarGrid');
+    if (!grid) return;
+    if (matchMedia('(max-width:760px)').matches) {
+      grid.classList.add('v033-calendar-list-shell');
+      grid.innerHTML = mobileCalendarMarkup(monthEvents);
+      return;
+    }
+    grid.classList.remove('v033-calendar-list-shell');
     const weekdays = DAY_NAMES.map((name) => '<div class="calendar-weekday">' + escapeHtml(name) + '</div>').join('');
     const today = dateISO(new Date());
     const cells = calendarCells().map((date) => {
       const iso = dateISO(date);
       const events = state.calendarEvents.filter((item) => item.event_date === iso);
       const outside = date.getMonth() !== state.calendarMonth.getMonth();
-      const shown = events.slice(0, 4).map((item) => '<button class="calendar-event ' + escapeHtml(item.event_type || 'other') + '" data-event-id="' + escapeHtml(item.id) + '" title="' + escapeHtml(item.title || calendarEventLabel(item)) + '"><span>' + calendarEventIcon(item) + '</span><b>' + escapeHtml(item.title || calendarEventLabel(item)) + '</b>' + (item.start_time ? '<small>' + trimTime(item.start_time) + '</small>' : '') + '</button>').join('');
+      const shown = events.slice(0, 4).map((item) => '<button class="calendar-event ' + escapeHtml(calendarTypeClass(item)) + '" data-event-type="' + escapeHtml(item.event_type || 'other') + '" data-event-id="' + escapeHtml(item.id) + '" title="' + escapeHtml(item.title || calendarEventLabel(item)) + '"><span>' + calendarEventIcon(item) + '</span><b>' + escapeHtml(item.title || calendarEventLabel(item)) + '</b>' + (item.start_time ? '<small>' + trimTime(item.start_time) + '</small>' : '') + '</button>').join('');
       return '<div class="calendar-day selectable ' + (outside ? 'outside ' : '') + (iso === today ? 'today ' : '') + (events.length ? 'has-events' : '') + '" data-calendar-date="' + iso + '" role="button" tabindex="0" aria-label="יצירת אירוע בתאריך ' + escapeHtml(formatDate(iso)) + '"><div class="calendar-day-number"><span>' + date.getDate() + '</span><span class="calendar-day-tools">' + (events.length ? '<small>' + events.length + '</small>' : '') + '<i aria-hidden="true">＋</i></span></div><div class="calendar-events">' + shown + (events.length > 4 ? '<span class="calendar-more">ועוד ' + (events.length - 4) + '</span>' : '') + '</div></div>';
     }).join('');
-    const grid = document.querySelector('#calendarGrid');
-    if (grid) grid.innerHTML = '<div class="calendar-weekdays">' + weekdays + '</div><div class="calendar-grid">' + cells + '</div>';
+    grid.innerHTML = '<div class="calendar-weekdays">' + weekdays + '</div><div class="calendar-grid">' + cells + '</div>';
   }
 
   function openCalendarDialogV033(item) {
@@ -509,16 +615,48 @@
   function tourSteps() {
     const manager = roleKind() === 'manager';
     return [
-      { tab:'dashboard', target:'#dashboardPanel', icon:'⌂', title:'המסך הראשי', text:'כאן מופיעים השיבוץ האישי, ההודעות והפעולות החשובות עבורך.' },
-      { tab:'schedule', target:'#schedulePanel', icon:'▦', title:'השיבוץ השבועי', text:manager ? 'כאן בונים, בודקים ומפרסמים את השיבוץ.' : 'כאן רואים את השבוע בהתאם להרשאה שלך ולתפקיד שלך.' },
+      { tab:'dashboard', target:'#v033DashboardWeek,#dashboardPanel .summary-grid,#dashboardPanel', icon:'⌂', title:'המסך הראשי', text:'המסגרת הסגולה מסמנת את האזור שמסבירים עכשיו. כאן מופיעים השיבוץ האישי והפעולות החשובות עבורך.' },
+      { tab:'schedule', target:'#scheduleExport,.schedule-heading', icon:'▦', title:'השיבוץ השבועי', text:manager ? 'כאן בונים, בודקים ומפרסמים את השיבוץ. החצים והמסגרת מסמנים את אזור העבודה.' : 'כאן רואים את כל ימי השבוע לרוחב, ורק את השיבוץ שמותר לתפקיד שלך לראות.' },
       { tab:'requests', target:'#newRequestBtn', icon:'↔', title:'הגשת בקשה', text:'לחצו על “בקשה חדשה”, בחרו חופשה, מחלה, שעות או החלפה ושלחו למעקב.' },
-      { tab:'announcements', target:'#announcementsPanel', icon:'◉', title:'הודעות ועדכונים', text:'כאן קוראים הודעות ומאשרים קריאה. בעלי הרשאה יכולים לפרסם לקהל המורשה.' },
+      { tab:'announcements', target:'#announcementsList,.content-toolbar,#announcementsPanel', icon:'◉', title:'הודעות ועדכונים', text:'כאן קוראים הודעות ומאשרים קריאה. בעלי הרשאה יכולים לפרסם לקהל המורשה.' },
       { tab:'calendar', target:'#newCalendarBtn', icon:'◫', title:'לוח השנה', text:'לחצו על יום או על “אירוע חדש” כדי ליצור אירוע פרטי או אירוע כיתה לפי התפקיד.' },
     ];
   }
 
   function clearTourFocus() {
     document.querySelectorAll('.v033-tour-focus').forEach((element) => element.classList.remove('v033-tour-focus'));
+    const spotlight = document.querySelector('#v033TourSpotlight');
+    if (spotlight) spotlight.hidden = true;
+  }
+
+  function ensureTourSpotlight() {
+    let spotlight = document.querySelector('#v033TourSpotlight');
+    if (spotlight) return spotlight;
+    spotlight = document.createElement('div');
+    spotlight.id = 'v033TourSpotlight';
+    spotlight.className = 'v033-tour-spotlight';
+    spotlight.hidden = true;
+    spotlight.innerHTML = '<i class="arrow top" aria-hidden="true">↓</i><i class="arrow right" aria-hidden="true">←</i><i class="arrow bottom" aria-hidden="true">↑</i><i class="arrow left" aria-hidden="true">→</i><span>כאן</span>';
+    document.body.append(spotlight);
+    return spotlight;
+  }
+
+  function positionTourSpotlight(target, dialog) {
+    if (!target) return;
+    const spotlight = ensureTourSpotlight();
+    const rect = target.getBoundingClientRect();
+    const margin = 7;
+    const top = Math.max(margin, rect.top - margin);
+    const left = Math.max(margin, rect.left - margin);
+    const width = Math.min(window.innerWidth - left - margin, Math.max(48, rect.width + margin * 2));
+    const height = Math.min(window.innerHeight - top - margin, Math.max(48, rect.height + margin * 2));
+    spotlight.style.top = top + 'px';
+    spotlight.style.left = left + 'px';
+    spotlight.style.width = width + 'px';
+    spotlight.style.height = height + 'px';
+    spotlight.classList.toggle('is-round', width < 120 && height < 120);
+    spotlight.hidden = false;
+    dialog.classList.toggle('place-top', rect.bottom > window.innerHeight * .62);
   }
 
   async function finishTour() {
@@ -541,7 +679,8 @@
     dialog = document.createElement('dialog');
     dialog.id = 'v033TourDialog';
     dialog.className = 'v033-tour-dialog';
-    dialog.innerHTML = '<section class="v033-tour-card"><button type="button" class="v033-tour-close" data-v033-tour-finish aria-label="סגירת הסיור">×</button><div class="v033-tour-heading"><span id="v033TourIcon">⌂</span><div><small id="v033TourCounter"></small><h3 id="v033TourTitle"></h3></div></div><p id="v033TourText"></p><div id="v033TourDots" class="v033-tour-dots"></div><div class="v033-tour-actions"><button type="button" class="ghost-btn" data-v033-tour-finish>דלג על הסיור</button><button type="button" class="primary-btn" data-v033-tour-next>הבא</button></div></section>';
+    dialog.setAttribute('aria-labelledby', 'v033TourTitle');
+    dialog.innerHTML = '<section class="v033-tour-card"><div class="v033-tour-active"><i></i> סיור מודרך פעיל</div><button type="button" class="v033-tour-close" data-v033-tour-finish aria-label="סגירת הסיור">×</button><div class="v033-tour-heading"><span id="v033TourIcon">⌂</span><div><small id="v033TourCounter"></small><h3 id="v033TourTitle"></h3></div></div><p id="v033TourText"></p><div id="v033TourDots" class="v033-tour-dots"></div><div class="v033-tour-actions"><button type="button" class="ghost-btn" data-v033-tour-finish>דלג על הסיור</button><button type="button" class="primary-btn" data-v033-tour-next>הבא</button></div></section>';
     document.body.append(dialog);
     dialog.addEventListener('cancel', (event) => {
       event.preventDefault();
@@ -564,18 +703,20 @@
     dialog.dataset.step = String(index);
     clearTourFocus();
     switchTab(step.tab);
-    requestAnimationFrame(() => {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
       const target = document.querySelector(step.target);
       target?.classList.add('v033-tour-focus');
-      target?.scrollIntoView({ block:'center', behavior:'smooth' });
-    });
+      target?.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
+      requestAnimationFrame(() => positionTourSpotlight(target, dialog));
+    }));
     document.querySelector('#v033TourIcon').textContent = step.icon;
     document.querySelector('#v033TourCounter').textContent = (index + 1) + ' מתוך ' + steps.length;
     document.querySelector('#v033TourTitle').textContent = step.title;
     document.querySelector('#v033TourText').textContent = step.text;
     document.querySelector('#v033TourDots').innerHTML = steps.map((_, dot) => '<i class="' + (dot === index ? 'active' : '') + '"></i>').join('');
     dialog.querySelector('[data-v033-tour-next]').textContent = index === steps.length - 1 ? 'סיום' : 'הבא';
-    if (!dialog.open) dialog.showModal();
+    if (!dialog.open) dialog.show();
+    dialog.focus({ preventScroll:true });
   }
 
   function maybeStartTour() {
@@ -760,6 +901,44 @@
     replaceLeadButton('v031PrintBtn', printLeadA4, '🖨️ הדפסה A4');
   }
 
+  function handleV033UtilityClick(event) {
+    const scrollButton = event.target.closest?.('[data-v033-week-scroll]');
+    if (!scrollButton) return;
+    const week = scrollButton.closest('.v033-week-scroll-shell')?.querySelector('.v033-personal-week');
+    const cards = [...(week?.querySelectorAll('.v033-personal-day') || [])];
+    if (!week || !cards.length) return;
+    event.preventDefault();
+    let index = Number(week.dataset.focusedDay || 0);
+    index += scrollButton.dataset.v033WeekScroll === 'left' ? 1 : -1;
+    index = Math.max(0, Math.min(cards.length - 1, index));
+    week.dataset.focusedDay = String(index);
+    cards[index].scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+  }
+
+  function installRoleGuard() {
+    if (window.__hadasV033RoleGuardInstalled) return;
+    const panel = document.querySelector('#schedulePanel');
+    if (!panel) return;
+    window.__hadasV033RoleGuardInstalled = true;
+    let frame = 0;
+    const observer = new MutationObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (state?.profile) applyRoleUi();
+      });
+    });
+    observer.observe(panel, { childList:true, subtree:true });
+    window.__hadasV033RoleObserver = observer;
+  }
+
+  function refreshTourSpotlight() {
+    const dialog = document.querySelector('#v033TourDialog');
+    if (!dialog?.open) return;
+    const step = tourSteps()[Number(dialog.dataset.step || 0)];
+    const target = step ? document.querySelector(step.target) : null;
+    positionTourSpotlight(target, dialog);
+  }
+
   function installOverrides() {
     if (window.__hadasV033Installed) return;
     window.__hadasV033Installed = true;
@@ -833,8 +1012,16 @@
     };
 
     installEmployeeTourAction();
+    installRoleGuard();
     installPasswordReveal();
     installVersionGuard();
+    document.addEventListener('click', handleV033UtilityClick);
+    window.addEventListener('resize', debounce(refreshTourSpotlight, 80), { passive:true });
+    window.addEventListener('scroll', debounce(refreshTourSpotlight, 40), { passive:true, capture:true });
+    const calendarMedia = matchMedia('(max-width:760px)');
+    calendarMedia.addEventListener?.('change', () => {
+      if (state?.profile && state.activeTab === 'calendar') renderCalendarV033();
+    });
   }
 
   async function boot() {
@@ -848,7 +1035,7 @@
       pinVersion();
       return true;
     } catch (error) {
-      console.error('Hadas v0.33.0 bootstrap failed', error);
+      console.error('Hadas v0.33.1 bootstrap failed', error);
       return false;
     } finally {
       releaseBootstrap();

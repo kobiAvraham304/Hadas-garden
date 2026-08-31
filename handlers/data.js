@@ -208,6 +208,22 @@ module.exports = async function handler(req, res) {
       return Date.parse(row.published_at) <= now && (!row.expires_at || Date.parse(row.expires_at) >= now);
     });
 
+    // אל תשלח לסייעת רגילה ספר עובדים מלא. לתצוגת כיתה נשלחים רק חברי
+    // הכיתה, ובכל תצוגה נשמרים מחברי הודעות/אירועים שנחוצים להצגת השם.
+    const visibleEmployeeIds = new Set([
+      caller.employee.id,
+      ...shifts.map((row) => row.employee_id),
+      ...todayShifts.map((row) => row.employee_id),
+      ...announcements.map((row) => row.created_by),
+      ...calendar.map((row) => row.created_by),
+    ].filter(Boolean));
+    if (classScheduleViewer) {
+      employeeRows.filter((row) => row.primary_class_id === caller.employee.primary_class_id).forEach((row) => visibleEmployeeIds.add(row.id));
+    }
+    const visibleEmployees = manager || fullScheduleViewer
+      ? employees
+      : employees.filter((employee) => visibleEmployeeIds.has(employee.id));
+
     send(res, 200, {
       ok: true,
       profile: {
@@ -229,7 +245,7 @@ module.exports = async function handler(req, res) {
         onboarding_required: !caller.user.onboarding_completed_at,
       },
       classes,
-      employees,
+      employees: visibleEmployees,
       constraints: manager ? constraints : [],
       settings,
       shifts,
