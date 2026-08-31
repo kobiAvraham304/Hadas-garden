@@ -590,6 +590,20 @@
   }
 
   function installPasswordReveal() {
+    if (!window.__hadasV033PasswordRevealInstalled) {
+      window.__hadasV033PasswordRevealInstalled = true;
+      document.addEventListener('click', (event) => {
+        const button = event.target.closest?.('.v033-password-toggle');
+        if (!button) return;
+        event.preventDefault();
+        const input = button.closest('.v033-password-field')?.querySelector('input');
+        if (!input) return;
+        const reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+        button.textContent = reveal ? '◉̸' : '◉';
+        button.setAttribute('aria-label', reveal ? 'הסתרת הסיסמה' : 'הצגת הסיסמה');
+      }, true);
+    }
     document.querySelectorAll('#loginForm input[type="password"],#passwordForm input[type="password"]').forEach((input) => {
       if (input.closest('.v033-password-field')) return;
       const wrap = document.createElement('span');
@@ -601,12 +615,6 @@
       button.className = 'v033-password-toggle';
       button.setAttribute('aria-label', 'הצגת הסיסמה');
       button.textContent = '◉';
-      button.addEventListener('click', () => {
-        const reveal = input.type === 'password';
-        input.type = reveal ? 'text' : 'password';
-        button.textContent = reveal ? '◉̸' : '◉';
-        button.setAttribute('aria-label', reveal ? 'הסתרת הסיסמה' : 'הצגת הסיסמה');
-      });
       wrap.append(button);
     });
   }
