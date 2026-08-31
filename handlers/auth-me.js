@@ -1,7 +1,8 @@
 const { db, getSession, requireSession, publicProfile, send, handleError, audit, assertDb, parseBody } = require('../lib/server');
 
 function profilePayload(caller) {
-  return { ...publicProfile(caller), onboarding_completed:Boolean(caller.user.onboarding_completed_at) };
+  const onboardingCompleted = Boolean(caller.user.onboarding_completed_at);
+  return { ...publicProfile(caller), onboarding_completed:onboardingCompleted, onboarding_required:!onboardingCompleted };
 }
 
 module.exports = async function handler(req, res) {

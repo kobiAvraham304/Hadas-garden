@@ -1,5 +1,5 @@
 const {
-  requireSession, parseBody, db, assertDb, isManager, canCreateContent,
+  requireSession, parseBody, db, assertDb, isManager, isTeacher, canCreateContent,
   emitEvent, audit, notifyEmployees, send, handleError, httpError,
 } = require('../lib/server');
 
@@ -38,6 +38,17 @@ function canManage(caller, item) {
   return isManager(caller) || item?.created_by === caller.employee.id;
 }
 
+function announcementAudience(caller, requestedType, requestedClassId) {
+  if (isTeacher(caller) && !isManager(caller)) {
+    if (!caller.employee.primary_class_id) throw httpError(403, 'לא מוגדרת לגננת כיתה קבועה');
+    return { audienceType:'class', classId:caller.employee.primary_class_id };
+  }
+  const audienceType = ['all', 'class', 'employees'].includes(requestedType) ? requestedType : 'all';
+  const classId = audienceType === 'class' ? requestedClassId || null : null;
+  if (audienceType === 'class' && !classId) throw httpError(400, 'יש לבחור כיתה');
+  return { audienceType, classId };
+}
+
 module.exports = async function handler(req, res) {
   try {
     const body = parseBody(req);
@@ -60,14 +71,13 @@ module.exports = async function handler(req, res) {
       const title = String(body.title || '').trim();
       const content = String(body.body || '').trim();
       if (!title || !content) throw httpError(400, 'יש להזין כותרת ותוכן');
-      const audienceType = ['all', 'class', 'employees'].includes(body.audience_type) ? body.audience_type : 'all';
-      if (audienceType === 'class' && !body.class_id) throw httpError(400, 'יש לבחור כיתה');
+      const { audienceType, classId } = announcementAudience(caller, body.audience_type, body.class_id);
       const row = {
         title,
         body: content,
         announcement_type: ['info', 'important', 'urgent'].includes(body.announcement_type) ? body.announcement_type : 'info',
         audience_type: audienceType,
-        class_id: audienceType === 'class' ? body.class_id : null,
+        class_id: classId,
         published_at: body.published_at || new Date().toISOString(),
         expires_at: body.expires_at || null,
         active: true,
@@ -103,11 +113,15 @@ module.exports = async function handler(req, res) {
       }
       if (body.popup_on_login !== undefined) row.popup_on_login = truthy(body.popup_on_login);
       if (body.audience_type !== undefined) {
-        const audienceType = ['all', 'class', 'employees'].includes(body.audience_type) ? body.audience_type : 'all';
-        if (audienceType === 'class' && !body.class_id) throw httpError(400, 'יש לבחור כיתה');
+        const { audienceType, classId } = announcementAudience(caller, body.audience_type, body.class_id);
         row.audience_type = audienceType;
-        row.class_id = audienceType === 'class' ? body.class_id : null;
+        row.class_id = classId;
         await replaceRecipients(id, audienceType, body.employee_ids);
+      } else if (isTeacher(caller) && !isManager(caller)) {
+        const { audienceType, classId } = announcementAudience(caller, 'class', caller.employee.primary_class_id);
+        row.audience_type = audienceType;
+        row.class_id = classId;
+        await replaceRecipients(id, audienceType, []);
       }
       assertDb(await db().from('hadas_announcements').update(row).eq('id', id), 'לא ניתן לעדכן הודעה');
       await audit(caller.employee.id, 'update', 'announcement', id);
@@ -127,3 +141,4 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.truthy = truthy;
+module.exports.announcementAudience = announcementAudience;

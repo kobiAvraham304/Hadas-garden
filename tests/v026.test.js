@@ -14,8 +14,8 @@ test('0.26 upgraded request and suggestion layers remain available under current
   const pkg = JSON.parse(read('package.json'));
   const api = read('api/index.js');
   const version = read('VERSION.md');
-  assert.equal(pkg.version, '0.32.1');
-  assert.match(version, /גרסה 0\.32\.1/);
+  assert.equal(pkg.version, '0.33.0');
+  assert.match(version, /גרסה 0\.33\.0/);
   assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
   assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);
   assert.match(read('lib/requests-v028.js'), /require\('\.\/requests-v026'\)/);
@@ -105,8 +105,8 @@ test('0.26 Vercel root hardening remains while current patch advances', () => {
   const vercel = JSON.parse(read('vercel.json'));
   assert.equal(Object.hasOwn(vercel, 'installCommand'), false);
   assert.ok(vercel.rewrites.some((item) => item.source === '/' && item.destination === '/index.html'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v032.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v032.css'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v033.js'));
+  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v033.css'));
   const headerMap = new Map(vercel.headers.map((item) => [item.source, item.headers]));
   assert.ok(headerMap.has('/'));
   assert.ok(headerMap.has('/patch-v025.js'));
