@@ -3,7 +3,7 @@
   const VERSION = '0.33.1';
   const V026 = '/patch-v026.js?v=0321';
   const V033 = '/patch-v033.js?v=0333';
-  const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf1';
+  const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
 
   let releaseApiGate;
   let gateReleased = false;

@@ -5,7 +5,6 @@
 
   const VERSION = '0.33.1';
   const PRINT_DIALOG_ID = 'v0331A4PrintDialog';
-  const PRINT_LAYER_ID = 'v0331A4PrintLayer';
   let currentPrintDataUrl = '';
 
   function managerScheduleView() {
@@ -24,26 +23,18 @@
       #${PRINT_DIALOG_ID} .v0331-print-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; margin-bottom:14px; }
       #${PRINT_DIALOG_ID} .v0331-print-head h3 { margin:2px 0 4px; font-size:1.25rem; }
       #${PRINT_DIALOG_ID} .v0331-print-head p { margin:0; color:#6d7185; }
-      #${PRINT_DIALOG_ID} .v0331-a4-preview-shell { background:#eef0f7; border-radius:18px; padding:14px; overflow:auto; }
+      #${PRINT_DIALOG_ID} .v0331-a4-preview-shell { background:#eef0f7; border-radius:18px; padding:10px; overflow:auto; }
       #${PRINT_DIALOG_ID} .v0331-a4-preview { width:100%; aspect-ratio:297 / 210; background:#fff; box-shadow:0 6px 24px rgba(31,35,58,.12); display:flex; align-items:center; justify-content:center; overflow:hidden; }
       #${PRINT_DIALOG_ID} .v0331-a4-preview img { display:block; width:100%; height:100%; object-fit:contain; }
       #${PRINT_DIALOG_ID} .v0331-print-note { margin:12px 2px 0; color:#676b7e; font-size:.92rem; }
       #${PRINT_DIALOG_ID} .v0331-print-actions { display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap; margin-top:16px; }
       #${PRINT_DIALOG_ID} .v0331-print-actions button { min-height:44px; }
-      #${PRINT_LAYER_ID} { display:none; }
       @media (max-width:700px) {
         #${PRINT_DIALOG_ID} { width:calc(100vw - 12px); }
         #${PRINT_DIALOG_ID} .v0331-print-card { border-radius:18px; padding:12px; }
-        #${PRINT_DIALOG_ID} .v0331-a4-preview-shell { padding:8px; border-radius:12px; }
+        #${PRINT_DIALOG_ID} .v0331-a4-preview-shell { padding:6px; border-radius:12px; }
         #${PRINT_DIALOG_ID} .v0331-print-actions { display:grid; grid-template-columns:1fr 1fr; }
         #${PRINT_DIALOG_ID} .v0331-print-actions .v0331-print-primary { grid-column:1 / -1; }
-      }
-      @page { size:A4 landscape; margin:6mm; }
-      @media print {
-        html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
-        body > *:not(#${PRINT_LAYER_ID}) { display:none !important; }
-        #${PRINT_LAYER_ID} { display:flex !important; position:fixed !important; inset:0 !important; width:100% !important; height:100% !important; align-items:center !important; justify-content:center !important; background:#fff !important; overflow:hidden !important; }
-        #${PRINT_LAYER_ID} img { display:block !important; width:100% !important; height:100% !important; object-fit:contain !important; }
       }
     `;
     document.head.append(style);
@@ -58,36 +49,152 @@
     field.setAttribute('aria-hidden', 'true');
   }
 
+  function cropCanvasToContent(sourceCanvas) {
+    if (!sourceCanvas?.width || !sourceCanvas?.height) return sourceCanvas;
+
+    const maxProbeWidth = 1200;
+    const maxProbeHeight = 850;
+    const probeScale = Math.min(1, maxProbeWidth / sourceCanvas.width, maxProbeHeight / sourceCanvas.height);
+    const probe = document.createElement('canvas');
+    probe.width = Math.max(1, Math.round(sourceCanvas.width * probeScale));
+    probe.height = Math.max(1, Math.round(sourceCanvas.height * probeScale));
+    const probeCtx = probe.getContext('2d', { willReadFrequently:true });
+    probeCtx.fillStyle = '#ffffff';
+    probeCtx.fillRect(0, 0, probe.width, probe.height);
+    probeCtx.drawImage(sourceCanvas, 0, 0, probe.width, probe.height);
+
+    let image;
+    try { image = probeCtx.getImageData(0, 0, probe.width, probe.height); }
+    catch { return sourceCanvas; }
+
+    const data = image.data;
+    let minX = probe.width;
+    let minY = probe.height;
+    let maxX = -1;
+    let maxY = -1;
+
+    for (let y = 0; y < probe.height; y += 1) {
+      for (let x = 0; x < probe.width; x += 1) {
+        const offset = (y * probe.width + x) * 4;
+        const alpha = data[offset + 3];
+        if (alpha < 20) continue;
+        const r = data[offset];
+        const g = data[offset + 1];
+        const b = data[offset + 2];
+        if (r > 247 && g > 247 && b > 247) continue;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    if (maxX < minX || maxY < minY) return sourceCanvas;
+
+    const sourcePerProbe = 1 / probeScale;
+    const safety = Math.max(16, Math.round(14 * sourcePerProbe));
+    const sx = Math.max(0, Math.floor(minX * sourcePerProbe) - safety);
+    const sy = Math.max(0, Math.floor(minY * sourcePerProbe) - safety);
+    const ex = Math.min(sourceCanvas.width, Math.ceil((maxX + 1) * sourcePerProbe) + safety);
+    const ey = Math.min(sourceCanvas.height, Math.ceil((maxY + 1) * sourcePerProbe) + safety);
+    const sw = Math.max(1, ex - sx);
+    const sh = Math.max(1, ey - sy);
+
+    const cropped = document.createElement('canvas');
+    cropped.width = sw;
+    cropped.height = sh;
+    const ctx = cropped.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, sw, sh);
+    ctx.drawImage(sourceCanvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    return cropped;
+  }
+
   function composeA4Canvas(sourceCanvas) {
     if (!sourceCanvas?.width || !sourceCanvas?.height) throw new Error('לא ניתן להכין את תצוגת השבוע להדפסה');
+
+    const cropped = cropCanvasToContent(sourceCanvas);
     const page = document.createElement('canvas');
-    page.width = 2480;
-    page.height = 1754;
+    page.width = 3508;
+    page.height = 2480;
     const ctx = page.getContext('2d');
-    const padding = 54;
+    const paddingX = 28;
+    const paddingY = 24;
+
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, page.width, page.height);
-    const scale = Math.min((page.width - padding * 2) / sourceCanvas.width, (page.height - padding * 2) / sourceCanvas.height);
-    const width = Math.max(1, Math.round(sourceCanvas.width * scale));
-    const height = Math.max(1, Math.round(sourceCanvas.height * scale));
+
+    const scale = Math.min(
+      (page.width - paddingX * 2) / cropped.width,
+      (page.height - paddingY * 2) / cropped.height,
+    );
+    const width = Math.max(1, Math.round(cropped.width * scale));
+    const height = Math.max(1, Math.round(cropped.height * scale));
     const x = Math.round((page.width - width) / 2);
     const y = Math.round((page.height - height) / 2);
+
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(sourceCanvas, x, y, width, height);
+    ctx.drawImage(cropped, x, y, width, height);
     return page;
   }
 
-  function ensurePrintLayer() {
-    let layer = document.querySelector('#' + PRINT_LAYER_ID);
-    if (!layer) {
-      layer = document.createElement('div');
-      layer.id = PRINT_LAYER_ID;
-      layer.setAttribute('aria-hidden', 'true');
-      layer.innerHTML = '<img alt="שיבוץ שבועי להדפסה">';
-      document.body.append(layer);
-    }
-    return layer;
+  function printInIsolatedFrame(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const iframe = document.createElement('iframe');
+      iframe.setAttribute('aria-hidden', 'true');
+      iframe.tabIndex = -1;
+      iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:297mm;height:210mm;border:0;opacity:0;pointer-events:none;';
+      document.body.append(iframe);
+
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        try { iframe.remove(); } catch {}
+        resolve();
+      };
+
+      try {
+        const doc = iframe.contentDocument;
+        doc.open();
+        doc.write(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>שיבוץ שבועי</title><style>
+          @page { size:A4 landscape; margin:0; }
+          html,body { width:297mm; height:210mm; margin:0; padding:0; overflow:hidden; background:#fff; }
+          * { box-sizing:border-box; }
+          .sheet { width:297mm; height:210mm; margin:0; padding:0; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; break-after:avoid-page; page-break-after:avoid; }
+          .sheet img { display:block; width:297mm; height:210mm; max-width:297mm; max-height:210mm; margin:0; padding:0; object-fit:contain; break-inside:avoid-page; page-break-inside:avoid; }
+        </style></head><body><main class="sheet"><img id="printImage" alt="שיבוץ שבועי"></main></body></html>`);
+        doc.close();
+
+        const image = doc.querySelector('#printImage');
+        const runPrint = () => {
+          try {
+            const printWindow = iframe.contentWindow;
+            printWindow.addEventListener('afterprint', cleanup, { once:true });
+            printWindow.focus();
+            setTimeout(() => {
+              try { printWindow.print(); }
+              catch (error) { reject(error); try { iframe.remove(); } catch {} }
+            }, 80);
+            setTimeout(cleanup, 90000);
+          } catch (error) {
+            try { iframe.remove(); } catch {}
+            reject(error);
+          }
+        };
+        image.addEventListener('load', runPrint, { once:true });
+        image.addEventListener('error', () => {
+          try { iframe.remove(); } catch {}
+          reject(new Error('טעינת עמוד ההדפסה נכשלה'));
+        }, { once:true });
+        image.src = dataUrl;
+        if (image.complete && image.naturalWidth) setTimeout(runPrint, 0);
+      } catch (error) {
+        try { iframe.remove(); } catch {}
+        reject(error);
+      }
+    });
   }
 
   function ensurePrintDialog() {
@@ -99,11 +206,11 @@
     dialog.innerHTML = `
       <section class="v0331-print-card">
         <div class="v0331-print-head">
-          <div><small class="eyebrow">שיבוץ שבועי</small><h3>הדפסה A4 לרוחב</h3><p>תצוגת השבוע כעמוד אחד, מותאם להדפסה.</p></div>
+          <div><small class="eyebrow">שיבוץ שבועי</small><h3>הדפסה A4 לרוחב</h3><p>עמוד אחד בלבד, עם שטח הדפסה גדול וקריא יותר.</p></div>
           <button type="button" class="icon-btn" data-v0331-print-close aria-label="סגירה">×</button>
         </div>
         <div class="v0331-a4-preview-shell"><div class="v0331-a4-preview"><img data-v0331-print-preview alt="תצוגה מקדימה של השיבוץ השבועי"></div></div>
-        <p class="v0331-print-note">ההדפסה נשארת בתוך המערכת ולא מעבירה אותך לעמוד אחר. מומלץ לבחור במדפסת “לרוחב” אם הדפדפן אינו בוחר זאת אוטומטית.</p>
+        <p class="v0331-print-note">המערכת מכינה מסמך A4 לרוחב בעמוד יחיד. שוליים פנימיים צומצמו כדי להגדיל את הטבלה והכיתוב.</p>
         <div class="v0331-print-actions">
           <button type="button" class="ghost-btn" data-v0331-print-close>סגירה</button>
           <button type="button" class="secondary-btn" data-v0331-print-save>שמירת תמונה</button>
@@ -112,12 +219,17 @@
       </section>`;
     document.body.append(dialog);
     dialog.querySelectorAll('[data-v0331-print-close]').forEach((button) => button.addEventListener('click', () => dialog.close()));
-    dialog.querySelector('[data-v0331-print-now]')?.addEventListener('click', () => {
+    dialog.querySelector('[data-v0331-print-now]')?.addEventListener('click', async (event) => {
       if (!currentPrintDataUrl) return showToast('אין תצוגה מוכנה להדפסה', 'error');
-      const layer = ensurePrintLayer();
-      layer.querySelector('img').src = currentPrintDataUrl;
-      try { window.print(); }
-      catch { showToast('הדפדפן לא הצליח לפתוח את חלון ההדפסה. אפשר לשמור את התמונה ולהדפיס אותה.', 'error'); }
+      const button = event.currentTarget;
+      if (typeof setBusy === 'function') setBusy(button, true, 'פותח הדפסה…');
+      try {
+        await printInIsolatedFrame(currentPrintDataUrl);
+      } catch {
+        showToast('Safari לא הצליח לפתוח את ההדפסה. אפשר לשמור את התמונה ולהדפיס אותה.', 'error');
+      } finally {
+        if (typeof setBusy === 'function') setBusy(button, false);
+      }
     });
     dialog.querySelector('[data-v0331-print-save]')?.addEventListener('click', () => {
       if (!currentPrintDataUrl) return;
@@ -127,7 +239,7 @@
       document.body.append(link);
       link.click();
       link.remove();
-      showToast('תמונת השיבוץ מוכנה לשמירה', 'success');
+      showToast('תמונת A4 של השיבוץ מוכנה לשמירה', 'success');
     });
     dialog.addEventListener('cancel', (event) => {
       event.preventDefault();
@@ -162,7 +274,7 @@
     const clone = button.cloneNode(true);
     clone.dataset.v0331A4Print = 'true';
     clone.textContent = '🖨️ הדפסה A4';
-    clone.title = 'תצוגה מקדימה והדפסת השיבוץ השבועי בעמוד A4 לרוחב';
+    clone.title = 'תצוגה מקדימה והדפסת השיבוץ השבועי בעמוד A4 אחד לרוחב';
     button.replaceWith(clone);
     clone.addEventListener('click', openA4PrintPreview);
     return clone;
@@ -179,7 +291,7 @@
     injectStyles();
     hideRedundantDaySelector();
     installPrintButton();
-    document.documentElement.dataset.hadasHotfix = VERSION + '-a4';
+    document.documentElement.dataset.hadasHotfix = VERSION + '-a4-single-page';
   }
 
   function installHooks() {
