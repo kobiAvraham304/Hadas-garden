@@ -3,6 +3,7 @@
   const VERSION = '0.33.1';
   const V026 = '/patch-v026.js?v=0321';
   const V033 = '/patch-v033.js?v=0333';
+  const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf1';
 
   let releaseApiGate;
   let gateReleased = false;
@@ -125,6 +126,7 @@
         const currentReady = await window.__hadasV033BootstrapPromise;
         if (!currentReady) throw new Error('שכבות הממשק לא סיימו להיטען');
       }
+      await loadScript(HOTFIX, 'v0331-hotfix');
       forceVersion();
     } catch (error) {
       console.error('Hadas v0.33.1 bootstrap failed', error);
