@@ -3,7 +3,7 @@
   const VERSION = '0.33.1';
   const V026 = '/patch-v026.js?v=0321';
   const V033 = '/patch-v033.js?v=0333';
-  const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf1';
+  const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
 
   let releaseApiGate;
   let gateReleased = false;
@@ -71,7 +71,7 @@
     guardTourDialog(document.querySelector('#v031TourDialog'));
     const bodyObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        for (const node of mutation.addedNodes || []) {
+        for (const node of mutations.addedNodes || []) {
           if (!(node instanceof Element)) continue;
           if (node.id === 'v031TourDialog') guardTourDialog(node);
           else guardTourDialog(node.querySelector?.('#v031TourDialog'));
