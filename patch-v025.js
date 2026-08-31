@@ -71,7 +71,7 @@
     guardTourDialog(document.querySelector('#v031TourDialog'));
     const bodyObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        for (const node of mutations.addedNodes || []) {
+        for (const node of mutation.addedNodes || []) {
           if (!(node instanceof Element)) continue;
           if (node.id === 'v031TourDialog') guardTourDialog(node);
           else guardTourDialog(node.querySelector?.('#v031TourDialog'));
