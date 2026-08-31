@@ -141,6 +141,13 @@
   line-height:1.45;
 }
 
+.v033-password-group {
+  display:grid;
+  gap:7px;
+  color:#445149;
+  font-weight:800;
+  font-size:.9rem;
+}
 .v033-password-field {
   position:relative;
   display:block;

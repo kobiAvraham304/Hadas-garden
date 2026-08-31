@@ -10,7 +10,7 @@ test('0.33 release bootstrap is current and preserves the 0.32 compatibility cha
   const entry = read('patch-v025.js');
   const patch = read('patch-v033.js');
   const vercel = JSON.parse(read('vercel.json'));
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0331'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0332'/);
   assert.match(entry, /__hadasV033BootstrapPromise/);
   assert.match(patch, /PREVIOUS = '\/patch-v032\.js\?v=0321'/);
   assert.match(patch, /releaseBootstrap/);
@@ -30,6 +30,8 @@ test('0.33 startup tolerates optional export controls and fixes mobile password 
   assert.match(patch, /input\.type = reveal \? 'text' : 'password'/);
   assert.match(patch, /__hadasV033PasswordRevealInstalled/);
   assert.match(patch, /button\.closest\('\.v033-password-field'\)/);
+  assert.match(read('index.html'), /id="loginPassword"[\s\S]*v033-password-toggle/);
+  assert.match(read('index.html'), /class="v033-password-group"/);
   assert.match(patch, /__hadasV032VersionObservers/);
   assert.match(patch, /window\.__hadasV033VersionObservers = observers/);
 });

@@ -29,11 +29,11 @@
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=0331" />
-  <link rel="stylesheet" href="/patch-v025.css?v=0331" />
+  <link rel="stylesheet" href="/styles.css?v=0332" />
+  <link rel="stylesheet" href="/patch-v025.css?v=0332" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0331" defer></script>
-  <script src="/patch-v025.js?v=0331" defer></script>
+  <script src="/app.js?v=0332" defer></script>
+  <script src="/patch-v025.js?v=0332" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -50,7 +50,10 @@
       <p class="muted">כניסה לצוות החינוכי והפרא־רפואי</p>
       <form id="loginForm" class="stack-form">
         <label>מספר טלפון<input name="phone" type="tel" inputmode="tel" autocomplete="username" placeholder="05X-XXXXXXX" required /></label>
-        <label>סיסמה<input name="password" type="password" autocomplete="current-password" required /></label>
+        <div class="v033-password-group">
+          <label for="loginPassword">סיסמה</label>
+          <span class="v033-password-field"><input id="loginPassword" name="password" type="password" autocomplete="current-password" required /><button type="button" class="v033-password-toggle" aria-label="הצגת הסיסמה">◉</button></span>
+        </div>
         <button class="primary-btn wide-btn" type="submit">כניסה למערכת</button>
       </form>
       <p class="small-note">בכניסה הראשונה הסיסמה היא <strong>hadas</strong>.</p>
@@ -65,8 +68,14 @@
       <div class="brand-mark app-logo"><img src="/favicon.svg" alt="" /><span>הדס</span></div><h1>בחירת סיסמה אישית</h1>
       <p class="muted">יש לבחור סיסמה חדשה באורך 8 תווים לפחות.</p>
       <form id="passwordForm" class="stack-form">
-        <label>סיסמה חדשה<input name="password" type="password" minlength="8" autocomplete="new-password" required /></label>
-        <label>אימות סיסמה<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required /></label>
+        <div class="v033-password-group">
+          <label for="newPassword">סיסמה חדשה</label>
+          <span class="v033-password-field"><input id="newPassword" name="password" type="password" minlength="8" autocomplete="new-password" required /><button type="button" class="v033-password-toggle" aria-label="הצגת הסיסמה">◉</button></span>
+        </div>
+        <div class="v033-password-group">
+          <label for="confirmPassword">אימות סיסמה</label>
+          <span class="v033-password-field"><input id="confirmPassword" name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required /><button type="button" class="v033-password-toggle" aria-label="הצגת הסיסמה">◉</button></span>
+        </div>
         <button class="primary-btn wide-btn" type="submit">שמירת הסיסמה</button>
       </form>
     </section>
