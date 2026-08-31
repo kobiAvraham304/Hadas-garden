@@ -2,7 +2,7 @@
 (() => {
   const VERSION = '0.33.0';
   const V026 = '/patch-v026.js?v=0321';
-  const V033 = '/patch-v033.js?v=0330';
+  const V033 = '/patch-v033.js?v=0331';
 
   let releaseApiGate;
   let gateReleased = false;
