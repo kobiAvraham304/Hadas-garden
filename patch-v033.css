@@ -1,5 +1,39 @@
-/* מערכת ניהול שיבוצים מעון הדס — עיצוב 0.33.0 */
+/* מערכת ניהול שיבוצים מעון הדס — עיצוב 0.33.1 */
 @import url('/patch-v032.css?v=0321');
+
+/* הרשאה יציבה גם מול שכבות CSS ישנות שמכריחות display עם !important. */
+html[data-hadas-role="regular"] #scheduleMode,
+html[data-hadas-role="regular"] #scheduleDayField,
+html[data-hadas-role="regular"] #v028ScheduleEmployeeSearch,
+html[data-hadas-role="regular"] #publishScheduleBtn,
+html[data-hadas-role="regular"] #schedulePublicationState,
+html[data-hadas-role="regular"] #scheduleIssuesToggle,
+html[data-hadas-role="regular"] #scheduleAbsences,
+html[data-hadas-role="regular"] .schedule-command-bar,
+html[data-hadas-role="regular"] .schedule-tools-menu,
+html[data-hadas-role="regular"] #printBtn,
+html[data-hadas-role="regular"] #imageBtn,
+html[data-hadas-role="regular"] #monthImageBtn,
+html[data-hadas-role="regular"] #v031PrintBtn,
+html[data-hadas-role="regular"] #v027AbsencePdfBtn,
+html[data-hadas-role="lead"] #publishScheduleBtn,
+html[data-hadas-role="lead"] #schedulePublicationState,
+html[data-hadas-role="lead"] #scheduleAbsences,
+html[data-hadas-role="teacher"] #publishScheduleBtn,
+html[data-hadas-role="full"] #publishScheduleBtn {
+  display:none !important;
+}
+
+html[data-hadas-can-create="false"] .announcement-card .audience-label {
+  display:none !important;
+}
+html[data-hadas-can-create="true"] .announcement-card .audience-label {
+  width:max-content;
+  max-width:100%;
+  padding:3px 8px;
+  font-size:.68rem;
+  line-height:1.25;
+}
 
 #appVersionBadge,
 #loginVersion {
@@ -19,19 +53,70 @@
 }
 
 .v033-personal-schedule-wrap {
-  overflow-x:auto;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
   padding-bottom:8px;
-  scrollbar-gutter:stable;
+}
+.v033-week-scroll-shell {
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
+  border:1px solid #e2e3ee;
+  border-radius:19px;
+  background:#fafaff;
+}
+.v033-week-swipe-hint {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-height:42px;
+  padding:6px 10px;
+  color:#686b83;
+  background:#f1f1ff;
+  border-bottom:1px solid #e0e1f0;
+  font-size:.7rem;
+  font-weight:850;
+}
+.v033-week-scroll-actions {
+  display:flex;
+  direction:ltr;
+  gap:5px;
+}
+.v033-week-scroll-actions button {
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  min-height:30px;
+  padding:0;
+  border:1px solid #d8d9eb;
+  border-radius:9px;
+  background:#fff;
+  color:#5559bd;
+  font-size:1.05rem;
 }
 .v033-personal-week {
   display:grid;
-  grid-template-columns:repeat(6,minmax(178px,1fr));
+  grid-template-columns:repeat(6,minmax(142px,1fr));
   gap:10px;
-  min-width:1120px;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scroll-snap-type:x mandatory;
+  scrollbar-width:thin;
+  scrollbar-color:#8f91dc #eeeff8;
+  touch-action:pan-x pan-y;
+  padding:9px;
 }
 .v033-personal-week.compact {
-  min-width:960px;
-  grid-template-columns:repeat(6,minmax(150px,1fr));
+  min-width:0;
+  grid-template-columns:repeat(6,minmax(132px,1fr));
 }
 .v033-personal-day {
   min-width:0;
@@ -40,6 +125,7 @@
   border-radius:18px;
   background:#fff;
   box-shadow:0 7px 20px rgba(56,58,100,.05);
+  scroll-snap-align:center;
 }
 .v033-personal-day > header {
   display:flex;
@@ -88,6 +174,21 @@
 .v033-dashboard-week .v033-personal-week {
   overflow-x:auto;
   padding-bottom:8px;
+}
+
+.v033-schedule-ack-dialog .modal-card {
+  width:min(650px,calc(100vw - 24px));
+}
+.v033-schedule-ack-list {
+  display:grid;
+  gap:8px;
+  max-height:min(58vh,540px);
+  overflow:auto;
+  padding:2px;
+}
+.v033-schedule-ack-list .tracking-row small {
+  display:block;
+  margin-top:3px;
 }
 
 .calendar-event.meeting { border-right-color:#6670df; background:#f0f1ff; }
@@ -176,22 +277,50 @@
 }
 
 .v033-tour-dialog {
+  position:fixed;
+  inset:auto 12px max(14px,env(safe-area-inset-bottom));
+  z-index:10002;
   width:min(520px,calc(100% - 24px));
+  max-height:min(48dvh,430px);
+  margin:0 auto;
   padding:0;
   border:0;
-  border-radius:26px;
-  overflow:visible;
-  box-shadow:0 28px 80px rgba(39,41,82,.28);
+  border-radius:22px;
+  overflow:auto;
+  box-shadow:0 18px 55px rgba(39,41,82,.22);
+}
+.v033-tour-dialog.place-top {
+  inset:max(12px,env(safe-area-inset-top)) 12px auto;
 }
 .v033-tour-dialog::backdrop {
-  background:rgba(31,33,61,.55);
-  backdrop-filter:blur(4px);
+  background:transparent;
+  backdrop-filter:none;
 }
 .v033-tour-card {
   position:relative;
-  padding:24px;
-  border-radius:26px;
+  padding:19px;
+  border:2px solid #797bdf;
+  border-radius:22px;
   background:#fff;
+}
+.v033-tour-active {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  margin:0 0 10px;
+  padding:4px 8px;
+  border-radius:999px;
+  color:#5054b5;
+  background:#efefff;
+  font-size:.68rem;
+  font-weight:900;
+}
+.v033-tour-active i {
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#696cda;
+  box-shadow:0 0 0 4px rgba(105,108,218,.14);
 }
 .v033-tour-close {
   position:absolute;
@@ -267,11 +396,56 @@
 }
 .v033-tour-focus {
   position:relative;
-  z-index:30 !important;
-  outline:4px solid rgba(111,114,217,.7) !important;
-  outline-offset:4px;
+  outline:4px solid rgba(111,114,217,.85) !important;
+  outline-offset:5px;
   border-radius:18px;
   box-shadow:0 0 0 9px rgba(111,114,217,.13) !important;
+}
+.v033-tour-spotlight {
+  position:fixed;
+  z-index:10001;
+  pointer-events:none;
+  border:4px solid #6f72d9;
+  border-radius:22px;
+  box-shadow:0 0 0 9999px rgba(38,40,76,.12),0 0 0 8px rgba(111,114,217,.18),0 10px 30px rgba(39,41,82,.18);
+  transition:top .22s ease,left .22s ease,width .22s ease,height .22s ease;
+  animation:v033-tour-pulse 1.7s ease-in-out infinite;
+}
+.v033-tour-spotlight.is-round {
+  border-radius:999px;
+}
+.v033-tour-spotlight > span {
+  position:absolute;
+  top:-18px;
+  right:12px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#6f72d9;
+  color:#fff;
+  font-size:.65rem;
+  font-weight:950;
+}
+.v033-tour-spotlight .arrow {
+  position:absolute;
+  display:grid;
+  place-items:center;
+  width:27px;
+  height:27px;
+  border-radius:50%;
+  background:#fff;
+  color:#575ac1;
+  box-shadow:0 4px 13px rgba(40,42,88,.22);
+  font-size:1rem;
+  font-style:normal;
+  font-weight:950;
+}
+.v033-tour-spotlight .arrow.top { top:-35px; left:calc(50% - 13px); }
+.v033-tour-spotlight .arrow.right { right:-35px; top:calc(50% - 13px); }
+.v033-tour-spotlight .arrow.bottom { bottom:-35px; left:calc(50% - 13px); }
+.v033-tour-spotlight .arrow.left { left:-35px; top:calc(50% - 13px); }
+@keyframes v033-tour-pulse {
+  0%,100% { border-color:#6f72d9; }
+  50% { border-color:#aa75dd; }
 }
 .v033-tour-reset {
   flex:1 1 190px;
@@ -289,9 +463,19 @@
   }
   .v033-personal-week,
   .v033-personal-week.compact {
-    grid-template-columns:repeat(6,minmax(156px,1fr));
-    min-width:996px;
+    grid-template-columns:repeat(6,minmax(132px,1fr));
+    width:100%;
+    min-width:0;
+    max-width:100%;
     gap:8px;
+  }
+  .v033-personal-week {
+    padding:7px;
+  }
+  .v033-week-swipe-hint {
+    position:sticky;
+    right:0;
+    font-size:.64rem;
   }
   .announcement-grid {
     grid-template-columns:1fr;
@@ -307,7 +491,7 @@
     grid-template-columns:auto minmax(0,1fr);
   }
   .v033-tour-card {
-    padding:20px 16px 16px;
+    padding:14px 13px 13px;
   }
   .v033-tour-heading {
     padding-left:32px;
@@ -317,13 +501,182 @@
     height:50px;
   }
   .v033-tour-actions {
-    grid-template-columns:1fr;
+    grid-template-columns:1fr 1fr;
   }
-  .v033-tour-actions .primary-btn {
-    grid-row:1;
+  .v033-tour-card > p {
+    margin:10px 0;
+    line-height:1.5;
+    font-size:.82rem;
+  }
+  .v033-tour-heading > span {
+    width:42px;
+    height:42px;
+    border-radius:14px;
+    font-size:1.2rem;
+  }
+  .v033-tour-heading h3 {
+    font-size:1.05rem;
+  }
+  .v033-tour-dots {
+    margin:6px 0 10px;
   }
   .calendar-type-grid {
     grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  #calendarGrid.v033-calendar-list-shell {
+    overflow:visible !important;
+    border:0;
+    border-radius:0;
+    box-shadow:none;
+    background:transparent;
+  }
+  .v033-calendar-mobile-list {
+    display:grid;
+    gap:10px;
+  }
+  .v033-calendar-date-group {
+    overflow:hidden;
+    border:1px solid #e1e2ed;
+    border-radius:17px;
+    background:#fff;
+    box-shadow:0 6px 18px rgba(50,52,91,.05);
+  }
+  .v033-calendar-date-group > header {
+    display:grid;
+    grid-template-columns:38px minmax(0,1fr) 34px;
+    align-items:center;
+    gap:8px;
+    min-height:54px;
+    padding:7px 9px;
+    background:#f4f4ff;
+    border-bottom:1px solid #e6e6f2;
+  }
+  .v033-calendar-date-group > header > span {
+    display:grid;
+    place-items:center;
+    width:36px;
+    height:36px;
+    border-radius:12px;
+    color:#fff;
+    background:#6f72d9;
+    font-size:1rem;
+    font-weight:950;
+  }
+  .v033-calendar-date-group > header strong,
+  .v033-calendar-date-group > header small {
+    display:block;
+  }
+  .v033-calendar-date-group > header small {
+    margin-top:1px;
+    color:#777a90;
+    font-size:.68rem;
+  }
+  .v033-calendar-date-group > header button {
+    width:32px;
+    height:32px;
+    min-height:32px;
+    padding:0;
+    border:1px solid #d9daeb;
+    border-radius:10px;
+    background:#fff;
+    color:#595dc2;
+    font-size:1.05rem;
+  }
+  .v033-calendar-date-group > div {
+    display:grid;
+    gap:6px;
+    padding:7px;
+  }
+  .v033-mobile-calendar-event {
+    display:grid !important;
+    grid-template-columns:38px minmax(0,1fr) 16px !important;
+    align-items:center;
+    gap:8px;
+    width:100%;
+    min-height:58px;
+    padding:7px 9px !important;
+    border:1px solid #dfe1ec !important;
+    border-right:5px solid #748096 !important;
+    border-radius:13px !important;
+    color:#404256 !important;
+    background:#f7f8fa !important;
+    text-align:right;
+  }
+  .v033-mobile-calendar-event .v033-event-icon {
+    display:grid;
+    place-items:center;
+    width:36px;
+    height:36px;
+    border-radius:11px;
+    background:rgba(255,255,255,.8);
+    font-size:1.05rem;
+  }
+  .v033-mobile-calendar-event strong,
+  .v033-mobile-calendar-event small {
+    display:block;
+    max-width:100%;
+    white-space:normal;
+    overflow-wrap:anywhere;
+  }
+  .v033-mobile-calendar-event strong {
+    font-size:.82rem;
+    line-height:1.35;
+  }
+  .v033-mobile-calendar-event small {
+    margin-top:3px;
+    color:#696c80;
+    font-size:.65rem;
+  }
+  .v033-mobile-calendar-event.meeting { border-right-color:#6670df !important; background:#f0f1ff !important; }
+  .v033-mobile-calendar-event.training { border-right-color:#9a67d7 !important; background:#f7efff !important; }
+  .v033-mobile-calendar-event.holiday { border-right-color:#dfa527 !important; background:#fff8df !important; }
+  .v033-mobile-calendar-event.birthday { border-right-color:#e66f83 !important; background:#fff0f3 !important; }
+  .v033-mobile-calendar-event.activity { border-right-color:#3ba987 !important; background:#eafaf4 !important; }
+  .v033-mobile-calendar-event.approved_leave { border-right-color:#d45a64 !important; background:#fff0f0 !important; }
+  .v033-calendar-empty {
+    display:grid;
+    place-items:center;
+    gap:5px;
+    min-height:180px;
+    padding:20px;
+    border:1px dashed #d8d9e7;
+    border-radius:18px;
+    background:#fff;
+    text-align:center;
+  }
+  .v033-calendar-empty > span { font-size:1.8rem; color:#686bce; }
+  .v033-calendar-empty small { color:#777a90; }
+
+  #leaveDayOffField .compact-radio-row {
+    grid-template-columns:1fr !important;
+  }
+  #leaveDayOffField .compact-radio-row label {
+    display:grid !important;
+    grid-template-columns:24px minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:9px !important;
+    min-height:54px !important;
+    padding:9px 11px !important;
+    text-align:right !important;
+  }
+  #leaveDayOffField .compact-radio-row input[type="radio"] {
+    appearance:auto !important;
+    display:block !important;
+    width:21px !important;
+    min-width:21px !important;
+    max-width:21px !important;
+    height:21px !important;
+    min-height:21px !important;
+    max-height:21px !important;
+    margin:0 !important;
+    padding:0 !important;
+    accent-color:#6f72d9;
+  }
+  #leaveDayOffField .compact-radio-row label > span {
+    min-width:0;
+    font-size:.78rem;
+    line-height:1.35;
   }
 }
 
