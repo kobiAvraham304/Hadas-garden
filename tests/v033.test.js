@@ -28,6 +28,8 @@ test('0.33 startup tolerates optional export controls and fixes mobile password 
   assert.match(css, /#appVersionBadge::after[\s\S]*content:none !important/);
   assert.match(patch, /v033-password-toggle/);
   assert.match(patch, /input\.type = reveal \? 'text' : 'password'/);
+  assert.match(patch, /__hadasV033PasswordRevealInstalled/);
+  assert.match(patch, /button\.closest\('\.v033-password-field'\)/);
   assert.match(patch, /__hadasV032VersionObservers/);
   assert.match(patch, /window\.__hadasV033VersionObservers = observers/);
 });
