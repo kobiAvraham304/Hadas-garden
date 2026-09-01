@@ -1,7 +1,7 @@
 /* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.34.0 */
 (() => {
   const VERSION='0.34.0';
-  const chain=[['/patch-v026.js?v=0321','v026'],['/patch-v033.js?v=0333','v033'],['/patch-v0331-hotfix.js?v=0331hf2','v0331-hotfix'],['/patch-v034.js?v=0340','v034'],['/patch-v0341.js?v=0341a','v0341'],['/patch-v0342.js?v=0342a','v0342'],['/patch-v0343.js?v=0344b','v0343']];
+  const chain=[['/patch-v026.js?v=0321','v026'],['/patch-v033.js?v=0333','v033'],['/patch-v0331-hotfix.js?v=0331hf2','v0331-hotfix'],['/patch-v034.js?v=0340','v034'],['/patch-v0341.js?v=0341a','v0341'],['/patch-v0342.js?v=0342a','v0342'],['/patch-v0343.js?v=0344b','v0343'],['/patch-v0344.js?v=0344a','v0344']];
   let releaseGate;let released=false;const ready=new Promise(r=>releaseGate=r);const base=typeof apiFetch==='function'?apiFetch:null;
   function forceVersion(){window.__HADAS_RELEASE_VERSION=VERSION;const b=document.querySelector('#appVersionBadge');if(b){b.textContent=`v${VERSION}`;b.title=`גרסת מערכת ${VERSION}`;}const l=document.querySelector('#loginVersion');if(l)l.textContent=`גרסה ${VERSION}`;document.documentElement.dataset.hadasVersion=VERSION;}
   function release(){if(released)return;released=true;window.__hadasCurrentBootstrapReady=true;releaseGate();window.dispatchEvent(new CustomEvent('hadas:bootstrap-ready',{detail:{version:VERSION}}));}
