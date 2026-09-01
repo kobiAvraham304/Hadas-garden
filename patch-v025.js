@@ -9,6 +9,7 @@
   const V0342 = '/patch-v0342.js?v=0342a';
   const V0343 = '/patch-v0343.js?v=0344b';
   const V0344 = '/patch-v0344.js?v=0344a';
+  const V0345 = '/patch-v0345.js?v=0345a';
 
   let releaseApiGate;
   let gateReleased = false;
@@ -142,6 +143,7 @@
       }
       await loadScript(V0343, 'v0343');
       await loadScript(V0344, 'v0344');
+      await loadScript(V0345, 'v0345');
       forceVersion();
     } catch (error) {
       console.error('Hadas v0.34.0 bootstrap failed', error);
