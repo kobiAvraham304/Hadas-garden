@@ -7,10 +7,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const { validateWeek } = require('../lib/schedule');
 
 test('0.28 metadata, health and request wrapper remain aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.33.1');
-  assert.match(read('VERSION.md'), /גרסה 0\.33\.1/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.33\.0'/);
-  assert.match(read('health.js'), /update-v0\.32\.0\.sql/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.34.0');
+  assert.match(read('VERSION.md'), /גרסה 0.34.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0.34.0'/);
+  assert.match(read('health.js'), /update-v0.34.0\.sql/);
   assert.match(read('api/index.js'), /'requests': require\('\.\.\/lib\/requests-v030'\)/);
   assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);
 });
@@ -103,8 +103,7 @@ test('0.28 high-quality A4 implementation remains historical while v0.30 removes
 
 test('0.28 stale 0.25 client URLs are forced to the current no-store patch', () => {
   const vercel = JSON.parse(read('vercel.json'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v033.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v033.css'));
+  assert.ok(!vercel.rewrites.some((item) => item.source === '/patch-v025.js' || item.source === '/patch-v025.css'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
   for (const route of ['/', '/index.html', '/api/config', '/patch-v025.js', '/patch-v031.js']) assert.ok(headers.has(route), route);
   const apiConfig = headers.get('/api/config').map((item) => `${item.key}:${item.value}`).join('|');

@@ -29,11 +29,11 @@
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=0333" />
-  <link rel="stylesheet" href="/patch-v025.css?v=0333" />
+  <link rel="stylesheet" href="/styles.css?v=0340" />
+  <link rel="stylesheet" href="/patch-v025.css?v=0340" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0333" defer></script>
-  <script src="/patch-v025.js?v=0333" defer></script>
+  <script src="/app.js?v=0340" defer></script>
+  <script src="/patch-v025.js?v=0340" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -102,7 +102,7 @@
       <button data-tab="schedule" class="nav-btn mobile-primary"><span class="nav-icon">▦</span><span>שיבוצים</span></button>
       <button data-tab="requests" class="nav-btn mobile-primary"><span class="nav-icon">↔</span><span>בקשות</span></button>
       <button data-tab="announcements" class="nav-btn mobile-primary"><span class="nav-icon">◉</span><span>הודעות</span><span id="announcementBadge" class="nav-badge hidden"></span></button>
-      <button data-tab="daily" class="nav-btn manager-only mobile-secondary"><span class="nav-icon">⚡</span><span>תפעול יומי</span></button>
+      <button data-tab="daily" class="nav-btn daily-operations-only mobile-secondary"><span class="nav-icon">⚡</span><span>תפעול יומי</span></button>
       <button data-tab="attendance" class="nav-btn mobile-secondary"><span class="nav-icon">✓</span><span>נוכחות</span></button>
       <button data-tab="tasks" class="nav-btn mobile-secondary"><span class="nav-icon">☑</span><span>משימות</span><span id="taskBadge" class="nav-badge hidden"></span></button>
       <button data-tab="calendar" class="nav-btn mobile-secondary"><span class="nav-icon">◫</span><span>לוח שנה</span></button>
@@ -173,7 +173,7 @@
         <div id="requestsList" class="request-board"></div>
       </section>
 
-      <section id="dailyPanel" class="panel manager-only">
+      <section id="dailyPanel" class="panel daily-operations-only">
         <div class="section-heading daily-heading"><div><p class="eyebrow">ניהול היום בזמן אמת</p><h2>תפעול יומי</h2><p class="muted">מרכז עבודה לנוכחות, חוסרים, כיסויים והעברות בין כיתות.</p></div><div class="daily-date-navigator"><button id="prevDailyBtn" type="button" class="icon-round-btn" aria-label="יום קודם">‹</button><label class="date-control"><span>תאריך</span><input id="dailyDate" type="date" /></label><button id="nextDailyBtn" type="button" class="icon-round-btn" aria-label="יום הבא">›</button><button id="todayDailyBtn" type="button" class="ghost-btn">היום</button></div></div>
         <div id="dailySummary" class="daily-summary"></div>
         <div class="daily-command-center">
@@ -242,7 +242,7 @@
       <div class="mobile-more-handle"></div>
       <div class="mobile-more-heading"><div><p class="eyebrow">אפשרויות נוספות</p><h3>לאן עוברים?</h3></div><button id="mobileMoreClose" type="button" class="icon-btn" aria-label="סגירה">×</button></div>
       <div class="mobile-more-grid">
-        <button type="button" data-more-tab="daily" class="manager-only"><span>⚡</span><strong>תפעול יומי</strong><small>היעדרויות והחלפות חירום</small></button>
+        <button type="button" data-more-tab="daily" class="daily-operations-only"><span>⚡</span><strong>תפעול יומי</strong><small>היעדרויות והחלפות חירום</small></button>
         <button type="button" data-more-tab="attendance"><span>✓</span><strong>נוכחות</strong><small>עדכון שעות בפועל</small></button>
         <button type="button" data-more-tab="tasks"><span>☑</span><strong>משימות</strong><small>מעקב ביצוע</small></button>
         <button type="button" data-more-tab="calendar"><span>◫</span><strong>לוח שנה</strong><small>אירועים וישיבות</small></button>
@@ -497,7 +497,7 @@
         <label><input type="radio" name="status" value="absent" /><span>×</span><strong>נעדר</strong></label>
         <label><input type="radio" name="status" value="sick" /><span>✚</span><strong>מחלה</strong></label>
       </div>
-      <div class="form-grid"><label>התחלה בפועל<input name="actual_start" type="time" /></label><label>סיום בפועל<input name="actual_end" type="time" /></label><label class="full-field">הערה<input name="note" placeholder="מידע תפעולי קצר" /></label></div>
+      <div class="form-grid"><label>שעת כניסה<input name="actual_start" type="time" /></label><label>שעת יציאה<input name="actual_end" type="time" /></label><label class="full-field"><span class="attendance-note-title">הערה</span><input name="note" placeholder="מידע תפעולי קצר" /></label></div>
       <div class="notice soft-notice">מחלה, היעדרות, איחור או יציאה מוקדמת יוצרים אוטומטית אירוע בתפעול היומי.</div>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת נוכחות ועדכון תפעול</button></div>
     </form>

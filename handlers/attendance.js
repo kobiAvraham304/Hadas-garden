@@ -1,6 +1,6 @@
 const {
   requireSession, parseBody, db, assertDb, emitEvent, audit,
-  send, handleError, httpError,
+  send, handleError, httpError, israelDateISO, canManageDailyOperations,
 } = require('../lib/server');
 const { timeToMinutes } = require('../lib/schedule');
 
@@ -65,13 +65,33 @@ async function syncDailyOperation({ shift, status, actualStart, actualEnd, note,
 
 module.exports = async function handler(req,res) {
   try {
-    if (req.method !== 'POST') return send(res,405,{ ok:false,error:'Method not allowed' });
-    const caller = await requireSession(req,{ manager:true });
+    const caller = await requireSession(req,{ csrf:req.method !== 'GET' });
     const body = parseBody(req);
+    const operationalManager = canManageDailyOperations(caller);
+
+    if (req.method === 'GET') {
+      const date = String(req.query?.date || israelDateISO());
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw httpError(400,'יש לבחור תאריך תקין');
+      if (date > israelDateISO()) throw httpError(400,'לא ניתן לדווח נוכחות על יום עתידי');
+      const [shiftsR,attendanceR] = await Promise.all([
+        db().from('hadas_shifts').select('*').eq('shift_date',date).eq('employee_id',caller.employee.id).order('start_time'),
+        db().from('hadas_attendance').select('*').eq('attendance_date',date).eq('employee_id',caller.employee.id),
+      ]);
+      return send(res,200,{
+        ok:true,
+        date,
+        shifts:assertDb(shiftsR,'לא ניתן לטעון את השיבוץ שלך') || [],
+        attendance:assertDb(attendanceR,'לא ניתן לטעון את דיווח הנוכחות שלך') || [],
+      });
+    }
+
+    if (req.method !== 'POST') return send(res,405,{ ok:false,error:'Method not allowed' });
 
     if (body.action === 'mark_all_present') {
+      if (!operationalManager) throw httpError(403,'אין הרשאה לעדכון נוכחות של עובדים אחרים');
       const date = String(body.date || '');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw httpError(400,'יש לבחור תאריך תקין');
+      if (date > israelDateISO()) throw httpError(400,'לא ניתן לדווח נוכחות על יום עתידי');
       let query = db().from('hadas_shifts').select('*').eq('shift_date', date);
       if (body.class_id) query = query.eq('class_id', body.class_id);
       const shifts = assertDb(await query, 'לא ניתן לטעון את שיבוצי היום') || [];
@@ -95,21 +115,27 @@ module.exports = async function handler(req,res) {
     if (!body.shift_id) throw httpError(400,'חסר שיבוץ');
     const shift = assertDb(await db().from('hadas_shifts').select('*').eq('id',body.shift_id).maybeSingle(),'השיבוץ לא נמצא');
     if (!shift) throw httpError(404,'השיבוץ לא נמצא');
-    const status = ATTENDANCE_STATUSES.has(body.status) ? body.status : 'scheduled';
-    let actualStart = body.actual_start || null;
-    let actualEnd = body.actual_end || null;
+    if (!operationalManager && shift.employee_id !== caller.employee.id) throw httpError(403,'ניתן לדווח נוכחות רק עבור עצמך');
+    if (String(shift.shift_date) > israelDateISO()) throw httpError(400,'לא ניתן לדווח נוכחות על יום עתידי');
+    const status = String(body.status || '');
+    if (!ATTENDANCE_STATUSES.has(status) || ['scheduled','replacement'].includes(status)) throw httpError(400,'מצב הנוכחות אינו תקין');
+    let actualStart = shortTime(body.actual_start) || null;
+    let actualEnd = shortTime(body.actual_end) || null;
+    if (status === 'present') {
+      actualStart = actualStart || shortTime(shift.start_time);
+      actualEnd = actualEnd || shortTime(shift.end_time);
+    }
     if (['absent','sick'].includes(status)) { actualStart=null; actualEnd=null; }
     if (status === 'late' && !actualStart) throw httpError(400,'באיחור יש להזין שעת הגעה בפועל');
     if (status === 'left_early' && !actualEnd) throw httpError(400,'בשחרור מוקדם יש להזין שעת יציאה בפועל');
-    if ((actualStart && !actualEnd) || (!actualStart && actualEnd)) {
-      if (status === 'late') actualEnd = shortTime(shift.end_time);
-      else if (status === 'left_early') actualStart = shortTime(shift.start_time);
-      else throw httpError(400,'יש להזין גם שעת התחלה וגם שעת סיום');
-    }
+    if (status === 'late') actualEnd = shortTime(shift.end_time);
+    if (status === 'left_early') actualStart = shortTime(shift.start_time);
+    if ((actualStart && !actualEnd) || (!actualStart && actualEnd)) throw httpError(400,'יש להזין גם שעת התחלה וגם שעת סיום');
     if (actualStart && timeToMinutes(actualEnd) <= timeToMinutes(actualStart)) throw httpError(400,'שעת הסיום בפועל חייבת להיות לאחר שעת ההתחלה');
     if (status === 'late' && timeToMinutes(actualStart) <= timeToMinutes(shift.start_time)) throw httpError(400,'שעת ההגעה באיחור חייבת להיות לאחר תחילת השיבוץ');
     if (status === 'left_early' && timeToMinutes(actualEnd) >= timeToMinutes(shift.end_time)) throw httpError(400,'שעת השחרור המוקדם חייבת להיות לפני סיום השיבוץ');
     const note = String(body.note || '').trim() || null;
+    if (status === 'absent' && !note) throw httpError(400,'בהיעדרות יש להזין סיבה');
     const row = {
       shift_id:shift.id, employee_id:shift.employee_id, attendance_date:shift.shift_date,
       actual_start:actualStart, actual_end:actualEnd, status, note, updated_by:caller.employee.id,

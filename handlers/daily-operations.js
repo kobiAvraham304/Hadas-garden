@@ -1,6 +1,6 @@
 const {
   requireSession, parseBody, db, assertDb, emitEvent, audit, notifyEmployees,
-  send, handleError, httpError, israelDateISO,
+  send, handleError, httpError, israelDateISO, canManageDailyOperations,
 } = require('../lib/server');
 const { timeToMinutes } = require('../lib/schedule');
 const {
@@ -110,7 +110,8 @@ function validateReport(type, body, shift) {
 
 module.exports = async function handler(req, res) {
   try {
-    const caller = await requireSession(req, { manager: true });
+    const caller = await requireSession(req, { csrf:req.method !== 'GET' });
+    if (!canManageDailyOperations(caller)) throw httpError(403, 'מסך התפעול היומי זמין רק למנהלת המעון, לגננת ולאחראית השיבוצים');
     const body = parseBody(req);
     if (req.method === 'GET') {
       const date = String(req.query?.date || israelDateISO());

@@ -9,10 +9,10 @@ const { truthy } = require('../lib/requests-v030');
 const { syntheticLeaveRequestId } = require('../lib/calendar-v030');
 
 test('0.30 release layers remain available under the current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.33.1');
-  assert.match(read('VERSION.md'), /גרסה 0\.33\.1/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.33\.0'/);
-  assert.match(read('health.js'), /update-v0\.32\.0\.sql/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.34.0');
+  assert.match(read('VERSION.md'), /גרסה 0.34.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0.34.0'/);
+  assert.match(read('health.js'), /update-v0.34.0\.sql/);
   const api = read('api/index.js');
   assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
@@ -95,23 +95,22 @@ test('0.30 calendar deletion and request list deletion both refresh schedule and
   assert.match(patch, /action:'delete_request'/);
 });
 
-test('0.30 runtime stays intact while physical legacy entrypoints advance to v0.33', () => {
+test('0.30 runtime stays intact while physical entrypoints advance to v0.34', () => {
   const entry = read('patch-v025.js');
   const cssEntry = read('patch-v025.css');
   assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
-  assert.match(entry, /const VERSION = '0\.33\.1'/);
+  assert.match(entry, /const VERSION = '0\.34\.0'/);
   assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321'/);
   assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
+  assert.match(entry, /await loadScript\(V034, 'v034'\)/);
   assert.ok(entry.indexOf("await loadScript(V026, 'v026')") < entry.indexOf("await loadScript(V033, 'v033')"));
-  assert.match(cssEntry, /patch-v026\.css\?v=0321/);
-  assert.match(cssEntry, /patch-v033\.css\?v=0333/);
-  assert.ok(cssEntry.indexOf('patch-v026.css') < cssEntry.indexOf('patch-v033.css'));
+  assert.match(cssEntry, /patch-v034\.css\?v=0340/);
 
   const vercel = JSON.parse(read('vercel.json'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));
-  for (const route of ['/patch-v025.js','/patch-v025.css','/patch-v030.js','/patch-v030.css','/patch-v031.js','/patch-v031.css','/patch-v032.js','/patch-v032.css','/patch-v033.js','/patch-v033.css']) assert.ok(headers.has(route), route);
+  for (const route of ['/patch-v025.js','/patch-v025.css','/patch-v030.js','/patch-v030.css','/patch-v031.js','/patch-v031.css','/patch-v032.js','/patch-v032.css','/patch-v033.js','/patch-v033.css','/patch-v034.js','/patch-v034.css']) assert.ok(headers.has(route), route);
 });

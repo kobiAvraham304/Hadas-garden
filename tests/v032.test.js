@@ -5,21 +5,21 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.32.1 layers remain available under the 0.33 release bootstrap', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.33.1');
-  assert.match(read('VERSION.md'), /גרסה 0\.33\.1/);
-  assert.match(read('handlers/health.js'), /schema_version === '0\.33\.0'/);
-  assert.match(read('handlers/health.js'), /databaseVersion:'0\.33\.0'/);
+test('0.32.1 layers remain available under the 0.34 release bootstrap', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.34.0');
+  assert.match(read('VERSION.md'), /גרסה 0.34.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0.34.0'/);
+  assert.match(read('handlers/health.js'), /databaseVersion:'0.34.0'/);
   const api = read('api/index.js');
   assert.match(api, /calendar-v032/);
   assert.match(api, /shifts-v032/);
   const entry = read('patch-v025.js');
-  assert.match(entry, /const VERSION = '0\.33\.1'/);
+  assert.match(entry, /const VERSION = '0\.34\.0'/);
   assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await window\.__hadasV033BootstrapPromise/);
   assert.match(entry, /hadas:bootstrap-ready/);
-  assert.match(read('patch-v025.css'), /patch-v033\.css\?v=0333/);
+  assert.match(read('patch-v025.css'), /patch-v034\.css\?v=0340/);
   const app = read('app.js');
   assert.match(app, /window\.addEventListener\('hadas:bootstrap-ready'/);
   assert.match(app, /if \(startupPromise\) return startupPromise/);
@@ -97,6 +97,5 @@ test('0.32 week arrows and Vercel cache routing are aligned', () => {
   for (const file of ['/patch-v032.js','/patch-v032-core.js','/patch-v032-exports.js','/patch-v032-ux.js','/patch-v032-stability.js','/patch-v032.css']) {
     assert.ok(vercel.headers.some((item) => item.source === file), file);
   }
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v033.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v033.css'));
+  assert.ok(!vercel.rewrites.some((item) => item.source === '/patch-v025.js' || item.source === '/patch-v025.css'));
 });

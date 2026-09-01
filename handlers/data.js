@@ -1,5 +1,5 @@
 const {
-  requireSession, isManager, scheduleScope, canViewFullSchedule, canCreateContent, db, assertDb, displayPhone, israelDateISO, send, handleError,
+  requireSession, isManager, scheduleScope, canViewFullSchedule, canCreateContent, canManageDailyOperations, db, assertDb, displayPhone, israelDateISO, send, handleError,
 } = require('../lib/server');
 const { dateRange, buildScheduleAvailability } = require('../lib/schedule');
 
@@ -72,9 +72,11 @@ module.exports = async function handler(req, res) {
     if (req.method !== 'GET') return send(res, 405, { ok: false, error: 'Method not allowed' });
     const caller = await requireSession(req, { csrf: false });
     const manager = isManager(caller);
+    const operationalManager = canManageDailyOperations(caller);
     const scope = scheduleScope(caller);
     const fullScheduleViewer = scope === 'full';
     const classScheduleViewer = scope === 'class';
+    const dashboardOperationsViewer = operationalManager || fullScheduleViewer || classScheduleViewer;
     const contentCreator = canCreateContent(caller);
     const weekStart = getSunday(String(req.query?.week_start || israelDateISO()));
     const weekEnd = plusDays(weekStart, 5);
@@ -98,6 +100,7 @@ module.exports = async function handler(req, res) {
       db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
       db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd).order('shift_date').order('start_time'),
       db().from('hadas_attendance').select('*').eq('attendance_date', attendanceDate),
+      attendanceDate === today ? Promise.resolve({ data:null, error:null }) : db().from('hadas_attendance').select('*').eq('attendance_date', today),
       db().from('hadas_requests').select('*').order('created_at', { ascending: false }).limit(500),
       db().from('hadas_request_messages').select('*').order('created_at').limit(1500),
       db().from('hadas_schedule_acknowledgements').select('*').eq('week_start', weekStart),
@@ -111,13 +114,18 @@ module.exports = async function handler(req, res) {
       manager ? db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle() : Promise.resolve({ data:null, error:null }),
       db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
       todayInSelectedWeek ? Promise.resolve({ data: [], error: null }) : db().from('hadas_schedule_changes').select('*').eq('week_start', todayWeekStart).is('published_revision', 'null').order('created_at'),
-      manager ? db().from('hadas_daily_operations').select('*').eq('operation_date', dailyDate).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
-      manager && !dailyInSelectedWeek ? db().from('hadas_shifts').select('*').eq('shift_date', dailyDate).order('start_time') : Promise.resolve({ data: [], error: null }),
-      manager && !dailyUsesAttendance ? db().from('hadas_attendance').select('*').eq('attendance_date', dailyDate) : Promise.resolve({ data: [], error: null }),
+      operationalManager ? db().from('hadas_daily_operations').select('*').eq('operation_date', dailyDate).order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+      dailyDate === today && operationalManager
+        ? Promise.resolve({ data:null, error:null })
+        : dashboardOperationsViewer
+          ? db().from('hadas_daily_operations').select('*').eq('operation_date', today).order('created_at', { ascending: false })
+          : Promise.resolve({ data:[], error:null }),
+      operationalManager && !dailyInSelectedWeek ? db().from('hadas_shifts').select('*').eq('shift_date', dailyDate).order('start_time') : Promise.resolve({ data: [], error: null }),
+      operationalManager && !dailyUsesAttendance ? db().from('hadas_attendance').select('*').eq('attendance_date', dailyDate) : Promise.resolve({ data: [], error: null }),
       db().from('hadas_notifications').select('*').eq('employee_id', caller.employee.id).order('created_at', { ascending: false }).limit(150),
     ]);
 
-    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, requestsR, requestMessagesR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, dailyShiftsR, dailyAttendanceR, notificationsR] = results;
+    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, todayAttendanceR, requestsR, requestMessagesR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, todayOperationsR, dailyShiftsR, dailyAttendanceR, notificationsR] = results;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
     const employeeRows = assertDb(employeesR, 'לא ניתן לטעון עובדים') || [];
     const userRows = assertDb(usersR, 'לא ניתן לטעון הרשאות') || [];
@@ -127,6 +135,7 @@ module.exports = async function handler(req, res) {
     const settings = assertDb(settingsR, 'לא ניתן לטעון הגדרות') || {};
     let shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
     let attendance = assertDb(attendanceR, 'לא ניתן לטעון נוכחות') || [];
+    let todayAttendance = attendanceDate === today ? [...attendance] : (assertDb(todayAttendanceR, 'לא ניתן לטעון את נוכחות היום') || []);
     let requests = assertDb(requestsR, 'לא ניתן לטעון בקשות') || [];
     let requestMessages = assertDb(requestMessagesR, 'לא ניתן לטעון תגובות לבקשות') || [];
     const allRequestsForCalendar=[...requests];
@@ -142,8 +151,11 @@ module.exports = async function handler(req, res) {
     const scheduleChanges = assertDb(changesR, 'לא ניתן לטעון שינויים') || [];
     const todayChanges = todayInSelectedWeek ? scheduleChanges : (assertDb(todayChangesR, 'לא ניתן לטעון שינויים') || []);
     const dailyOperations = assertDb(dailyOperationsR, 'לא ניתן לטעון תפעול יומי') || [];
-    const dailyShifts = manager ? (dailyInSelectedWeek ? shifts.filter((row) => row.shift_date === dailyDate) : (assertDb(dailyShiftsR, 'לא ניתן לטעון את שיבוץ התפעול היומי') || [])) : [];
-    const dailyAttendance = manager ? (dailyUsesAttendance ? attendance : (assertDb(dailyAttendanceR, 'לא ניתן לטעון את נוכחות התפעול היומי') || [])) : [];
+    let todayOperations = dailyDate === today && operationalManager
+      ? [...dailyOperations]
+      : (assertDb(todayOperationsR, 'לא ניתן לטעון את תפעול היום') || []);
+    const dailyShifts = operationalManager ? (dailyInSelectedWeek ? shifts.filter((row) => row.shift_date === dailyDate) : (assertDb(dailyShiftsR, 'לא ניתן לטעון את שיבוץ התפעול היומי') || [])) : [];
+    const dailyAttendance = operationalManager ? (dailyUsesAttendance ? attendance : (assertDb(dailyAttendanceR, 'לא ניתן לטעון את נוכחות התפעול היומי') || [])) : [];
     const notifications = assertDb(notificationsR, 'לא ניתן לטעון עדכונים') || [];
 
     const usersByEmployee = new Map(userRows.map((row) => [row.employee_id, row]));
@@ -169,6 +181,12 @@ module.exports = async function handler(req, res) {
         todayShifts = todayShifts.filter((row) => row.employee_id === caller.employee.id);
       }
       attendance = attendance.filter((row) => row.employee_id === caller.employee.id);
+      const visibleTodayShiftIds = new Set(todayShifts.map((row) => row.id));
+      todayAttendance = todayAttendance.filter((row) => visibleTodayShiftIds.has(row.shift_id) || row.employee_id === caller.employee.id);
+      todayOperations = dashboardOperationsViewer ? todayOperations.filter((row) => {
+        if (visibleTodayShiftIds.has(row.shift_id)) return true;
+        return classScheduleViewer && (row.class_id === caller.employee.primary_class_id || row.replacement_from_class_id === caller.employee.primary_class_id);
+      }) : [];
       requests = requests.filter((row) => row.requester_id === caller.employee.id || row.target_employee_id === caller.employee.id);
       acknowledgements = acknowledgements.filter((row) => row.employee_id === caller.employee.id);
       reads = reads.filter((row) => row.employee_id === caller.employee.id || (contentCreator && announcements.some((a) => a.created_by === caller.employee.id && a.id === row.announcement_id)));
@@ -239,6 +257,7 @@ module.exports = async function handler(req, res) {
         schedule_scope: scope,
         can_view_class_schedule: classScheduleViewer,
         can_view_full_schedule: fullScheduleViewer,
+        can_manage_daily_operations: operationalManager,
         fixed_day_off: caller.employee.fixed_day_off,
         weekly_patterns: patternsByEmployee.get(caller.employee.id) || [],
         onboarding_completed: Boolean(caller.user.onboarding_completed_at),
@@ -251,6 +270,8 @@ module.exports = async function handler(req, res) {
       shifts,
       todayShifts,
       attendance,
+      todayAttendance,
+      todayOperations,
       requests,
       requestMessages: requestMessages.map((row)=>({...row,author_name:employeeRows.find((e)=>e.id===row.author_id)?.full_name||'עובד',author_is_manager:userRows.some((u)=>u.employee_id===row.author_id&&['admin','scheduler'].includes(u.role))})),
       acknowledgements,
@@ -263,9 +284,9 @@ module.exports = async function handler(req, res) {
       publication: manager ? publication : null,
       scheduleChanges: manager ? scheduleChanges : [],
       scheduleAbsences: visibleScheduleAbsences,
-      dailyOperations: manager ? dailyOperations : [],
-      dailyShifts: manager ? dailyShifts : [],
-      dailyAttendance: manager ? dailyAttendance : [],
+      dailyOperations: operationalManager ? dailyOperations : [],
+      dailyShifts: operationalManager ? dailyShifts : [],
+      dailyAttendance: operationalManager ? dailyAttendance : [],
       dailyDate,
       notifications,
       weekDates: dateRange(weekStart, 6),

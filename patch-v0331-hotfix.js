@@ -1,9 +1,9 @@
-/* מערכת ניהול שיבוצים מעון הדס — hotfix הדפסה A4 + ניקוי בחירת יום 0.33.1 */
+/* מערכת ניהול שיבוצים מעון הדס — hotfix הדפסה A4 + ניקוי בחירת יום 0.34.0 */
 (() => {
   if (window.__hadasV0331PrintHotfixInstalled) return;
   window.__hadasV0331PrintHotfixInstalled = true;
 
-  const VERSION = '0.33.1';
+  const VERSION = '0.34.0';
   const PRINT_DIALOG_ID = 'v0331A4PrintDialog';
   let currentPrintDataUrl = '';
 
@@ -16,7 +16,6 @@
     const style = document.createElement('style');
     style.id = 'v0331A4PrintStyles';
     style.textContent = `
-      html[data-hadas-role="manager"] #scheduleDayField { display:none !important; }
       #${PRINT_DIALOG_ID} { border:0; padding:0; background:transparent; width:min(1180px, calc(100vw - 20px)); max-width:none; }
       #${PRINT_DIALOG_ID}::backdrop { background:rgba(31,35,58,.56); backdrop-filter:blur(2px); }
       #${PRINT_DIALOG_ID} .v0331-print-card { background:#fff; border-radius:24px; padding:18px; box-shadow:0 24px 70px rgba(31,35,58,.24); }
@@ -44,9 +43,10 @@
     if (!managerScheduleView()) return;
     const field = document.querySelector('#scheduleDayField');
     if (!field) return;
-    field.classList.add('hidden');
-    field.hidden = true;
-    field.setAttribute('aria-hidden', 'true');
+    const visible = state?.scheduleMode === 'day';
+    field.hidden = false;
+    field.classList.toggle('hidden', !visible);
+    field.setAttribute('aria-hidden', visible ? 'false' : 'true');
   }
 
   function cropCanvasToContent(sourceCanvas) {
@@ -141,58 +141,56 @@
 
   function printInIsolatedFrame(dataUrl) {
     return new Promise((resolve, reject) => {
-      const iframe = document.createElement('iframe');
-      iframe.setAttribute('aria-hidden', 'true');
-      iframe.tabIndex = -1;
-      iframe.style.cssText = 'position:fixed;left:-10000px;top:0;width:297mm;height:210mm;border:0;opacity:0;pointer-events:none;';
-      document.body.append(iframe);
-
-      let cleaned = false;
-      const cleanup = () => {
-        if (cleaned) return;
-        cleaned = true;
-        try { iframe.remove(); } catch {}
-        resolve();
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) return reject(new Error('חלון ההדפסה נחסם'));
+      let settled = false;
+      const finish = (error) => {
+        if (settled) return;
+        settled = true;
+        if (error) reject(error); else resolve();
       };
 
       try {
-        const doc = iframe.contentDocument;
+        const doc = printWindow.document;
         doc.open();
         doc.write(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><title>שיבוץ שבועי</title><style>
-          @page { size:A4 landscape; margin:0; }
-          html,body { width:297mm; height:210mm; margin:0; padding:0; overflow:hidden; background:#fff; }
+          @page { size:A4 landscape; margin:5mm; }
+          html,body { width:287mm; height:200mm; margin:0; padding:0; overflow:hidden; background:#fff; }
           * { box-sizing:border-box; }
-          .sheet { width:297mm; height:210mm; margin:0; padding:0; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; break-after:avoid-page; page-break-after:avoid; }
-          .sheet img { display:block; width:297mm; height:210mm; max-width:297mm; max-height:210mm; margin:0; padding:0; object-fit:contain; break-inside:avoid-page; page-break-inside:avoid; }
+          .sheet { width:287mm; height:200mm; margin:0; padding:0; overflow:hidden; background:#fff; display:flex; align-items:center; justify-content:center; break-after:avoid-page; page-break-after:avoid; }
+          .sheet img { display:block; width:100%; height:100%; margin:0; padding:0; object-fit:contain; break-inside:avoid-page; page-break-inside:avoid; }
         </style></head><body><main class="sheet"><img id="printImage" alt="שיבוץ שבועי"></main></body></html>`);
         doc.close();
 
         const image = doc.querySelector('#printImage');
+        let printed = false;
         const runPrint = () => {
+          if (printed) return;
+          printed = true;
           try {
-            const printWindow = iframe.contentWindow;
-            printWindow.addEventListener('afterprint', cleanup, { once:true });
+            printWindow.addEventListener('afterprint', () => {
+              try { printWindow.close(); } catch {}
+            }, { once:true });
             printWindow.focus();
             setTimeout(() => {
-              try { printWindow.print(); }
-              catch (error) { reject(error); try { iframe.remove(); } catch {} }
-            }, 80);
-            setTimeout(cleanup, 90000);
+              try { printWindow.print(); finish(); }
+              catch (error) { try { printWindow.close(); } catch {} finish(error); }
+            }, 120);
           } catch (error) {
-            try { iframe.remove(); } catch {}
-            reject(error);
+            try { printWindow.close(); } catch {}
+            finish(error);
           }
         };
         image.addEventListener('load', runPrint, { once:true });
         image.addEventListener('error', () => {
-          try { iframe.remove(); } catch {}
-          reject(new Error('טעינת עמוד ההדפסה נכשלה'));
+          try { printWindow.close(); } catch {}
+          finish(new Error('טעינת עמוד ההדפסה נכשלה'));
         }, { once:true });
         image.src = dataUrl;
         if (image.complete && image.naturalWidth) setTimeout(runPrint, 0);
       } catch (error) {
-        try { iframe.remove(); } catch {}
-        reject(error);
+        try { printWindow.close(); } catch {}
+        finish(error);
       }
     });
   }

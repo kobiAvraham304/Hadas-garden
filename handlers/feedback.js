@@ -10,7 +10,7 @@ function isFeedbackManager(caller) { return String(caller?.user?.phone || '') ==
 async function loadFeedback(caller) {
   const manager = isFeedbackManager(caller);
   let query = db().from('hadas_feedback').select('*').order('created_at', { ascending:false }).limit(manager ? 300 : 100);
-  if (!manager) query = query.eq('employee_id', caller.employee.id);
+  query = manager ? query.neq('employee_id', caller.employee.id) : query.eq('employee_id', caller.employee.id);
   const rows = assertDb(await query, 'לא ניתן לטעון משובים') || [];
   const ids = [...new Set(rows.flatMap((row) => [row.employee_id,row.responded_by]).filter(Boolean))];
   let employees=[];
@@ -32,6 +32,7 @@ module.exports = async function handler(req,res) {
     if (req.method === 'GET') return send(res,200,{ ok:true, canManage:manager, feedback:await loadFeedback(caller) });
 
     if (req.method === 'POST' && body.action === 'create') {
+      if (manager) throw httpError(403,'לינור יכולה לצפות ולנהל משובים של עובדים אחרים בלבד');
       const topic = String(body.topic || 'אחר').trim();
       const content = String(body.content || '').trim();
       if (!TOPICS.has(topic)) throw httpError(400,'יש לבחור נושא משוב');

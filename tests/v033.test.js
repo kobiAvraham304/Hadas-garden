@@ -5,8 +5,8 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('0.33 release bootstrap is current and preserves the 0.32 compatibility chain', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.33.1');
+test('0.33 release remains in the 0.34 compatibility chain', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.34.0');
   const entry = read('patch-v025.js');
   const patch = read('patch-v033.js');
   const vercel = JSON.parse(read('vercel.json'));
@@ -14,8 +14,8 @@ test('0.33 release bootstrap is current and preserves the 0.32 compatibility cha
   assert.match(entry, /__hadasV033BootstrapPromise/);
   assert.match(patch, /PREVIOUS = '\/patch-v032\.js\?v=0321'/);
   assert.match(patch, /releaseBootstrap/);
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.js' && item.destination === '/patch-v033.js'));
-  assert.ok(vercel.rewrites.some((item) => item.source === '/patch-v025.css' && item.destination === '/patch-v033.css'));
+  assert.match(entry, /V034 = '\/patch-v034\.js\?v=0340'/);
+  assert.ok(!vercel.rewrites.some((item) => item.source === '/patch-v025.js' || item.source === '/patch-v025.css'));
 });
 
 test('0.33 startup tolerates optional export controls and fixes mobile password zoom', () => {

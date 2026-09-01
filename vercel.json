@@ -37,6 +37,9 @@
     {"source":"/patch-v032.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {"source":"/patch-v033.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {"source":"/patch-v033.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
+    {"source":"/patch-v0331-hotfix.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
+    {"source":"/patch-v034.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
+    {"source":"/patch-v034.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {
       "source": "/(.*)",
       "headers": [
@@ -52,8 +55,6 @@
   ],
   "rewrites": [
     {"source":"/","destination":"/index.html"},
-    {"source":"/patch-v025.js","destination":"/patch-v033.js"},
-    {"source":"/patch-v025.css","destination":"/patch-v033.css"},
     {"source":"/health","destination":"/health.html"},
     {"source":"/api/announcements","destination":"/api/index?route=announcements"},
     {"source":"/api/attendance","destination":"/api/index?route=attendance"},

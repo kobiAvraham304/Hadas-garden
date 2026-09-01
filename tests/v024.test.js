@@ -92,7 +92,7 @@ test('0.24 UI explains calendar leave, clarifies notifications and renders daily
   const app=read('app.js'),html=read('index.html'),css=read('styles.css'),shifts=read('handlers/shifts.js'),daily=read('handlers/daily-operations.js');
   assert.match(app,/approved_leave: 'חופשה מאושרת'/);assert.match(app,/חופשה מאושרת ממערכת הבקשות/);assert.match(app,/calendarEventLabel/);
   assert.match(html,/data-notification-filter="action"/);assert.match(app,/notificationNeedsAction/);assert.match(app,/הטיפול הושלם/);
-  assert.match(app,/daily-operations-table/);assert.match(app,/דיווח על העובד/);assert.match(app,/daily-schedule-source/);assert.match(css,/\.daily-operations-table/);
+  assert.match(app,/daily-operations-table/);assert.doesNotMatch(app,/>דיווח על העובד</);assert.match(app,/daily-schedule-source/);assert.match(css,/\.daily-operations-table/);
   assert.match(daily,/scheduleMeta/);assert.match(daily,/latest_shift_update/);
   assert.match(shifts,/automaticSchedulesMatch/);assert.match(shifts,/assertShiftsSafeToDelete/);
 });
