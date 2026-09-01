@@ -1,7 +1,7 @@
 /* מעון הדס — הודעות: עריכה אמינה, תאריך ברור וצירוף מהגלריה */
 (() => {
-  if (window.__hadasV0344AnnouncementsInstalled) return;
-  window.__hadasV0344AnnouncementsInstalled = true;
+  if (window.__hadasV0343AnnouncementsInstalled) return;
+  window.__hadasV0343AnnouncementsInstalled = true;
 
   const form = document.querySelector('#announcementForm');
   const dialog = document.querySelector('#announcementDialog');
@@ -259,6 +259,9 @@
           actions.insertAdjacentHTML('beforeend', `<button type="button" class="ghost-btn" data-action="edit_announcement" data-id="${item.id}">עריכה</button>`);
         }
       }
+      const creator = typeof employeeById === 'function' ? employeeById(item.created_by) : null;
+      const meta = card.querySelector('.card-heading p.muted');
+      if (meta) meta.textContent = `${israelDateTime(item.published_at)}${creator?.full_name ? ` · ${creator.full_name}` : ''}`;
     });
   };
 

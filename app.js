@@ -580,6 +580,7 @@ async function refreshAll(showSuccess = false) {
       dailyOperations: data.dailyOperations || [],
       dailyShifts: data.dailyShifts || [],
       dailyAttendance: data.dailyAttendance || [],
+      dailyScheduleMeta: data.dailyScheduleMeta || null,
       requests: data.requests,
       requestMessages: data.requestMessages || [],
       acknowledgements: data.acknowledgements,

@@ -1,6 +1,6 @@
-/* מערכת ניהול שיבוצים מעון הדס — נוכחות ותפעול יומי 0.34.0 */
+/* מערכת ניהול שיבוצים מעון הדס — נוכחות, תפעול ודוח זמינות 0.35.0 */
 (() => {
-  const VERSION = '0.34.0';
+  const VERSION = '0.35.0';
   const DAY_FIELD_HIDDEN_CLASS = 'v034-day-field-hidden';
   const ABSENCE_TYPES = new Set(['leave', 'day_off', 'sick', 'fixed_day_off']);
 
@@ -78,17 +78,47 @@
     return { fill:'#f5f2ff', border:'#d8cff1', text:'#64548b', mark:'#8f7bc0' };
   }
 
-  function absenceRowsForWeek() {
-    const dateSet = new Set(weekDates().map(dateISO));
-    return (state.scheduleAbsences || [])
-      .filter((item) => dateSet.has(item.absence_date) && ABSENCE_TYPES.has(item.absence_type))
-      .sort((a, b) => {
-        const dateCompare = String(a.absence_date || '').localeCompare(String(b.absence_date || ''));
-        if (dateCompare) return dateCompare;
-        const aName = employeeById(a.employee_id)?.full_name || a.employee_name || '';
-        const bName = employeeById(b.employee_id)?.full_name || b.employee_name || '';
-        return aName.localeCompare(bName, 'he');
+  function absenceRowsFromRenderedAvailability() {
+    const dates = weekDates();
+    const cards = [...document.querySelectorAll('#scheduleAbsences .absence-day-card')];
+    if (state.scheduleMode !== 'week' || cards.length !== dates.length) return null;
+    const rows = [];
+    cards.forEach((dayCard, dayIndex) => {
+      dayCard.querySelectorAll('.absence-person').forEach((personCard) => {
+        const typeClass = [...personCard.classList].find((name) => name.startsWith('type-')) || '';
+        const type = typeClass.slice(5) || 'fixed_day_off';
+        if (type === 'day_off_worked') return;
+        rows.push({
+          absence_date: dateISO(dates[dayIndex]),
+          absence_type: ABSENCE_TYPES.has(type) ? type : 'fixed_day_off',
+          employee_name: personCard.querySelector('strong')?.textContent?.trim() || 'עובד',
+          detail: personCard.querySelector('small')?.textContent?.trim() || '',
+        });
       });
+    });
+    return rows;
+  }
+
+  function absenceRowsForWeek() {
+    const rendered = absenceRowsFromRenderedAvailability();
+    if (rendered) return rendered.sort((a, b) => `${a.absence_date}-${a.employee_name}`.localeCompare(`${b.absence_date}-${b.employee_name}`, 'he'));
+
+    const dateSet = new Set(weekDates().map(dateISO));
+    const scheduled = new Set((state.shifts || []).map((shift) => `${shift.employee_id}:${shift.shift_date}`));
+    const rows = new Map();
+    for (const item of state.scheduleAbsences || []) {
+      if (!dateSet.has(item.absence_date) || !ABSENCE_TYPES.has(item.absence_type) || item.absence_type === 'day_off_worked') continue;
+      const availabilityKey = `${item.employee_id}:${item.absence_date}`;
+      if (item.absence_type === 'fixed_day_off' && scheduled.has(availabilityKey)) continue;
+      const employeeName = employeeById(item.employee_id)?.full_name || item.employee_name || 'עובד';
+      const rowKey = `${item.absence_date}:${item.employee_id || employeeName}`;
+      const existing = rows.get(rowKey);
+      const priority = item.absence_kind === 'one_time_absence' ? 2 : 1;
+      const existingPriority = existing?.absence_kind === 'one_time_absence' ? 2 : 1;
+      if (existing && existingPriority > priority) continue;
+      rows.set(rowKey, { ...item, employee_name: employeeName });
+    }
+    return [...rows.values()].sort((a, b) => `${a.absence_date}-${a.employee_name}`.localeCompare(`${b.absence_date}-${b.employee_name}`, 'he'));
   }
 
   function canvasText(ctx, text, x, y, options = {}) {
@@ -207,14 +237,14 @@
         const titleY = compact ? y + cardHeight / 2 : y + 21;
         canvasText(ctx, name, right - 24, titleY, { size:compact ? 15 : 17, weight:900, color:palette.text, maxWidth:cardWidth - 34 });
         if (!compact) {
-          const meta = `${absenceTypeLabel(item.absence_type)}${className ? ` · ${className}` : ''}`;
+          const meta = item.detail || `${absenceTypeLabel(item.absence_type)}${className ? ` · ${className}` : ''}`;
           canvasText(ctx, meta, right - 24, y + 47, { size:12, weight:700, color:'#737789', maxWidth:cardWidth - 34 });
         }
         y += cardHeight + gap;
       });
     });
 
-    canvasText(ctx, 'מוצגים חופשה מאושרת, יום חופשי, מחלה ויום חופשי קבוע. השיבוצים עצמם אינם מוצגים במסמך זה.', logicalWidth - margin, logicalHeight - margin + 8, { size:14, weight:600, color:'#8b8e9d', maxWidth:contentWidth });
+    canvasText(ctx, 'הדוח משקף את רשימת ״זמינות צוות״ במסך השיבוצים. עובדים שמשובצים ביום חופשי קבוע אינם מוצגים כחופשים.', logicalWidth - margin, logicalHeight - margin + 8, { size:14, weight:600, color:'#8b8e9d', maxWidth:contentWidth });
     return canvas;
   }
 
@@ -291,7 +321,7 @@
     event?.preventDefault?.();
     event?.stopImmediatePropagation?.();
     const button = document.querySelector('#v027AbsencePdfBtn');
-    if (typeof setBusy === 'function') setBusy(button, true, 'מכין טבלת שבוע…');
+    if (typeof setBusy === 'function') setBusy(button, true, 'מכין לפי זמינות הצוות…');
     try {
       await document.fonts?.ready;
       const canvas = drawAbsenceWeekCanvas(2);
@@ -311,7 +341,7 @@
     const clone = button.cloneNode(true);
     clone.dataset.v034WeeklyAbsencePdf = 'true';
     clone.textContent = 'PDF חופשות השבוע';
-    clone.title = 'טבלת שבוע עם הימים והחופשות בלבד, ללא שיבוצים';
+    clone.title = 'דוח זהה לזמינות הצוות במסך – רק העובדים שאינם זמינים בפועל';
     clone.addEventListener('click', exportAbsenceWeekPdf, true);
     button.replaceWith(clone);
   }
@@ -320,6 +350,7 @@
     injectFixStyles();
     syncScheduleDayField();
     installAbsencePdfButton();
+    document.documentElement.dataset.hadasAbsenceReport = 'availability-source';
   }
 
   function installHooks() {

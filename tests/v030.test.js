@@ -9,10 +9,10 @@ const { truthy } = require('../lib/requests-v030');
 const { syntheticLeaveRequestId } = require('../lib/calendar-v030');
 
 test('0.30 release layers remain available under the current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.34.0');
-  assert.match(read('VERSION.md'), /גרסה 0.34.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0.34.0'/);
-  assert.match(read('health.js'), /update-v0.34.0\.sql/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.35.0');
+  assert.match(read('VERSION.md'), /גרסה 0.35.0/);
+  assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
+  assert.match(read('health.js'), /update-v0.35.0\.sql/);
   const api = read('api/index.js');
   assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
@@ -101,14 +101,14 @@ test('0.30 runtime stays intact while physical entrypoints advance to v0.34', ()
   assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
-  assert.match(entry, /const VERSION = '0\.34\.0'/);
+  assert.match(entry, /const VERSION = '0\.35\.0'/);
   assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321'/);
   assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await loadScript\(V034, 'v034'\)/);
   assert.ok(entry.indexOf("await loadScript(V026, 'v026')") < entry.indexOf("await loadScript(V033, 'v033')"));
-  assert.match(cssEntry, /patch-v034\.css\?v=0340/);
+  assert.match(cssEntry, /patch-v034\.css\?v=0350/);
 
   const vercel = JSON.parse(read('vercel.json'));
   const headers = new Map(vercel.headers.map((item) => [item.source, item.headers]));

@@ -1,9 +1,9 @@
-/* מערכת ניהול שיבוצים מעון הדס — hotfix הדפסה A4 + ניקוי בחירת יום 0.34.0 */
+/* מערכת ניהול שיבוצים מעון הדס — hotfix הדפסה A4 + ניקוי בחירת יום 0.35.0 */
 (() => {
   if (window.__hadasV0331PrintHotfixInstalled) return;
   window.__hadasV0331PrintHotfixInstalled = true;
 
-  const VERSION = '0.34.0';
+  const VERSION = '0.35.0';
   const PRINT_DIALOG_ID = 'v0331A4PrintDialog';
   let currentPrintDataUrl = '';
 

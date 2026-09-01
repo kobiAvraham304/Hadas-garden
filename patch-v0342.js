@@ -3,33 +3,8 @@
   if (window.__hadasV0342Installed) return;
   window.__hadasV0342Installed = true;
 
-  const VERSION = '0.34.0';
+  const VERSION = '0.35.0';
   const SCALE = 2; // 1754×1240 logical -> 3508×2480 px, close to 300dpi A4 landscape.
-
-  function isManagementRole() {
-    return ['admin', 'scheduler'].includes(String(state?.profile?.role || ''));
-  }
-
-  /*
-   * מנהלת מעון ואחראית שיבוצים הן אותה רמת הרשאה. שמות התפקיד נשארים
-   * שונים לתצוגה בלבד; אין שינוי ב-role עצמו או ב-ROLE_LABELS.
-   */
-  const previousIsManager = typeof isManager === 'function' ? isManager : null;
-  if (previousIsManager && !window.__hadasV0342ManagerParity) {
-    isManager = function v0342IsManager() {
-      return isManagementRole();
-    };
-    window.__hadasV0342ManagerParity = true;
-  }
-
-  function enforceManagerParity() {
-    if (!state?.profile || !isManagementRole()) return;
-    state.profile.can_view_full_schedule = true;
-    state.profile.can_create_content = true;
-    state.profile.can_manage_daily_operations = true;
-    state.profile.schedule_scope = 'full';
-    document.documentElement.dataset.hadasRole = 'manager';
-  }
 
   function isSubstitute(employeeOrId) {
     const employee = typeof employeeOrId === 'object' ? employeeOrId : employeeById(employeeOrId);
@@ -353,7 +328,6 @@
     const button = event.currentTarget;
     if (typeof setBusy === 'function') setBusy(button, true, 'מכין PDF…');
     try {
-      enforceManagerParity();
       stripSubstituteAvailability();
       await document.fonts?.ready;
       const canvas = buildA4ScheduleCanvas();
@@ -379,7 +353,6 @@
   }
 
   function apply() {
-    enforceManagerParity();
     stripApprovedValidationState();
     stripSubstituteAvailability();
     installA4Button();
@@ -389,7 +362,6 @@
   if (typeof renderSchedule === 'function' && !window.__hadasV0342RenderHook) {
     const previousRenderSchedule = renderSchedule;
     renderSchedule = function v0342RenderSchedule(...args) {
-      enforceManagerParity();
       stripApprovedValidationState();
       state.scheduleAbsences = filterSubstituteAbsences(state.scheduleAbsences);
       const result = previousRenderSchedule.apply(this, args);
@@ -403,7 +375,6 @@
   if (typeof renderAll === 'function' && !window.__hadasV0342RenderAllHook) {
     const previousRenderAll = renderAll;
     renderAll = function v0342RenderAll(...args) {
-      enforceManagerParity();
       const result = previousRenderAll.apply(this, args);
       queueMicrotask(apply);
       requestAnimationFrame(apply);

@@ -5,10 +5,11 @@ const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
-test('validation sync hotfix is loaded after the current announcement layers', () => {
+test('validation sync hotfix is loaded after the consolidated announcement layer', () => {
   const entry = read('patch-v025.js');
-  assert.match(entry, /const V0345 = '\/patch-v0345\.js\?v=0345a'/);
-  assert.match(entry, /await loadScript\(V0344, 'v0344'\);\s*\n\s*await loadScript\(V0345, 'v0345'\)/);
+  assert.match(entry, /const V0345 = '\/patch-v0345\.js\?v=0350'/);
+  assert.match(entry, /await loadScript\(V0343, 'v0343'\);\s*\n\s*await loadScript\(V0345, 'v0345'\)/);
+  assert.doesNotMatch(entry, /V0341|V0344/);
 });
 
 test('managers never see raw validation errors while server approvals are unresolved', () => {

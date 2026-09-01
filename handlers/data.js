@@ -123,9 +123,12 @@ module.exports = async function handler(req, res) {
       operationalManager && !dailyInSelectedWeek ? db().from('hadas_shifts').select('*').eq('shift_date', dailyDate).order('start_time') : Promise.resolve({ data: [], error: null }),
       operationalManager && !dailyUsesAttendance ? db().from('hadas_attendance').select('*').eq('attendance_date', dailyDate) : Promise.resolve({ data: [], error: null }),
       db().from('hadas_notifications').select('*').eq('employee_id', caller.employee.id).order('created_at', { ascending: false }).limit(150),
+      operationalManager && !(manager && dailyInSelectedWeek)
+        ? db().from('hadas_schedule_publications').select('week_start,revision,published_at,updated_at').eq('week_start', getSunday(dailyDate)).maybeSingle()
+        : Promise.resolve({ data:null, error:null }),
     ]);
 
-    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, todayAttendanceR, requestsR, requestMessagesR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, todayOperationsR, dailyShiftsR, dailyAttendanceR, notificationsR] = results;
+    const [classesR, employeesR, usersR, privateR, constraintsR, weeklyPatternsR, settingsR, shiftsR, attendanceR, todayAttendanceR, requestsR, requestMessagesR, ackR, announcementsR, recipientsR, readsR, tasksR, assigneesR, calendarR, todayShiftsR, publicationR, changesR, todayChangesR, dailyOperationsR, todayOperationsR, dailyShiftsR, dailyAttendanceR, notificationsR, dailyPublicationR] = results;
     const classes = assertDb(classesR, 'לא ניתן לטעון כיתות') || [];
     const employeeRows = assertDb(employeesR, 'לא ניתן לטעון עובדים') || [];
     const userRows = assertDb(usersR, 'לא ניתן לטעון הרשאות') || [];
@@ -156,6 +159,18 @@ module.exports = async function handler(req, res) {
       : (assertDb(todayOperationsR, 'לא ניתן לטעון את תפעול היום') || []);
     const dailyShifts = operationalManager ? (dailyInSelectedWeek ? shifts.filter((row) => row.shift_date === dailyDate) : (assertDb(dailyShiftsR, 'לא ניתן לטעון את שיבוץ התפעול היומי') || [])) : [];
     const dailyAttendance = operationalManager ? (dailyUsesAttendance ? attendance : (assertDb(dailyAttendanceR, 'לא ניתן לטעון את נוכחות התפעול היומי') || [])) : [];
+    const dailyPublication = operationalManager
+      ? (manager && dailyInSelectedWeek ? publication : (assertDb(dailyPublicationR, 'לא ניתן לטעון את מצב פרסום השיבוץ היומי') || null))
+      : null;
+    const dailyScheduleMeta = operationalManager ? {
+      week_start: getSunday(dailyDate),
+      shift_count: dailyShifts.length,
+      draft_count: dailyShifts.filter((row) => row.status === 'draft').length,
+      published_count: dailyShifts.filter((row) => row.status === 'published').length,
+      latest_shift_update: dailyShifts.reduce((latest, row) => row.updated_at && (!latest || String(row.updated_at) > latest) ? String(row.updated_at) : latest, null),
+      publication_revision: dailyPublication?.revision || 0,
+      published_at: dailyPublication?.published_at || null,
+    } : null;
     const notifications = assertDb(notificationsR, 'לא ניתן לטעון עדכונים') || [];
 
     const usersByEmployee = new Map(userRows.map((row) => [row.employee_id, row]));
@@ -287,6 +302,7 @@ module.exports = async function handler(req, res) {
       dailyOperations: operationalManager ? dailyOperations : [],
       dailyShifts: operationalManager ? dailyShifts : [],
       dailyAttendance: operationalManager ? dailyAttendance : [],
+      dailyScheduleMeta,
       dailyDate,
       notifications,
       weekDates: dateRange(weekStart, 6),

@@ -1,6 +1,6 @@
 {
   "name": "hadas-scheduling",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "private": true,
   "description": "מערכת ניהול שיבוצים מעון הדס — שיבוצים, צוות, בקשות, הודעות ולוח שנה",
   "license": "UNLICENSED",

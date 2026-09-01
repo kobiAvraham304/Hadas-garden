@@ -6,8 +6,8 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.27 release layers remain wired under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.34.0');
-  assert.match(read('VERSION.md'), /גרסה 0.34.0/);
+  assert.equal(JSON.parse(read('package.json')).version, '0.35.0');
+  assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   const api = read('api/index.js');
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
   assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v032'\)/);
@@ -118,6 +118,6 @@ test('0.27 assets remain directly available while current wrapper owns cache rou
   assert.ok(!vercel.rewrites.some((item) => item.source === '/patch-v025.js' || item.source === '/patch-v025.css'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v027.js'));
   assert.ok(vercel.headers.some((item) => item.source === '/patch-v031.js'));
-  assert.match(read('handlers/health.js'), /schema_version === '0.34.0'/);
-  assert.match(read('health.js'), /update-v0.34.0\.sql/);
+  assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
+  assert.match(read('health.js'), /update-v0.35.0\.sql/);
 });
