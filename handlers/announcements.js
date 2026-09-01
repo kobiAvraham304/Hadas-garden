@@ -40,7 +40,7 @@ function canManage(caller, item) {
 function audience(caller, type, classId) {
   if (isTeacher(caller) && !isManager(caller)) {
     if (!caller.employee.primary_class_id) throw httpError(403, 'לא מוגדרת לגננת כיתה קבועה');
-    return { audienceType: 'class', classId: caller.employee.primary_class_id };
+    return {audienceType:'class', classId:caller.employee.primary_class_id};
   }
   const audienceType = ['all', 'class', 'employees'].includes(type) ? type : 'all';
   const cid = audienceType === 'class' ? (classId || null) : null;
