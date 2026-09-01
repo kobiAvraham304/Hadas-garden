@@ -2,7 +2,9 @@ const {
   requireSession, parseBody, db, assertDb, emitEvent, audit, isManager, scheduleScope, canViewFullSchedule, notifyEmployees,
   send, handleError, httpError, israelDateISO,
 } = require('../lib/server');
-const { validateWeek, timeToMinutes, closingTimeForDate, requiredStaffAt, leaderRequiredAt, buildScheduleAvailability } = require('../lib/schedule');
+const schedule = require('../lib/schedule');
+const { validateWeek, timeToMinutes, closingTimeForDate, requiredStaffAt, leaderRequiredAt, buildScheduleAvailability } = schedule;
+const validateWeekUnapproved = schedule.validateWeekUnapproved || validateWeek;
 const { generateAutomaticSchedule, employeeAvailability, partialAsNeededIssue } = require('../lib/auto-schedule');
 const dailyOperations = require('./daily-operations');
 const { employeeCanLead, sourceClassCanRelease, loadContext: loadDailyContext } = dailyOperations;
@@ -176,23 +178,15 @@ function automaticSchedulesMatch(existingRows,generatedRows,selectedDates) {
   const selected=new Set(selectedDates);return JSON.stringify(automaticComparableRows(existingRows.filter((row)=>selected.has(row.shift_date))))===JSON.stringify(automaticComparableRows(generatedRows));
 }
 
-function autoShiftRestoreRow(shift) {
-  return {
-    id: shift.id,
-    shift_date: shift.shift_date,
-    class_id: shift.class_id,
-    employee_id: shift.employee_id,
-    start_time: shift.start_time,
-    end_time: shift.end_time,
-    shift_role: shift.shift_role,
-    status: shift.status || 'draft',
-    public_note: shift.public_note ?? null,
-    rule_override:Boolean(shift.rule_override),
-    rule_override_note:shift.rule_override_note ?? null,
-    created_by: shift.created_by ?? null,
-    created_at: shift.created_at,
-    updated_at: shift.updated_at,
-  };
+function transferRpcData(result) {
+  if (!result?.error) return result?.data;
+  const message = String(result.error.message || '');
+  if (message.includes('HADAS_TRANSFER_OPERATIONAL_DATA')) throw httpError(409, 'לא ניתן להעביר שיבוץ שכבר כולל נוכחות או תפעול יומי. הנתונים בפועל נשמרו ללא שינוי.');
+  if (message.includes('HADAS_TRANSFER_ACTIVE_REQUEST')) throw httpError(409, 'לא ניתן להעביר שיבוץ שמקושר לבקשה פעילה. יש לטפל בבקשה תחילה.');
+  if (message.includes('HADAS_TRANSFER_OVERLAP')) throw httpError(409, 'אפשרות ההעברה כבר אינה זמינה כי נוצר שיבוץ חופף.');
+  if (message.includes('HADAS_TRANSFER_STALE')) throw httpError(409, 'השיבוץ השתנה מאז הצגת ההצעה. יש לרענן ולבחור שוב.');
+  if (message.includes('HADAS_TRANSFER_SHIFT_IDS') || message.includes('HADAS_TRANSFER_PAYLOAD')) throw httpError(400, 'פרטי הצעת ההעברה אינם תקינים.');
+  throw httpError(500, 'לא ניתן לבצע את ההעברה כפעולה אטומית', result.error);
 }
 
 async function getWeekValidation(weekStart) {
@@ -209,7 +203,7 @@ async function getWeekValidation(weekStart) {
   const shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
   return {
     shifts,
-    validation: validateWeek({
+    validation: validateWeekUnapproved({
       shifts,
       classes: assertDb(classesR, 'לא ניתן לטעון כיתות') || [],
       employees: assertDb(employeesR, 'לא ניתן לטעון עובדים') || [],
@@ -391,10 +385,10 @@ module.exports = async function handler(req, res) {
       if (!targetShift) {
         await validateShift(payload, sourceShift.id, false);
         const updatedSource = assertDb(await db().from('hadas_shifts').update({
-          class_id: payload.class_id,
-          shift_role: payload.shift_role,
-          status: 'draft',
-          public_note: payload.public_note || `הועבר/ה מכיתה אחרת`,
+          class_id:payload.class_id,
+          shift_role:payload.shift_role,
+          status:'draft',
+          public_note:payload.public_note || 'הועבר/ה מכיתה אחרת',
         }).eq('id', sourceShift.id).select('*').single(), 'לא ניתן להעביר את העובד לכיתה');
         await recordChange(caller, 'update', sourceShift, updatedSource);
         await audit(caller.employee.id, 'apply_transfer_suggestion', 'shift', sourceShift.id, { from_class_id:sourceShift.class_id, to_class_id:payload.class_id });
@@ -402,22 +396,16 @@ module.exports = async function handler(req, res) {
         return send(res, 200, { ok:true, shift:updatedSource, candidateType:'transfer' });
       }
 
-      let updatedTarget = null;
-      let sourceDeleted = false;
-      try {
-        assertDb(await db().from('hadas_shifts').delete().eq('id', sourceShift.id), 'לא ניתן לפנות את שיבוץ המקור');
-        sourceDeleted = true;
-        await validateShift(payload, targetShift.id, false);
-        updatedTarget = assertDb(await db().from('hadas_shifts').update(payload).eq('id', targetShift.id).select('*').single(), 'לא ניתן להחיל את ההחלפה');
-        await recordChange(caller, 'delete', sourceShift, null);
-        await recordChange(caller, 'update', targetShift, updatedTarget);
-      } catch (error) {
-        if (updatedTarget) await db().from('hadas_shifts').update({ shift_date:targetShift.shift_date, class_id:targetShift.class_id, employee_id:targetShift.employee_id, start_time:targetShift.start_time, end_time:targetShift.end_time, shift_role:targetShift.shift_role, status:targetShift.status, public_note:targetShift.public_note }).eq('id', targetShift.id);
-        if (sourceDeleted) await db().from('hadas_shifts').insert(autoShiftRestoreRow(sourceShift));
-        throw error;
-      }
-      await audit(caller.employee.id, 'apply_transfer_suggestion', 'shift', targetShift.id, { source_shift_id:sourceShift.id, from_class_id:sourceShift.class_id, to_class_id:payload.class_id });
-      await emitEvent('shifts');
+      // Ignore the candidate's source row during validation; the RPC deletes it
+      // and updates the target in the same transaction.
+      await validateShift(payload, sourceShift.id, false);
+      const applied = transferRpcData(await db().rpc('hadas_apply_transfer_suggestion_v035', {
+        p_source_shift_id:sourceShift.id,
+        p_target_shift_id:targetShift.id,
+        p_payload:payload,
+        p_actor_id:caller.employee.id,
+      })) || {};
+      const updatedTarget = applied.shift || applied;
       return send(res, 200, { ok:true, shift:updatedTarget, candidateType:'transfer' });
     }
 

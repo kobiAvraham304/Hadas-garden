@@ -96,4 +96,5 @@ test('manual rule override is not returned again as a live validation exception'
   });
   assert.equal(result.warnings.some((item) => item.code === 'manual_rule_override'), false);
   assert.equal(result.warnings.some((item) => item.code === 'max_weekly_hours'), false);
+  assert.equal(result.errors.some((item) => item.code === 'max_weekly_hours'), true);
 });

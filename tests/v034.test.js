@@ -7,15 +7,15 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const { canManageDailyOperations } = require('../lib/server');
 const { operationPayload } = require('../handlers/attendance');
 
-test('0.34 release bootstrap and schema markers are current', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.34.0');
-  assert.match(read('VERSION.md'), /גרסה 0\.34\.0/);
-  assert.match(read('patch-v025.js'), /V034 = '\/patch-v034\.js\?v=0340'/);
+test('0.35 release bootstrap and schema markers are current', () => {
+  assert.equal(JSON.parse(read('package.json')).version, '0.35.0');
+  assert.match(read('VERSION.md'), /גרסה 0\.35\.0/);
+  assert.match(read('patch-v025.js'), /V034 = '\/patch-v034\.js\?v=0350'/);
   assert.match(read('patch-v025.js'), /await loadScript\(V034, 'v034'\)/);
-  assert.match(read('patch-v025.css'), /patch-v034\.css\?v=0340/);
-  assert.match(read('patch-v034.js'), /const VERSION = '0\.34\.0'/);
-  assert.match(read('supabase/update-v0.34.0.sql'), /schema_version = '0\.34\.0'/);
-  assert.match(read('handlers/health.js'), /databaseVersion:'0\.34\.0'/);
+  assert.match(read('patch-v025.css'), /patch-v034\.css\?v=0350/);
+  assert.match(read('patch-v034.js'), /const VERSION = '0\.35\.0'/);
+  assert.match(read('supabase/update-v0.35.0.sql'), /values\(1,'0\.35\.0','0\.35\.0'/);
+  assert.match(read('handlers/health.js'), /databaseVersion:'0\.35\.0'/);
 });
 
 test('daily operations are limited to scheduling managers, teachers and daycare managers', () => {
