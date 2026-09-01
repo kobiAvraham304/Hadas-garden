@@ -6,6 +6,7 @@
   const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
   const V034 = '/patch-v034.js?v=0340';
   const V0341 = '/patch-v0341.js?v=0341a';
+  const V0342 = '/patch-v0342.js?v=0342a';
 
   let releaseApiGate;
   let gateReleased = false;
@@ -138,6 +139,11 @@
       if (window.__hadasV0341BootstrapPromise) {
         const reportReady = await window.__hadasV0341BootstrapPromise;
         if (!reportReady) throw new Error('עדכון דוח החופשות לא סיים להיטען');
+      }
+      await loadScript(V0342, 'v0342');
+      if (window.__hadasV0342BootstrapPromise) {
+        const schedulingReady = await window.__hadasV0342BootstrapPromise;
+        if (!schedulingReady) throw new Error('עדכון ההדפסה והשיבוץ לא סיים להיטען');
       }
       forceVersion();
     } catch (error) {

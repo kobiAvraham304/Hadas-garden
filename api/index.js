@@ -3,6 +3,10 @@
  * כל נתיבי ה-API מנותבים לפונקציית Serverless יחידה כדי להישאר מתחת
  * למגבלת 12 הפונקציות של החבילה החינמית.
  */
+// Must load before route modules: it wraps shared scheduling exports before
+// handlers destructure them and also provides per-request approval context.
+const schedulingHotfix = require('../lib/hotfix-v0342');
+
 const routes = Object.freeze({
   'announcements': require('../handlers/announcements'),
   'attendance': require('../handlers/attendance'),
@@ -49,7 +53,7 @@ module.exports = async function unifiedApiHandler(req, res) {
     return res.end(JSON.stringify({ ok: false, error: 'נתיב API לא נמצא' }));
   }
 
-  return handler(req, res);
+  return schedulingHotfix.runWithRequestContext(req, route, () => handler(req, res));
 };
 
 module.exports.routes = routes;
