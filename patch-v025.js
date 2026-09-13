@@ -5,7 +5,7 @@
   const V033 = '/patch-v033.js?v=0333';
   const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
   const V034 = '/patch-v034.js?v=0350';
-  const V0342 = '/patch-v0342.js?v=0360';
+  const V0342 = '/patch-v0342.js?v=0360hf1';
   const V0343 = '/patch-v0343.js?v=0350';
   const V0345 = '/patch-v0345.js?v=0360';
 
@@ -24,6 +24,29 @@
     const login = document.querySelector('#loginVersion');
     if (login) login.textContent = `גרסה ${VERSION}`;
     document.documentElement.dataset.hadasVersion = VERSION;
+  }
+
+  function installReleaseVersionGuard() {
+    for (const key of ['__hadasV031VersionObservers','__hadasV032VersionObservers','__hadasV033VersionObservers','__hadasV034VersionObservers','__hadasReleaseVersionObservers']) {
+      (window[key] || []).forEach((observer) => {
+        try { observer?.disconnect(); } catch {}
+      });
+      window[key] = [];
+    }
+    const observers = [];
+    for (const [node, expected] of [
+      [document.querySelector('#appVersionBadge'), `v${VERSION}`],
+      [document.querySelector('#loginVersion'), `גרסה ${VERSION}`],
+    ]) {
+      if (!node) continue;
+      const observer = new MutationObserver(() => {
+        if (node.textContent !== expected) node.textContent = expected;
+      });
+      observer.observe(node, { subtree:true, childList:true, characterData:true });
+      observers.push(observer);
+    }
+    window.__hadasReleaseVersionObservers = observers;
+    forceVersion();
   }
 
   function releaseGate() {
@@ -136,7 +159,7 @@
       }
       await loadScript(V0343, 'v0343');
       await loadScript(V0345, 'v0345');
-      forceVersion();
+      installReleaseVersionGuard();
     } catch (error) {
       console.error('Hadas v0.36.0 bootstrap failed', error);
       const toast = document.querySelector('#toast');
