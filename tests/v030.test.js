@@ -43,7 +43,7 @@ test('0.30 schedule validation approvals are deterministic, reversible and affec
   const second = validationIssueKey({ code:'understaffed', date:'2026-08-30', class_id:'x', time:'09:00', count:3, expected:4, message:'בעיה' });
   const changed = validationIssueKey({ code:'understaffed', date:'2026-08-30', class_id:'x', time:'09:00', count:2, expected:4, message:'בעיה' });
   assert.equal(first, second);
-  assert.notEqual(first, changed);
+  assert.equal(first, changed, 'coverage approvals stay stable when the post-apply count/range changes');
   const shifts = read('lib/shifts-v030.js');
   assert.match(shifts, /hadas_schedule_issue_approvals/);
   assert.match(shifts, /action === 'approve_issue'/);
@@ -103,7 +103,7 @@ test('0.30 runtime stays intact while physical entrypoints advance to v0.34', ()
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
   assert.match(entry, /const VERSION = '0\.36\.0'/);
   assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321'/);
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf7'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await loadScript\(V034, 'v034'\)/);
