@@ -106,6 +106,34 @@
     ctx.restore();
   }
 
+  function fitText(ctx, value, x, y, options = {}) {
+    const {
+      size = 16,
+      minSize = Math.max(10, size * .72),
+      weight = 700,
+      color = '#303448',
+      align = 'right',
+      maxWidth,
+    } = options;
+    let output = String(value ?? '');
+    let fittedSize = size;
+    if (maxWidth && output) {
+      ctx.save();
+      ctx.direction = 'rtl';
+      ctx.font = `${weight} ${fittedSize}px Arial, "Helvetica Neue", sans-serif`;
+      const measured = ctx.measureText(output).width;
+      if (measured > maxWidth) fittedSize = Math.max(minSize, fittedSize * (maxWidth / measured));
+      ctx.font = `${weight} ${fittedSize}px Arial, "Helvetica Neue", sans-serif`;
+      if (ctx.measureText(output).width > maxWidth) {
+        const suffix = '…';
+        while (output.length > 2 && ctx.measureText(output + suffix).width > maxWidth) output = output.slice(0, -1);
+        output += suffix;
+      }
+      ctx.restore();
+    }
+    text(ctx, output, x, y, { size:fittedSize, weight, color, align });
+  }
+
   function classRows() {
     return (state.classes || [])
       .filter((item) => item.active !== false)
@@ -124,15 +152,15 @@
     const name = employee?.full_name || 'עובד';
     const role = roleMark(shift.shift_role);
     const time = `${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`;
-    const compact = height < 42;
+    const compact = height < 48;
     roundRect(ctx, x, y, width, height, 9, '#f7f7fc', '#d9dbea', 1);
     if (compact) {
-      text(ctx, name, x + width - 9, y + height / 2, { size: 17.5, weight: 900, maxWidth: width * 0.59 });
-      text(ctx, time, x + 9, y + height / 2, { size: 15.5, weight: 800, color: '#565d73', align: 'left', maxWidth: width * 0.36 });
+      fitText(ctx, name, x + width - 9, y + height / 2, { size:18.8, minSize:14.4, weight:900, maxWidth:width * .59 });
+      fitText(ctx, time, x + 9, y + height / 2, { size:16.4, minSize:13.4, weight:800, color:'#565d73', align:'left', maxWidth:width * .36 });
       return;
     }
-    text(ctx, name, x + width - 9, y + height * 0.35, { size: 20.5, weight: 900, maxWidth: width - 18 });
-    text(ctx, `${time}${role ? ` · ${role}` : ''}`, x + width - 9, y + height * 0.72, { size: 16.5, weight: 800, color: '#61677b', maxWidth: width - 18 });
+    fitText(ctx, name, x + width - 9, y + height * .31, { size:22, minSize:16.5, weight:900, maxWidth:width - 18 });
+    fitText(ctx, `${time}${role ? ` · ${role}` : ''}`, x + width - 9, y + height * .73, { size:17.7, minSize:14.2, weight:800, color:'#61677b', maxWidth:width - 18 });
   }
 
   function absenceEntriesForDate(iso, sourceRows = state.scheduleAbsences || []) {
@@ -194,13 +222,13 @@
 
     const margin = 28;
     const headerTop = 24;
-    const headerHeight = 88;
+    const headerHeight = 92;
     const dayHeaderTop = headerTop + headerHeight + 10;
-    const dayHeaderHeight = 72;
-    const absenceHeight = 170;
+    const dayHeaderHeight = 76;
+    const absenceHeight = 184;
     const footerHeight = 22;
     const tableWidth = logicalWidth - margin * 2;
-    const classColumnWidth = 174;
+    const classColumnWidth = 180;
     const classColumnX = margin + tableWidth - classColumnWidth;
     const dayAreaX = margin;
     const dayAreaWidth = tableWidth - classColumnWidth;
@@ -214,15 +242,15 @@
     const rowHeight = classBodyHeight / Math.max(1, classes.length);
 
     roundRect(ctx, margin, headerTop, tableWidth, headerHeight, 18, '#f4f3fb', '#ddddea', 1.2);
-    text(ctx, 'שיבוץ שבועי · מעון הדס', logicalWidth - margin - 24, headerTop + 31, { size:30, weight:900, color:'#292d43' });
-    text(ctx, 'השבוע ' + orderedWeekLabel(weekStart), logicalWidth - margin - 24, headerTop + 64, { size:18.5, weight:800, color:'#62667b' });
-    text(ctx, 'A4 לרוחב · עמוד אחד', margin + 22, headerTop + 45, { size:14.5, weight:750, color:'#777b8f', align:'left' });
+    text(ctx, 'שיבוץ שבועי · מעון הדס', logicalWidth - margin - 24, headerTop + 31, { size:32, weight:900, color:'#292d43' });
+    text(ctx, 'השבוע ' + orderedWeekLabel(weekStart), logicalWidth - margin - 24, headerTop + 64, { size:20, weight:800, color:'#62667b' });
+    text(ctx, 'A4 לרוחב · עמוד אחד', margin + 22, headerTop + 45, { size:15.5, weight:750, color:'#777b8f', align:'left' });
 
     ctx.fillStyle = '#efeff7';
     ctx.fillRect(classColumnX, dayHeaderTop, classColumnWidth, dayHeaderHeight);
     ctx.strokeStyle = '#d9dbe7';
     ctx.strokeRect(classColumnX, dayHeaderTop, classColumnWidth, dayHeaderHeight);
-    text(ctx, 'כיתה', classColumnX + classColumnWidth / 2, dayHeaderTop + dayHeaderHeight / 2, { size:21, weight:950, color:'#44485e', align:'center' });
+    text(ctx, 'כיתה', classColumnX + classColumnWidth / 2, dayHeaderTop + dayHeaderHeight / 2, { size:22.5, weight:950, color:'#44485e', align:'center' });
 
     dates.forEach((date, index) => {
       const x = dayAreaX + (5 - index) * dayWidth;
@@ -230,8 +258,8 @@
       ctx.fillRect(x, dayHeaderTop, dayWidth, dayHeaderHeight);
       ctx.strokeStyle = '#dfe1ea';
       ctx.strokeRect(x, dayHeaderTop, dayWidth, dayHeaderHeight);
-      text(ctx, DAY_NAMES[date.getDay()], x + dayWidth / 2, dayHeaderTop + 25, { size:20, weight:950, align:'center' });
-      text(ctx, shortDate(date), x + dayWidth / 2, dayHeaderTop + 50, { size:16.5, weight:800, color:'#72768a', align:'center' });
+      text(ctx, DAY_NAMES[date.getDay()], x + dayWidth / 2, dayHeaderTop + 25, { size:21.5, weight:950, align:'center' });
+      text(ctx, shortDate(date), x + dayWidth / 2, dayHeaderTop + 50, { size:17.8, weight:800, color:'#72768a', align:'center' });
     });
 
     classes.forEach((classItem, classIndex) => {
@@ -246,9 +274,9 @@
       ctx.fillRect(classColumnX, y, classColumnWidth, h);
       ctx.strokeStyle = '#dad9e7';
       ctx.strokeRect(classColumnX, y, classColumnWidth, h);
-      text(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, y + h / 2 - 10, { size:25, weight:950, color:'#4a4562', align:'center', maxWidth:classColumnWidth - 18 });
+      fitText(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, y + h / 2 - 12, { size:27, minSize:20, weight:950, color:'#4a4562', align:'center', maxWidth:classColumnWidth - 18 });
       const weeklyCount = shiftRows.filter((row) => row.class_id === classItem.id && dates.some((date) => row.shift_date === dateISO(date))).length;
-      text(ctx, weeklyCount + ' שיבוצים', classColumnX + classColumnWidth / 2, y + h / 2 + 24, { size:12.8, weight:750, color:'#858197', align:'center', maxWidth:classColumnWidth - 18 });
+      fitText(ctx, weeklyCount + ' שיבוצים', classColumnX + classColumnWidth / 2, y + h / 2 + 26, { size:13.8, minSize:11.5, weight:750, color:'#858197', align:'center', maxWidth:classColumnWidth - 18 });
 
       dates.forEach((date, index) => {
         const iso = dateISO(date);
@@ -297,9 +325,9 @@
       const cardH = Math.min(142, Math.max(112, bodyH * .42));
       const cardY = classesTop + (bodyH - cardH) / 2;
       roundRect(ctx, x + 12, cardY, dayWidth - 24, cardH, 17, '#fff3d4', '#e4c97f', 1.3);
-      text(ctx, 'חופש כללי', x + dayWidth / 2, cardY + 31, { size:21, weight:950, color:'#76551b', align:'center', maxWidth:dayWidth - 38 });
-      text(ctx, off.title || 'יום חופשי', x + dayWidth / 2, cardY + 66, { size:17.5, weight:900, color:'#866326', align:'center', maxWidth:dayWidth - 38 });
-      if (off.description) text(ctx, compactReason(off.description, 52), x + dayWidth / 2, cardY + 101, { size:12.5, weight:700, color:'#9a7942', align:'center', maxWidth:dayWidth - 42 });
+      fitText(ctx, 'חופש כללי', x + dayWidth / 2, cardY + 31, { size:22.5, minSize:18, weight:950, color:'#76551b', align:'center', maxWidth:dayWidth - 38 });
+      fitText(ctx, off.title || 'יום חופשי', x + dayWidth / 2, cardY + 66, { size:18.8, minSize:15, weight:900, color:'#866326', align:'center', maxWidth:dayWidth - 38 });
+      if (off.description) fitText(ctx, compactReason(off.description, 52), x + dayWidth / 2, cardY + 101, { size:13.5, minSize:10.5, weight:700, color:'#9a7942', align:'center', maxWidth:dayWidth - 42 });
     });
 
     const absenceTop = classesBottom;
@@ -312,8 +340,8 @@
     ctx.fillRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
     ctx.strokeStyle = '#e0d4bc';
     ctx.strokeRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
-    text(ctx, 'חופש / היעדרות', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 - 12, { size:20.5, weight:950, color:'#735f3e', align:'center', maxWidth:classColumnWidth - 14 });
-    text(ctx, 'לפי יום', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 + 20, { size:13, weight:750, color:'#9a886b', align:'center' });
+    text(ctx, 'חופש / היעדרות', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 - 12, { size:22.5, weight:950, color:'#735f3e', align:'center', maxWidth:classColumnWidth - 14 });
+    text(ctx, 'לפי יום', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 + 20, { size:14.2, weight:750, color:'#9a886b', align:'center' });
 
     dates.forEach((date, index) => {
       const x = dayAreaX + (5 - index) * dayWidth;
@@ -321,7 +349,7 @@
       ctx.strokeRect(x, absenceTop, dayWidth, absenceHeight);
       const items = absenceEntriesForDate(dateISO(date), absenceRows);
       if (!items.length) {
-        text(ctx, '—', x + dayWidth / 2, absenceTop + absenceHeight / 2, { size:16, weight:650, color:'#b0aa9c', align:'center' });
+        text(ctx, '—', x + dayWidth / 2, absenceTop + absenceHeight / 2, { size:17, weight:650, color:'#b0aa9c', align:'center' });
         return;
       }
 
@@ -334,7 +362,7 @@
       const innerWidth = dayWidth - 14;
       const innerHeight = absenceHeight - 16;
       const cardWidth = (innerWidth - gapX * (columns - 1)) / columns;
-      const cardHeight = Math.max(27, Math.min(38, (innerHeight - gapY * (rowsPerColumn - 1)) / rowsPerColumn));
+      const cardHeight = Math.max(29, Math.min(42, (innerHeight - gapY * (rowsPerColumn - 1)) / rowsPerColumn));
 
       items.forEach((item, itemIndex) => {
         const column = Math.floor(itemIndex / rowsPerColumn);
@@ -342,22 +370,23 @@
         const cardX = innerX + (columns - 1 - column) * (cardWidth + gapX);
         const cardY = innerY + row * (cardHeight + gapY);
         const worked = item.absence_type === 'day_off_worked';
-        const fill = worked ? '#edf9f1' : '#fff0f0';
-        const border = worked ? '#add7bb' : '#efb1b1';
-        const color = worked ? '#2f754a' : '#923b3b';
+        const approvedLeave = item.absence_type === 'leave';
+        const fill = worked ? '#edf9f1' : approvedLeave ? '#fff0f0' : '#f8f8fb';
+        const border = worked ? '#add7bb' : approvedLeave ? '#efb1b1' : '#d9dbe5';
+        const color = worked ? '#2f754a' : approvedLeave ? '#923b3b' : '#555b6e';
         roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 8, fill, border, 1);
         const name = item.employee_name || employeeById(item.employee_id)?.full_name || 'עובד';
         const label = absencePdfLabel(item.absence_type);
-        if (cardHeight >= 34) {
-          text(ctx, name, cardX + cardWidth - 7, cardY + cardHeight * .35, { size:15.2, weight:900, color, maxWidth:cardWidth - 14 });
-          text(ctx, label, cardX + cardWidth - 7, cardY + cardHeight * .72, { size:10.4, weight:750, color, maxWidth:cardWidth - 14 });
+        if (cardHeight >= 35) {
+          fitText(ctx, name, cardX + cardWidth - 7, cardY + cardHeight * .34, { size:16.2, minSize:12.8, weight:900, color, maxWidth:cardWidth - 14 });
+          fitText(ctx, label, cardX + cardWidth - 7, cardY + cardHeight * .73, { size:11.3, minSize:9.4, weight:750, color, maxWidth:cardWidth - 14 });
         } else {
-          text(ctx, name, cardX + cardWidth - 7, cardY + cardHeight / 2, { size:13.4, weight:850, color, maxWidth:cardWidth - 14 });
+          fitText(ctx, name, cardX + cardWidth - 7, cardY + cardHeight / 2, { size:14.4, minSize:11.8, weight:850, color, maxWidth:cardWidth - 14 });
         }
       });
     });
 
-    text(ctx, 'מעון הדס · ' + orderedWeekLabel(weekStart), logicalWidth - margin, logicalHeight - 15, { size:10.8, weight:700, color:'#8b8e9e' });
+    text(ctx, 'מעון הדס · ' + orderedWeekLabel(weekStart), logicalWidth - margin, logicalHeight - 15, { size:11.8, weight:700, color:'#8b8e9e' });
     return canvas;
   }
 
