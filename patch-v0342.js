@@ -441,165 +441,47 @@
     }
     return rows;
   }
-  async function monthSchedulePayload(monthKey) {
-    const dates = monthDates(monthKey);
-    if (!dates.length) return { shifts: [], generalDaysOff: [] };
-    const firstSunday = startOfWeek(dates[0]);
-    const lastSunday = startOfWeek(dates[dates.length - 1]);
+  function monthWeekStarts(monthKey) {
+    const [year, month] = String(monthKey).split('-').map(Number);
+    const firstDay = new Date(year, month - 1, 1, 12);
+    const lastDay = new Date(year, month, 0, 12);
+    const firstSunday = startOfWeek(firstDay);
+    const lastSunday = startOfWeek(lastDay);
     const weeks = [];
-    for (let cursor = firstSunday; cursor <= lastSunday; cursor = addDays(cursor, 7)) weeks.push(new Date(cursor));
-    const payloads = await Promise.all(weeks.map((week) => fetchScheduleWeek(week, { force: false, apply: false })));
-    const shiftMap = new Map();
-    const dayOffMap = new Map();
-    for (const payload of payloads) {
-      for (const row of payload?.shifts || []) shiftMap.set(row.id || [row.shift_date,row.class_id,row.employee_id,row.start_time].join('|'), row);
-      for (const row of payload?.generalDaysOff || []) dayOffMap.set(row.id || row.event_date, row);
-    }
-    return { shifts: [...shiftMap.values()], generalDaysOff: [...dayOffMap.values()] };
-  }
-  function buildMonthlyA4Canvas(monthKey, payload) {
-    const logicalWidth = 1754;
-    const logicalHeight = 1240;
-    const canvas = document.createElement('canvas');
-    canvas.width = logicalWidth * SCALE;
-    canvas.height = logicalHeight * SCALE;
-    const ctx = canvas.getContext('2d', { alpha:false });
-    ctx.scale(SCALE, SCALE);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, logicalWidth, logicalHeight);
-
-    const margin = 26;
-    const titleHeight = 78;
-    const headerHeight = 50;
-    const footerHeight = 20;
-    const tableWidth = logicalWidth - margin * 2;
-    const dates = monthDates(monthKey);
-    const classes = classRows();
-    const tableTop = margin + titleHeight;
-    const tableBottom = logicalHeight - margin - footerHeight;
-    const rowHeight = (tableBottom - tableTop - headerHeight) / Math.max(1, dates.length);
-    const dateColumnWidth = 158;
-    const dateColumnX = margin + tableWidth - dateColumnWidth;
-    const classAreaX = margin;
-    const classAreaWidth = tableWidth - dateColumnWidth;
-    const classWidth = classAreaWidth / Math.max(1, classes.length);
-    const parts = String(monthKey).split('-').map(Number);
-    const monthLabel = new Intl.DateTimeFormat('he-IL', { month:'long', year:'numeric' }).format(new Date(parts[0], parts[1] - 1, 1, 12));
-
-    function compactShiftLabel(shift) {
-      const employee = employeeById(shift.employee_id);
-      const name = employee?.full_name || 'עובד';
-      return name + ' ' + trimTime(shift.start_time) + '–' + trimTime(shift.end_time);
-    }
-    function linesForLabels(labels, maxWidth, size) {
-      ctx.save();
-      ctx.direction = 'rtl';
-      ctx.font = '800 ' + size + 'px Arial, "Helvetica Neue", sans-serif';
-      const lines = [];
-      let current = '';
-      labels.forEach((label) => {
-        const candidate = current ? current + ' · ' + label : label;
-        if (current && ctx.measureText(candidate).width > maxWidth) {
-          lines.push(current);
-          current = label;
-        } else current = candidate;
-      });
-      if (current) lines.push(current);
-      ctx.restore();
-      return lines;
-    }
-    function drawMonthlyCell(labels, x, y, width, height) {
-      if (!labels.length) {
-        text(ctx, '—', x + width / 2, y + height / 2, { size:11, weight:650, color:'#b3b5c0', align:'center' });
-        return;
-      }
-      let size = 12.6;
-      let lines = linesForLabels(labels, width - 14, size);
-      while (lines.length > 3 && size > 9.8) {
-        size -= .6;
-        lines = linesForLabels(labels, width - 14, size);
-      }
-      const lineHeight = Math.min(size + 2, (height - 4) / Math.max(1, lines.length));
-      const total = lineHeight * lines.length;
-      let yy = y + (height - total) / 2 + lineHeight / 2;
-      lines.forEach((line) => {
-        text(ctx, line, x + width - 7, yy, { size, weight:800, color:'#3f4355', maxWidth:width - 14 });
-        yy += lineHeight;
-      });
-    }
-
-    roundRect(ctx, margin, margin, tableWidth, titleHeight - 8, 17, '#f4f3fb', '#ddddea', 1.1);
-    text(ctx, 'שיבוץ חודשי · מעון הדס', logicalWidth - margin - 22, margin + 24, { size:28, weight:950, color:'#292d43' });
-    text(ctx, monthLabel, logicalWidth - margin - 22, margin + 52, { size:19, weight:850, color:'#62667b' });
-    text(ctx, 'A4 לרוחב · עמוד אחד', margin + 20, margin + 37, { size:14, weight:750, color:'#777b8f', align:'left' });
-
-    ctx.fillStyle = '#efeff7';
-    ctx.fillRect(dateColumnX, tableTop, dateColumnWidth, headerHeight);
-    ctx.strokeStyle = '#daddE8';
-    ctx.strokeRect(dateColumnX, tableTop, dateColumnWidth, headerHeight);
-    text(ctx, 'יום', dateColumnX + dateColumnWidth / 2, tableTop + headerHeight / 2, { size:17, weight:950, align:'center' });
-
-    classes.forEach((classItem, index) => {
-      const x = classAreaX + (classes.length - 1 - index) * classWidth;
-      ctx.fillStyle = index % 2 ? '#fafafe' : '#f6f6fb';
-      ctx.fillRect(x, tableTop, classWidth, headerHeight);
-      ctx.strokeStyle = '#dfe1ea';
-      ctx.strokeRect(x, tableTop, classWidth, headerHeight);
-      text(ctx, classItem.name || 'כיתה', x + classWidth / 2, tableTop + headerHeight / 2, { size:17, weight:950, color:'#44485e', align:'center', maxWidth:classWidth - 16 });
-    });
-
-    const offByDate = new Map((payload.generalDaysOff || []).map((row) => [String(row.event_date || row.date || ''), row]));
-    dates.forEach((date, rowIndex) => {
-      const iso = dateISO(date);
-      const y = tableTop + headerHeight + rowIndex * rowHeight;
-      const h = rowIndex === dates.length - 1 ? tableBottom - y : rowHeight;
-      const off = offByDate.get(iso);
-      const baseFill = rowIndex % 2 ? '#ffffff' : '#fcfcff';
-      ctx.fillStyle = off ? '#fff8e7' : baseFill;
-      ctx.fillRect(margin, y, tableWidth, h);
-      ctx.strokeStyle = off ? '#ead9ac' : '#e3e4ec';
-      ctx.strokeRect(margin, y, tableWidth, h);
-
-      ctx.fillStyle = off ? '#fff1ca' : '#f8f8fc';
-      ctx.fillRect(dateColumnX, y, dateColumnWidth, h);
-      ctx.strokeStyle = off ? '#e4cb87' : '#e0e1e9';
-      ctx.strokeRect(dateColumnX, y, dateColumnWidth, h);
-      text(ctx, DAY_NAMES[date.getDay()] + ' · ' + shortDate(date), dateColumnX + dateColumnWidth - 9, y + h / 2, { size:Math.max(11.5, Math.min(13.5, h * .34)), weight:900, color:off ? '#76551b' : '#4e5267', maxWidth:dateColumnWidth - 18 });
-
-      if (off) {
-        ctx.fillStyle = '#fff8e7';
-        ctx.fillRect(classAreaX, y, classAreaWidth, h);
-        ctx.strokeStyle = '#ead9ac';
-        ctx.strokeRect(classAreaX, y, classAreaWidth, h);
-        const holidayText = 'חופש כללי · ' + (off.title || 'יום חופשי');
-        text(ctx, holidayText, classAreaX + classAreaWidth - 12, y + h / 2 - (off.description ? 6 : 0), { size:Math.max(12, Math.min(14.2, h * .38)), weight:950, color:'#7b5a1f', maxWidth:classAreaWidth - 24 });
-        if (off.description) text(ctx, compactReason(off.description, 110), classAreaX + classAreaWidth - 12, y + h / 2 + 10, { size:Math.max(9.5, Math.min(11, h * .28)), weight:700, color:'#9b7a43', maxWidth:classAreaWidth - 24 });
-        return;
-      }
-
-      classes.forEach((classItem, index) => {
-        const x = classAreaX + (classes.length - 1 - index) * classWidth;
-        ctx.strokeStyle = '#e6e7ee';
-        ctx.strokeRect(x, y, classWidth, h);
-        const rows = typeof sortScheduleRows === 'function'
-          ? sortScheduleRows((payload.shifts || []).filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id))
-          : (payload.shifts || []).filter((shift) => shift.shift_date === iso && shift.class_id === classItem.id);
-        drawMonthlyCell(rows.map(compactShiftLabel), x, y, classWidth, h);
-      });
-    });
-
-    text(ctx, 'מעון הדס · ' + monthLabel, logicalWidth - margin, logicalHeight - 13, { size:10.5, weight:700, color:'#8b8e9e' });
-    return canvas;
+    for (let cursor = new Date(firstSunday); cursor <= lastSunday; cursor = addDays(cursor, 7)) weeks.push(new Date(cursor));
+    return weeks;
   }
 
-  function printCanvasDirect(canvas) {
+  async function monthSchedulePages(monthKey) {
+    const weeks = monthWeekStarts(monthKey);
+    const payloads = await Promise.all(weeks.map((week) => fetchScheduleWeek(week, { force:false, apply:false })));
+    return weeks.map((weekStart, index) => ({
+      weekStart,
+      payload:payloads[index] || {},
+      canvas:buildA4ScheduleCanvas({
+        weekStart,
+        shifts:payloads[index]?.shifts || [],
+        scheduleAbsences:payloads[index]?.scheduleAbsences || [],
+        generalDaysOff:payloads[index]?.generalDaysOff || [],
+      }),
+    }));
+  }
+
+  function printCanvasesDirect(canvases) {
+    const pages = (canvases || []).filter(Boolean);
+    if (!pages.length) return;
     document.querySelector('#v036PrintRoot')?.remove();
     const root = document.createElement('div');
     root.id = 'v036PrintRoot';
-    const image = document.createElement('img');
-    image.alt = 'שיבוץ מעון הדס להדפסה';
-    image.src = canvas.toDataURL('image/jpeg', .99);
-    root.append(image);
+    pages.forEach((canvas, index) => {
+      const page = document.createElement('section');
+      page.className = 'v036-print-page';
+      const image = document.createElement('img');
+      image.alt = `שיבוץ מעון הדס להדפסה · עמוד ${index + 1}`;
+      image.src = canvas.toDataURL('image/jpeg', .99);
+      page.append(image);
+      root.append(page);
+    });
     document.body.append(root);
     document.body.classList.add('v036-printing');
     const cleanup = () => {
@@ -619,6 +501,10 @@
     setTimeout(() => {
       if (document.body.classList.contains('v036-printing')) cleanup();
     }, 60000);
+  }
+
+  function printCanvasDirect(canvas) {
+    printCanvasesDirect([canvas]);
   }
 
   function ensureUnifiedPdfDialog() {
