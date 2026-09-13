@@ -9,7 +9,7 @@ const { truthy } = require('../lib/requests-v030');
 const { syntheticLeaveRequestId } = require('../lib/calendar-v030');
 
 test('0.30 release layers remain available under the current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.35.0');
+  assert.equal(JSON.parse(read('package.json')).version, '0.36.0');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('health.js'), /update-v0.35.0\.sql/);
