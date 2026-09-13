@@ -10,9 +10,9 @@ test('0.33 release remains in the 0.34 compatibility chain', () => {
   const entry = read('patch-v025.js');
   const patch = read('patch-v033.js');
   const vercel = JSON.parse(read('vercel.json'));
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf7'/);
   assert.match(entry, /__hadasV033BootstrapPromise/);
-  assert.match(patch, /PREVIOUS = '\/patch-v032\.js\?v=0321'/);
+  assert.match(patch, /PREVIOUS = '\/patch-v032\.js\?v=0321hf7'/);
   assert.match(patch, /releaseBootstrap/);
   assert.match(entry, /V034 = '\/patch-v034\.js\?v=0350'/);
   assert.ok(!vercel.rewrites.some((item) => item.source === '/patch-v025.js' || item.source === '/patch-v025.css'));
