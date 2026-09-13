@@ -879,9 +879,26 @@
     .v036-pdf-status{padding:0 16px 8px;color:#6b6f83;font-size:.82rem;font-weight:800}.v036-pdf-preview{overflow:auto;margin:0 14px 12px;padding:10px;border:1px solid #dfe1e9;border-radius:16px;background:#d9dbe2;display:grid;place-items:center;overscroll-behavior:contain}.v036-pdf-canvas{display:block!important;width:min(100%,1040px)!important;height:auto!important;box-shadow:0 8px 25px rgba(31,33,58,.18);background:#fff}
     .v036-pdf-shell>footer{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:9px;padding:13px 16px;background:#fff;border-top:1px solid #e4e5ed}.v036-pdf-shell>footer button{min-height:44px!important;font-size:.86rem!important}
     html[data-hadas-role="manager"] #v036PdfBtn,html[data-hadas-role="teacher"] #v036PdfBtn,html[data-hadas-role="full"] #v036PdfBtn,html[data-hadas-role="lead"] #v036PdfBtn{display:inline-flex!important;visibility:visible!important}
+    #v036PrintRoot{display:none}
+    @media print{
+      @page{size:A4 landscape;margin:0}
+      html,body{margin:0!important;padding:0!important;background:#fff!important}
+      body.v036-printing>*:not(#v036PrintRoot){display:none!important}
+      body.v036-printing #v036PrintRoot{display:flex!important;position:fixed!important;inset:0!important;width:297mm!important;height:210mm!important;margin:0!important;padding:0!important;align-items:center!important;justify-content:center!important;background:#fff!important;z-index:2147483647!important}
+      body.v036-printing #v036PrintRoot img{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important}
+    }
     @media(max-width:820px){
       #appVersionBadge{display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;top:calc(env(safe-area-inset-top) + 66px)!important;left:7px!important;bottom:auto!important;z-index:140!important;background:rgba(255,255,255,.96)!important;font-size:.66rem!important;padding:4px 8px!important}
       .schedule-secondary-actions #v036PdfBtn{grid-column:1/-1!important;min-height:44px!important;font-size:.76rem!important;width:100%!important;justify-content:center!important}
+      .schedule-tools-menu:not([open])>.schedule-secondary-actions{display:none!important}
+      .mobile-week-day>.v036-mobile-day-toggle{appearance:none!important;-webkit-appearance:none!important;width:100%!important;border:0!important;margin:0!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"name chevron" "stats status"!important;align-items:center!important;gap:6px 9px!important;min-height:76px!important;padding:11px 13px!important;background:linear-gradient(135deg,#fff,#fafaff)!important;color:inherit!important;text-align:right!important;font:inherit!important;cursor:pointer!important;touch-action:manipulation!important}
+      .mobile-week-day.is-open>.v036-mobile-day-toggle{border-bottom:1px solid #e8e9f2!important;background:#f0efff!important}
+      .mobile-week-day.is-open .mobile-week-chevron{transform:rotate(180deg)!important}
+      .mobile-week-day-body[hidden]{display:none!important}
+      .v036-mobile-holiday-status{background:#fff0c8!important;color:#7e5b18!important}
+      .v036-mobile-holiday-body{display:grid;gap:5px;place-items:center;padding:18px 12px;border:1px solid #ecd49a;border-radius:14px;background:#fff8e8;color:#79581d;text-align:center}
+      .v036-mobile-holiday-body strong{font-size:1rem}.v036-mobile-holiday-body span{font-size:.82rem;font-weight:900}.v036-mobile-holiday-body small{font-size:.68rem;line-height:1.4;color:#93763f}
+
       .v036-pdf-dialog{width:98vw;max-height:96vh;border-radius:18px}.v036-pdf-shell{max-height:95vh}.v036-pdf-shell>header{padding:12px}.v036-pdf-shell>header strong{font-size:1.08rem}.v036-pdf-shell>header small{font-size:.72rem}
       .v036-pdf-options{align-items:stretch;flex-direction:column;padding:9px 10px}.v036-pdf-tabs{width:100%}.v036-pdf-tabs button{flex:1;min-height:42px}.v036-month-field{justify-content:space-between}
       .v036-pdf-shell>footer{grid-template-columns:1fr 1fr;padding:10px;gap:7px}.v036-pdf-shell>footer [data-pdf-action="print"]{grid-column:1/-1}
