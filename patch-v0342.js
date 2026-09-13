@@ -590,7 +590,7 @@
     }));
     setTimeout(() => {
       if (document.body.classList.contains('v036-printing')) cleanup();
-    }, 15000);
+    }, 60000);
   }
 
   function ensureUnifiedPdfDialog() {
@@ -626,6 +626,7 @@
         return;
       }
       if(action==='print'){
+        try { dialog.close(); } catch {}
         printCanvasDirect(context.canvas);
         return;
       }
