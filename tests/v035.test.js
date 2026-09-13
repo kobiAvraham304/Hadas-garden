@@ -85,6 +85,6 @@ test('approval classification starts from raw validation before filtering exact 
   const approvals = read('lib/shifts-v030.js');
   assert.match(hotfix, /schedule\.validateWeekUnapproved = originalValidateWeek/);
   assert.match(base, /validation: validateWeekUnapproved\(/);
-  assert.match(approvals, /const validation = validateWeekUnapproved\(/);
+  assert.match(approvals, /const validation = withoutGeneralDayIssues\(validateWeekUnapproved\(/);
   assert.match(approvals, /approved = rawErrors\.filter\(\(item\) => approvals\.keys\.has\(item\.approval_key\)\)/);
 });
