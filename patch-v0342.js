@@ -127,12 +127,12 @@
     const compact = height < 42;
     roundRect(ctx, x, y, width, height, 9, '#f7f7fc', '#d9dbea', 1);
     if (compact) {
-      text(ctx, name, x + width - 9, y + height / 2, { size: 14.8, weight: 850, maxWidth: width * 0.59 });
-      text(ctx, time, x + 9, y + height / 2, { size: 13.6, weight: 750, color: '#565d73', align: 'left', maxWidth: width * 0.36 });
+      text(ctx, name, x + width - 9, y + height / 2, { size: 17.5, weight: 900, maxWidth: width * 0.59 });
+      text(ctx, time, x + 9, y + height / 2, { size: 15.5, weight: 800, color: '#565d73', align: 'left', maxWidth: width * 0.36 });
       return;
     }
-    text(ctx, name, x + width - 9, y + height * 0.36, { size: 17, weight: 900, maxWidth: width - 18 });
-    text(ctx, `${time}${role ? ` · ${role}` : ''}`, x + width - 9, y + height * 0.72, { size: 13.5, weight: 750, color: '#61677b', maxWidth: width - 18 });
+    text(ctx, name, x + width - 9, y + height * 0.35, { size: 20.5, weight: 900, maxWidth: width - 18 });
+    text(ctx, `${time}${role ? ` · ${role}` : ''}`, x + width - 9, y + height * 0.72, { size: 16.5, weight: 800, color: '#61677b', maxWidth: width - 18 });
   }
 
   function absenceNamesForDate(iso) {
@@ -175,7 +175,7 @@
     const headerTop = 28;
     const titleHeight = 95;
     const dayHeaderTop = headerTop + titleHeight + 12;
-    const dayHeaderHeight = 84;
+    const dayHeaderHeight = 78;
     const absenceHeight = 92;
     const footerHeight = 24;
     const classLabelWidth = 142;
@@ -207,11 +207,11 @@
       ctx.lineWidth = 1;
       ctx.strokeRect(x, dayHeaderTop, dayWidth, dayHeaderHeight);
       const generalOff = generalDayOffFor(date);
-      text(ctx, DAY_NAMES[date.getDay()], x + dayWidth / 2, dayHeaderTop + 18, { size: 18.5, weight: 900, align: 'center' });
-      text(ctx, shortDate(date), x + dayWidth / 2, dayHeaderTop + 40, { size: 15.5, weight: 750, color: '#70758a', align: 'center' });
+      text(ctx, DAY_NAMES[date.getDay()], x + dayWidth / 2, dayHeaderTop + 17, { size: 20, weight: 900, align: 'center' });
+      text(ctx, shortDate(date), x + dayWidth / 2, dayHeaderTop + 39, { size: 17, weight: 800, color: '#70758a', align: 'center' });
       if (generalOff) {
-        text(ctx, generalOff.title || 'חופש כללי', x + dayWidth / 2, dayHeaderTop + 59, { size: 12.5, weight: 900, color: '#8a5c18', align: 'center', maxWidth: dayWidth - 12 });
-        if (generalOff.description) text(ctx, compactReason(generalOff.description, 42), x + dayWidth / 2, dayHeaderTop + 75, { size: 9.8, weight: 650, color: '#9a7a49', align: 'center', maxWidth: dayWidth - 10 });
+        text(ctx, generalOff.title || 'חופש כללי', x + dayWidth / 2, dayHeaderTop + 58, { size: 13.8, weight: 900, color: '#8a5c18', align: 'center', maxWidth: dayWidth - 12 });
+        if (generalOff.description) text(ctx, compactReason(generalOff.description, 42), x + dayWidth / 2, dayHeaderTop + 73, { size: 10.8, weight: 700, color: '#9a7a49', align: 'center', maxWidth: dayWidth - 10 });
       }
     });
 
@@ -427,10 +427,10 @@
     dates.forEach((date,rowIndex)=>{
       const iso=dateISO(date),y=tableTop+headerH+rowIndex*rowH,off=offByDate.get(iso);
       ctx.fillStyle=off?'#fff8e8':(rowIndex%2?'#fff':'#fdfdff');ctx.fillRect(margin,y,tableW,rowH);ctx.strokeStyle='#e2e4ed';ctx.strokeRect(margin,y,tableW,rowH);
-      text(ctx,`${DAY_NAMES[date.getDay()]} · ${shortDate(date)}`,margin+dayCol-8,y+rowH/2,{size:Math.max(10.5,Math.min(13,rowH*.34)),weight:850,maxWidth:dayCol-16});
+      text(ctx,`${DAY_NAMES[date.getDay()]} · ${shortDate(date)}`,margin+dayCol-8,y+rowH/2,{size:Math.max(12,Math.min(14.5,rowH*.39)),weight:900,maxWidth:dayCol-16});
       if(off){
-        text(ctx,`חופש כללי — ${compactReason(off.title||'',34)}`,margin+dayCol+10,y+rowH/2-5,{size:Math.max(10,Math.min(13,rowH*.32)),weight:900,color:'#8a5c18',maxWidth:tableW-dayCol-20});
-        if(off.description) text(ctx,compactReason(off.description,92),margin+dayCol+10,y+rowH/2+9,{size:Math.max(8.5,Math.min(10.5,rowH*.25)),weight:650,color:'#987749',maxWidth:tableW-dayCol-20});
+        text(ctx,`חופש כללי — ${compactReason(off.title||'',34)}`,margin+dayCol+10,y+rowH/2-6,{size:Math.max(11.5,Math.min(14,rowH*.36)),weight:900,color:'#8a5c18',maxWidth:tableW-dayCol-20});
+        if(off.description) text(ctx,compactReason(off.description,92),margin+dayCol+10,y+rowH/2+10,{size:Math.max(9.8,Math.min(11.8,rowH*.29)),weight:700,color:'#987749',maxWidth:tableW-dayCol-20});
         return;
       }
       classes.forEach((classItem,index)=>{
@@ -439,7 +439,7 @@
         if(!rows.length){text(ctx,'—',x+classW/2,y+rowH/2,{size:11,weight:650,color:'#b0b3bf',align:'center'});return;}
         const labels=rows.slice(0,4).map((shift)=>`${employeeById(shift.employee_id)?.full_name||'עובד'} ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`);
         const line=labels.join(' · ')+(rows.length>4?` · +${rows.length-4}`:'');
-        text(ctx,line,x+classW-7,y+rowH/2,{size:Math.max(8.8,Math.min(11.6,rowH*.29)),weight:760,color:'#3f4355',maxWidth:classW-14});
+        text(ctx,line,x+classW-7,y+rowH/2,{size:Math.max(10.5,Math.min(13.2,rowH*.34)),weight:800,color:'#3f4355',maxWidth:classW-14});
       });
     });
     text(ctx,`מעון הדס · ${monthLabel}`,logicalWidth-margin,logicalHeight-15,{size:10.5,weight:650,color:'#8c8f9e'});
@@ -519,16 +519,48 @@
   function enhanceScheduleDays(){
     const dates=Array.from({length:6},(_,i)=>addDays(state.weekStart,i));
     const headers=[...document.querySelectorAll('#scheduleExport .schedule-desktop-week thead th:not(.class-name)')];
-    headers.forEach((header,index)=>{const date=dates[index];if(!date)return;const iso=dateISO(date),off=generalDayOffFor(iso);header.dataset.copyScheduleDay=iso;header.classList.add('v036-copy-day-header');if(!header.querySelector('.v036-copy-hint'))header.insertAdjacentHTML('beforeend','<span class="v036-copy-hint">העתק יום</span>');const old=header.querySelector('.v036-general-day');if(old)old.remove();if(off)header.insertAdjacentHTML('beforeend',`<span class="v036-general-day"><b>☀ ${escapeHtml(off.title||'חופש כללי')}</b><small>${escapeHtml(off.description||'חופש כללי')}</small></span>`);});
+    headers.forEach((header,index)=>{
+      const date=dates[index]; if(!date)return;
+      const iso=dateISO(date),off=generalDayOffFor(iso);
+      header.dataset.copyScheduleDay=iso;
+      header.classList.add('v036-copy-day-header');
+      header.title='לחיצה להעתקת השיבוץ של היום';
+      header.setAttribute('aria-label',`${header.textContent?.trim()||'יום'} — לחיצה להעתקת השיבוץ`);
+      header.querySelector('.v036-copy-hint')?.remove();
+      header.querySelector('.v036-general-day')?.remove();
+      if(off) header.insertAdjacentHTML('beforeend',`<span class="v036-general-day" title="${escapeHtml(off.description||off.title||'חופש כללי')}"><b>☀ ${escapeHtml(off.title||'חופש כללי')}</b></span>`);
+    });
     const tableRows=[...document.querySelectorAll('#scheduleExport .schedule-desktop-week tbody tr')];
-    tableRows.forEach((row)=>dates.forEach((date,index)=>{const cell=row.children[index+1];if(!cell)return;const off=generalDayOffFor(dateISO(date));cell.classList.toggle('v036-general-off-cell',Boolean(off));if(off&&!cell.querySelector('.shift-card')&&!cell.querySelector('.v036-off-label'))cell.querySelector('.schedule-cell')?.insertAdjacentHTML('afterbegin',`<div class="v036-off-label"><strong>חופש כללי</strong><small>${escapeHtml(off.title||'')}</small></div>`);}));
-    document.querySelectorAll('#scheduleExport .mobile-week-day').forEach((day,index)=>{const date=dates[index],off=date&&generalDayOffFor(dateISO(date));day.querySelector('.v036-mobile-copy')?.remove();const body=day.querySelector('.mobile-week-day-body');if(body&&date)body.insertAdjacentHTML('afterbegin',`<button type="button" class="secondary-btn v036-mobile-copy" data-copy-schedule-day="${dateISO(date)}">העתקת השיבוץ של היום</button>`);day.querySelector('.v036-mobile-general')?.remove();if(off)day.querySelector('summary')?.insertAdjacentHTML('beforeend',`<span class="v036-mobile-general">☀ ${escapeHtml(off.title||'חופש כללי')}</span>`);});
+    tableRows.forEach((row)=>dates.forEach((date,index)=>{
+      const cell=row.children[index+1]; if(!cell)return;
+      const off=generalDayOffFor(dateISO(date));
+      cell.classList.toggle('v036-general-off-cell',Boolean(off));
+      cell.querySelector('.v036-off-label')?.remove();
+      if(off&&!cell.querySelector('.shift-card')){
+        const reason=off.description||off.title||'חופש כללי';
+        cell.querySelector('.schedule-cell')?.insertAdjacentHTML('afterbegin',`<div class="v036-off-label"><strong>חופש כללי</strong><small>${escapeHtml(off.title||'')}</small><em>${escapeHtml(reason)}</em></div>`);
+      }
+    }));
+    document.querySelectorAll('#scheduleExport .mobile-week-day').forEach((day,index)=>{
+      const date=dates[index],off=date&&generalDayOffFor(dateISO(date));
+      day.querySelector('.v036-mobile-copy')?.remove();
+      const body=day.querySelector('.mobile-week-day-body');
+      if(body&&date) body.insertAdjacentHTML('afterbegin',`<button type="button" class="secondary-btn v036-mobile-copy" data-copy-schedule-day="${dateISO(date)}">⧉ העתקת יום</button>`);
+      day.querySelector('.v036-mobile-general')?.remove();
+      if(off) day.querySelector('summary')?.insertAdjacentHTML('beforeend',`<span class="v036-mobile-general">☀ ${escapeHtml(off.title||'חופש כללי')}</span>`);
+    });
   }
   function installScheduleCopyEvents(){
     const panel=document.querySelector('#schedulePanel');if(!panel||panel.dataset.v036CopyEvents)return;panel.dataset.v036CopyEvents='true';
     panel.addEventListener('click',(event)=>{const target=event.target.closest('[data-copy-schedule-day]');if(!target)return;event.preventDefault();event.stopPropagation();copyDay(target.dataset.copyScheduleDay);},true);
   }
 
+  function canShowUnifiedPdf() {
+    if (!state?.profile) return false;
+    if (typeof isManager === 'function' && isManager()) return true;
+    const title=String(state.profile.job_title||'');
+    return Boolean(state.profile.can_view_full_schedule || ['full','class'].includes(String(state.profile.schedule_scope||'')) || /גנ(?:נ|ן)|סייעת\s+מובילה/.test(title));
+  }
   function installA4Button() {
     const current = document.querySelector('#printBtn');
     if (current && current.dataset.v036Pdf !== 'true') {
@@ -538,6 +570,12 @@
       button.title = 'שבוע או חודש · שמירה, שיתוף והדפסה A4';
       button.addEventListener('click', openUnifiedPdf, true);
       current.replaceWith(button);
+    }
+    const pdfButton=document.querySelector('#printBtn[data-v036-pdf="true"]');
+    if(pdfButton){
+      const visible=canShowUnifiedPdf();
+      pdfButton.classList.toggle('hidden',!visible);
+      pdfButton.setAttribute('aria-hidden',visible?'false':'true');
     }
     ['#imageBtn','#monthImageBtn','#v031PrintBtn'].forEach((selector)=>{const item=document.querySelector(selector);if(item){item.classList.add('hidden');item.setAttribute('aria-hidden','true');}});
   }
@@ -587,16 +625,26 @@
   v036Style.textContent=`
     #scheduleAbsences{overflow-x:auto!important;-webkit-overflow-scrolling:touch}
     #scheduleAbsences .absence-grid{grid-template-columns:repeat(6,minmax(148px,1fr))!important;min-width:900px!important;gap:8px!important}
-    .v036-copy-day-header{cursor:pointer!important;position:relative!important;transition:.15s ease}.v036-copy-day-header:hover{background:#e9ebff!important}
-    .v036-copy-hint{display:block;margin-top:4px;font-size:.58rem;font-weight:850;color:#767bc5}.v036-general-day{display:grid;gap:1px;margin-top:4px;padding:4px 5px;border-radius:8px;background:#fff4d9;color:#7b591b}.v036-general-day b{font-size:.62rem}.v036-general-day small{font-size:.52rem;line-height:1.15;white-space:normal}
-    .v036-general-off-cell{background:#fffaf0!important}.v036-off-label{display:grid;place-items:center;gap:3px;min-height:78px;padding:9px;border:1px dashed #e3c98c;border-radius:12px;background:#fff7e5;color:#79591f}.v036-off-label small{font-size:.68rem}
-    .v036-mobile-copy{width:100%;margin:0 0 8px}.v036-mobile-general{margin-inline-start:auto;padding:4px 7px;border-radius:999px;background:#fff1cf;color:#785719;font-size:.62rem;font-weight:900}
-    .v036-pdf-dialog{width:min(1100px,96vw);max-width:1100px;border:0;border-radius:24px;padding:0;box-shadow:0 25px 80px rgba(38,40,78,.28)}.v036-pdf-dialog::backdrop{background:rgba(29,31,54,.55);backdrop-filter:blur(4px)}
+    #scheduleExport .schedule-desktop-week thead th{padding:5px 7px!important;line-height:1.08!important;height:auto!important;min-height:0!important}
+    .v036-copy-day-header{cursor:pointer!important;position:relative!important;transition:.15s ease;padding-inline-start:25px!important}.v036-copy-day-header:hover{background:#e9ebff!important}.v036-copy-day-header::after{content:'⧉';position:absolute;inset-inline-start:6px;top:6px;width:16px;height:16px;display:grid;place-items:center;border-radius:5px;background:#eef0ff;color:#676dcc;font-size:.64rem;font-weight:900}
+    .v036-copy-hint{display:none!important}.v036-general-day{display:block;margin-top:3px;padding:3px 5px;border-radius:7px;background:#fff4d9;color:#7b591b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v036-general-day b{font-size:.61rem}.v036-general-day small{display:none}
+    .v036-general-off-cell{background:#fffaf0!important}.v036-off-label{display:grid;place-items:center;gap:2px;min-height:64px;padding:7px;border:1px dashed #e3c98c;border-radius:11px;background:#fff7e5;color:#79591f}.v036-off-label small{font-size:.68rem}.v036-off-label em{font-size:.6rem;font-style:normal;color:#94733b;line-height:1.15;text-align:center}
+    .v036-mobile-copy{width:auto!important;justify-self:end;margin:0 0 6px!important;padding:6px 10px!important;min-height:34px!important;font-size:.7rem!important}.v036-mobile-general{margin-inline-start:auto;padding:4px 7px;border-radius:999px;background:#fff1cf;color:#785719;font-size:.62rem;font-weight:900}
+    .v036-pdf-dialog{width:min(1160px,96vw);max-width:1160px;border:0;border-radius:24px;padding:0;box-shadow:0 25px 80px rgba(38,40,78,.28)}.v036-pdf-dialog::backdrop{background:rgba(29,31,54,.55);backdrop-filter:blur(4px)}
     .v036-pdf-shell{display:grid;grid-template-rows:auto auto auto minmax(260px,1fr) auto;max-height:94vh;background:#f7f7fb}.v036-pdf-shell>header{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;background:#fff;border-bottom:1px solid #e4e5ed}.v036-pdf-shell>header div{display:grid;gap:2px}.v036-pdf-shell>header strong{font-size:1.25rem}.v036-pdf-shell>header small{color:#777b8d}
     .v036-pdf-options{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px}.v036-pdf-tabs{display:flex;gap:6px;padding:4px;border-radius:13px;background:#e9eaf2}.v036-pdf-tabs button{border:0;border-radius:10px;padding:9px 22px;background:transparent;font-weight:900}.v036-pdf-tabs button.active{background:#fff;color:#565bd0;box-shadow:0 2px 9px rgba(65,67,115,.12)}.v036-month-field{display:flex;align-items:center;gap:8px;font-weight:800}.v036-month-field input{width:auto}
-    .v036-pdf-status{padding:0 16px 8px;color:#6b6f83;font-size:.78rem;font-weight:800}.v036-pdf-preview{overflow:auto;margin:0 14px 12px;padding:10px;border:1px solid #dfe1e9;border-radius:16px;background:#d9dbe2;display:grid;place-items:center}.v036-pdf-canvas{display:block!important;width:min(100%,980px)!important;height:auto!important;box-shadow:0 8px 25px rgba(31,33,58,.18);background:#fff}
-    .v036-pdf-shell>footer{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:9px;padding:13px 16px;background:#fff;border-top:1px solid #e4e5ed}
-    @media(max-width:820px){#appVersionBadge{display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;top:calc(env(safe-area-inset-top) + 66px)!important;left:7px!important;bottom:auto!important;z-index:140!important;background:rgba(255,255,255,.96)!important;font-size:.62rem!important;padding:3px 7px!important}.v036-pdf-dialog{width:98vw;max-height:96vh}.v036-pdf-shell{max-height:95vh}.v036-pdf-options{align-items:stretch;flex-direction:column}.v036-pdf-tabs{width:100%}.v036-pdf-tabs button{flex:1}.v036-month-field{justify-content:space-between}.v036-pdf-shell>footer{grid-template-columns:1fr 1fr}.v036-pdf-shell>footer [data-pdf-action="print"]{grid-column:1/-1}.v036-pdf-preview{margin-inline:8px;padding:5px}.v036-copy-hint{font-size:.55rem}}
+    .v036-pdf-status{padding:0 16px 8px;color:#6b6f83;font-size:.82rem;font-weight:800}.v036-pdf-preview{overflow:auto;margin:0 14px 12px;padding:10px;border:1px solid #dfe1e9;border-radius:16px;background:#d9dbe2;display:grid;place-items:center;overscroll-behavior:contain}.v036-pdf-canvas{display:block!important;width:min(100%,1040px)!important;height:auto!important;box-shadow:0 8px 25px rgba(31,33,58,.18);background:#fff}
+    .v036-pdf-shell>footer{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:9px;padding:13px 16px;background:#fff;border-top:1px solid #e4e5ed}.v036-pdf-shell>footer button{min-height:44px!important;font-size:.86rem!important}
+    html[data-hadas-role="manager"] #printBtn[data-v036-pdf="true"],html[data-hadas-role="teacher"] #printBtn[data-v036-pdf="true"],html[data-hadas-role="full"] #printBtn[data-v036-pdf="true"],html[data-hadas-role="lead"] #printBtn[data-v036-pdf="true"]{display:inline-flex!important;visibility:visible!important}
+    @media(max-width:820px){
+      #appVersionBadge{display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;top:calc(env(safe-area-inset-top) + 66px)!important;left:7px!important;bottom:auto!important;z-index:140!important;background:rgba(255,255,255,.96)!important;font-size:.66rem!important;padding:4px 8px!important}
+      .schedule-secondary-actions #printBtn[data-v036-pdf="true"]{grid-column:1/-1!important;min-height:44px!important;font-size:.76rem!important}
+      .v036-pdf-dialog{width:98vw;max-height:96vh;border-radius:18px}.v036-pdf-shell{max-height:95vh}.v036-pdf-shell>header{padding:12px}.v036-pdf-shell>header strong{font-size:1.08rem}.v036-pdf-shell>header small{font-size:.72rem}
+      .v036-pdf-options{align-items:stretch;flex-direction:column;padding:9px 10px}.v036-pdf-tabs{width:100%}.v036-pdf-tabs button{flex:1;min-height:42px}.v036-month-field{justify-content:space-between}
+      .v036-pdf-shell>footer{grid-template-columns:1fr 1fr;padding:10px;gap:7px}.v036-pdf-shell>footer [data-pdf-action="print"]{grid-column:1/-1}
+      .v036-pdf-preview{margin-inline:7px;padding:6px;display:block;max-height:54vh}.v036-pdf-canvas{width:820px!important;max-width:none!important}.v036-pdf-status{padding-inline:10px;font-size:.73rem}.v036-mobile-copy{min-height:36px!important}.v036-copy-hint{display:none!important}
+    }
+    @media(max-width:430px){.v036-pdf-canvas{width:760px!important}.v036-pdf-shell>footer button{font-size:.73rem!important;padding-inline:6px!important}}
   `;
   document.head.append(v036Style);
 

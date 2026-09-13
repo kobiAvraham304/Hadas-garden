@@ -72,4 +72,20 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /data-copy-schedule-day/);
   assert.match(patch, /v036-general-day/);
   assert.match(patch, /grid-template-columns:repeat\(6,minmax\(148px,1fr\)\)/);
+  assert.match(patch, /data-v036-pdf/);
+  assert.match(patch, /canShowUnifiedPdf/);
+  assert.doesNotMatch(patch, />העתק יום<\/span>/);
+  assert.match(patch, /v036-copy-day-header::after/);
+  assert.match(patch, /width:820px!important/);
+  assert.match(patch, /size: 20\.5/);
+});
+
+test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
+  const entry = read('patch-v025.js');
+  const index = read('index.html');
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf1'/);
+  assert.match(entry, /installReleaseVersionGuard/);
+  assert.match(entry, /__hadasV034VersionObservers/);
+  assert.match(entry, /__hadasReleaseVersionObservers/);
+  assert.match(index, /patch-v025\.js\?v=0360hf1/);
 });
