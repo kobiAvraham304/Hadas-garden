@@ -93,11 +93,19 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /approvedLeave \? '#fff0f0' : '#f8f8fb'/);
   assert.match(patch, /approvedLeave \? '#efb1b1' : '#d9dbe5'/);
   assert.match(patch, /function fitText/);
-  assert.match(patch, /const compact = height < 48/);
+  assert.match(patch, /ellipsis = true/);
+  assert.match(patch, /ellipsis:false/);
+  assert.match(patch, /const meta =/);
+  assert.match(patch, /size:30, minSize:25, weight:950/);
+  assert.match(patch, /const dayHeaderHeight = 64/);
+  assert.match(patch, /size:24\.5, minSize:20, weight:950/);
+  assert.match(patch, /size:17\.4, minSize:12\.8/);
+  assert.match(patch, /size:24, minSize:19, weight:950/);
+  assert.match(patch, /const compact = height < 34/);
   assert.doesNotMatch(patch, /const fill = worked \? '#edf9f1' : '#fff0f0'/);
   assert.doesNotMatch(patch, /\+.*נוספים/);
   assert.match(patch, /size:27, minSize:20, weight:950/);
-  assert.match(patch, /const absenceHeight = 184/);
+  assert.match(patch, /const absenceHeight = 192/);
   assert.match(patch, /className = 'v036-print-page'/);
   assert.doesNotMatch(patch, /window\.open\('',\s*'_blank'/);
   assert.match(patch, /v036-mobile-day-toggle/);
@@ -110,9 +118,9 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
 test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
   const entry = read('patch-v025.js');
   const index = read('index.html');
-  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf5'/);
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf6'/);
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0360hf5/);
+  assert.match(index, /patch-v025\.js\?v=0360hf6/);
 });
