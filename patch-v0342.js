@@ -371,19 +371,26 @@
   }
   function ascii(value) { return new TextEncoder().encode(String(value)); }
 
-  async function pdfFromCanvas(canvas) {
-    const jpegBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.995));
-    if (!jpegBlob) throw new Error('לא ניתן להכין את קובץ ההדפסה');
-    const image = new Uint8Array(await jpegBlob.arrayBuffer());
+  async function pdfFromCanvases(canvases) {
+    const pages = (canvases || []).filter(Boolean);
+    if (!pages.length) throw new Error('לא נמצאו עמודים להכנת PDF');
     const pageW = 841.89;
     const pageH = 595.28;
     const margin = 5;
-    const fit = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
-    const drawW = canvas.width * fit;
-    const drawH = canvas.height * fit;
-    const x = (pageW - drawW) / 2;
-    const y = (pageH - drawH) / 2;
-    const content = ascii(`q\n${drawW.toFixed(3)} 0 0 ${drawH.toFixed(3)} ${x.toFixed(3)} ${y.toFixed(3)} cm\n/Im0 Do\nQ\n`);
+    const rendered = [];
+    for (const canvas of pages) {
+      const jpegBlob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.995));
+      if (!jpegBlob) throw new Error('לא ניתן להכין את קובץ ההדפסה');
+      const image = new Uint8Array(await jpegBlob.arrayBuffer());
+      const fit = Math.min((pageW - margin * 2) / canvas.width, (pageH - margin * 2) / canvas.height);
+      const drawW = canvas.width * fit;
+      const drawH = canvas.height * fit;
+      const x = (pageW - drawW) / 2;
+      const y = (pageH - drawH) / 2;
+      const content = ascii(`q\n${drawW.toFixed(3)} 0 0 ${drawH.toFixed(3)} ${x.toFixed(3)} ${y.toFixed(3)} cm\n/Im0 Do\nQ\n`);
+      rendered.push({ canvas, image, content });
+    }
+
     const parts = [];
     const offsets = [0];
     let length = 0;
@@ -395,55 +402,30 @@
       bodyParts.forEach(push);
       push(ascii('\nendobj\n'));
     };
+
+    const pageIds = rendered.map((_, index) => 3 + index * 3);
     object(1, [ascii('<< /Type /Catalog /Pages 2 0 R >>')]);
-    object(2, [ascii('<< /Type /Pages /Kids [3 0 R] /Count 1 >>')]);
-    object(3, [ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`)]);
-    object(4, [ascii(`<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${image.length} >>\nstream\n`), image, ascii('\nendstream')]);
-    object(5, [ascii(`<< /Length ${content.length} >>\nstream\n`), content, ascii('endstream')]);
+    object(2, [ascii(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${rendered.length} >>`)]);
+    rendered.forEach((page, index) => {
+      const pageId = 3 + index * 3;
+      const imageId = pageId + 1;
+      const contentId = pageId + 2;
+      object(pageId, [ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] /Resources << /XObject << /Im0 ${imageId} 0 R >> >> /Contents ${contentId} 0 R >>`)]);
+      object(imageId, [ascii(`<< /Type /XObject /Subtype /Image /Width ${page.canvas.width} /Height ${page.canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${page.image.length} >>\nstream\n`), page.image, ascii('\nendstream')]);
+      object(contentId, [ascii(`<< /Length ${page.content.length} >>\nstream\n`), page.content, ascii('endstream')]);
+    });
+
+    const maxId = 2 + rendered.length * 3;
     const xrefOffset = length;
-    push(ascii('xref\n0 6\n0000000000 65535 f \n'));
-    for (let id = 1; id <= 5; id += 1) push(ascii(`${String(offsets[id]).padStart(10, '0')} 00000 n \n`));
-    push(ascii(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
-    return new Blob([concatBytes(parts)], { type: 'application/pdf' });
+    push(ascii(`xref\n0 ${maxId + 1}\n0000000000 65535 f \n`));
+    for (let id = 1; id <= maxId; id += 1) push(ascii(`${String(offsets[id]).padStart(10, '0')} 00000 n \n`));
+    push(ascii(`trailer\n<< /Size ${maxId + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`));
+    return new Blob([concatBytes(parts)], { type:'application/pdf' });
   }
 
-  async function shareOrDownload(blob) {
-    const filename = `שיבוץ-מעון-הדס-${dateISO(state.weekStart)}.pdf`;
-    const file = new File([blob], filename, { type: 'application/pdf' });
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: 'שיבוץ שבועי – מעון הדס', text: `שיבוץ שבועי ${orderedWeekLabel(state.weekStart)}` });
-      return 'shared';
-    }
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = filename;
-    document.body.append(anchor);
-    anchor.click();
-    anchor.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
-    return 'downloaded';
+  async function pdfFromCanvas(canvas) {
+    return pdfFromCanvases([canvas]);
   }
-
-  async function exportA4(event) {
-    event?.preventDefault?.();
-    event?.stopImmediatePropagation?.();
-    const button = event.currentTarget;
-    if (typeof setBusy === 'function') setBusy(button, true, 'מכין PDF…');
-    try {
-      stripSubstituteAvailability();
-      await document.fonts?.ready;
-      const canvas = buildA4ScheduleCanvas();
-      const blob = await pdfFromCanvas(canvas);
-      const result = await shareOrDownload(blob);
-      if (result === 'downloaded' && typeof showToast === 'function') showToast('קובץ A4 נשמר', 'success');
-    } catch (error) {
-      if (error?.name !== 'AbortError' && typeof showToast === 'function') showToast(error?.message || 'הכנת ההדפסה נכשלה', 'error');
-    } finally {
-      if (typeof setBusy === 'function') setBusy(button, false);
-    }
-  }
-
 
   function monthKeyFromWeek() {
     const d = parseDateValue(state.weekStart);
