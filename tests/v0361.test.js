@@ -21,11 +21,13 @@ test('0.36 validation ignores general holidays and uses stable auto-approval ide
 
 test('0.36 approved validation exceptions are hidden until explicitly requested', () => {
   const v031 = read('patch-v031.js');
+  const v032 = read('patch-v032-core.js');
   const v0342 = read('patch-v0342.js');
   assert.match(v031, /v031ShowApproved/);
-  assert.match(v031, /data-v031-toggle-approved/);
-  assert.match(v031, /הצגת חריגות שאושרו/);
-  assert.match(v031, /approvedHtml = state\.v031ShowApproved/);
+  assert.match(v032, /v032ShowApproved/);
+  assert.match(v032, /data-v032-toggle-approved/);
+  assert.match(v032, /הצגת חריגות שאושרו/);
+  assert.match(v032, /approvedHtml=state\.v032ShowApproved/);
   assert.match(v0342, /state\.v030Validation\.approved = state\.v030Validation\.approved \|\| \[\]/);
   assert.match(v0342, /v031-validation-card\.approved/);
   assert.match(v0342, /day-class-card\.attention-pulse/);
@@ -64,4 +66,5 @@ test('0.36 current cache chain loads the validation/request hotfix', () => {
   assert.match(entry, /patch-v0342\.js\?v=0360hf7/);
   assert.match(v033, /patch-v032\.js\?v=0321hf7/);
   assert.match(v032, /patch-v031\.js\?v=0321hf7/);
+  assert.match(v032, /patch-v032-core\.js\?v=0321hf7/);
 });
