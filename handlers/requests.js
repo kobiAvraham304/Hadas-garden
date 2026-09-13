@@ -152,20 +152,23 @@ module.exports = async function handler(req,res) {
         if (certificate) await deletePrivateFile(CERTIFICATE_BUCKET,certificate.path);
         throw error;
       }
+      const postCreateTasks = [
+        audit(caller.employee.id,'create','request',request.id,{ type,on_behalf:onBehalf,requester_id:requesterId }),
+      ];
       if(onBehalf){
-        await notifyEmployees([requesterId],{type:'request',title:'נוספה עבורך בקשה במערכת',message:`${caller.employee.full_name} הזין/ה עבורך ${type==='leave'?'חופשה':type==='sick'?'מחלה':type==='day_off'?'יום חופשי':'בקשה'} (${requestRangeLabel(request)}).`,entityType:'request',entityId:request.id,actionRequired:false});
+        postCreateTasks.push(notifyEmployees([requesterId],{type:'request',title:'נוספה עבורך בקשה במערכת',message:`${caller.employee.full_name} הזין/ה עבורך ${type==='leave'?'חופשה':type==='sick'?'מחלה':type==='day_off'?'יום חופשי':'בקשה'} (${requestRangeLabel(request)}).`,entityType:'request',entityId:request.id,actionRequired:false}));
       }
       if (type === 'swap') {
-        await notifyEmployees([payload.target_employee_id],{
+        postCreateTasks.push(notifyEmployees([payload.target_employee_id],{
           type:'swap',title:'בקשת החלפה ממתינה לאישור שלך',
           message:`${onBehalf?'הנהלת המעון':caller.employee.full_name} ביקש/ה להחליף איתך בתאריך ${payload.request_date}.`,
           entityType:'request',entityId:request.id,actionRequired:true,
-        });
+        }));
       } else if(!onBehalf) {
         const manualNote = type === 'leave' && inclusiveDays(payload.request_date,payload.request_end_date) > 2 ? ' נדרשת גם השלמת טופס חופשה ידני.' : '';
-        await notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id);
+        postCreateTasks.push(notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id));
       }
-      await audit(caller.employee.id,'create','request',request.id,{ type,on_behalf:onBehalf,requester_id:requesterId });
+      await Promise.all(postCreateTasks);
       let finalRequest=request;
       if(onBehalf&&body.apply_now===true&&['leave','day_off'].includes(type)){
         const rpc=await db().rpc('hadas_apply_approved_request',{p_request_id:request.id,p_actor_id:caller.employee.id});
