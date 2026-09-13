@@ -5,7 +5,7 @@
   const V033 = '/patch-v033.js?v=0333';
   const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
   const V034 = '/patch-v034.js?v=0350';
-  const V0342 = '/patch-v0342.js?v=0360hf2';
+  const V0342 = '/patch-v0342.js?v=0360hf3';
   const V0343 = '/patch-v0343.js?v=0350';
   const V0345 = '/patch-v0345.js?v=0360';
 
