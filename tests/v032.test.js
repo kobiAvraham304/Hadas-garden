@@ -14,7 +14,7 @@ test('0.32.1 layers remain available under the 0.34 release bootstrap', () => {
   assert.match(api, /calendar-v032/);
   assert.match(api, /shifts-v032/);
   const entry = read('patch-v025.js');
-  assert.match(entry, /const VERSION = '0\\.36\\.0'/);
+  assert.match(entry, /const VERSION = '0\.36\.0'/);
   assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await window\.__hadasV033BootstrapPromise/);
