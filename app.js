@@ -895,7 +895,8 @@ function scheduleValidationKey() {
   const settingsKey = ['opening_time','closing_time','friday_closing_time','required_staff','closing_required_staff','closing_window_minutes','validation_slot_minutes','require_leader'].map((key) => `${key}:${state.settings[key] ?? ''}`).join('|');
   const shiftKey = state.shifts.map((shift) => `${shift.id}:${shift.shift_date}:${shift.class_id}:${shift.employee_id}:${trimTime(shift.start_time)}:${trimTime(shift.end_time)}:${shift.shift_role}:${shift.status}`).sort().join(';');
   const employeeKey = state.employees.filter((item) => item.active).map((employee) => `${employee.id}:${employee.weekly_hours ?? ''}:${employee.max_weekly_hours ?? ''}`).sort().join(';');
-  return `${dateISO(state.weekStart)}|${settingsKey}|${shiftKey}|${employeeKey}`;
+  const generalOffKey = (state.calendarEvents || []).filter((item) => item?.is_general_day_off).map((item) => String(item.event_date || '')).sort().join(',');
+  return `${dateISO(state.weekStart)}|${settingsKey}|${shiftKey}|${employeeKey}|${generalOffKey}`;
 }
 function validateScheduleClient() {
   const validationKey = scheduleValidationKey();
