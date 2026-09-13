@@ -135,11 +135,27 @@
     text(ctx, `${time}${role ? ` · ${role}` : ''}`, x + width - 9, y + height * 0.72, { size: 16.5, weight: 800, color: '#61677b', maxWidth: width - 18 });
   }
 
-  function absenceNamesForDate(iso) {
-    return filterSubstituteAbsences(state.scheduleAbsences)
-      .filter((item) => item.absence_date === iso && item.absence_type !== 'day_off_worked')
-      .map((item) => employeeById(item.employee_id)?.full_name || item.employee_name || '')
-      .filter(Boolean);
+  function absenceEntriesForDate(iso, sourceRows = state.scheduleAbsences || []) {
+    const rows = filterSubstituteAbsences(sourceRows).filter((item) => item.absence_date === iso);
+    const byEmployee = new Map();
+    const priority = (item) => item.absence_type === 'day_off_worked' ? 4 : item.absence_kind === 'one_time_absence' ? 3 : item.absence_type === 'leave' ? 3 : 1;
+    for (const item of rows) {
+      const name = employeeById(item.employee_id)?.full_name || item.employee_name || '';
+      if (!name) continue;
+      const key = item.employee_id || name;
+      const existing = byEmployee.get(key);
+      if (existing && priority(existing) > priority(item)) continue;
+      byEmployee.set(key, { ...item, employee_name:name });
+    }
+    return [...byEmployee.values()].sort((a,b)=>String(a.employee_name||'').localeCompare(String(b.employee_name||''),'he'));
+  }
+  function absencePdfLabel(type) {
+    if (type === 'day_off_worked') return 'הגיעה ביום חופשי';
+    if (type === 'leave') return 'חופשה מאושרת';
+    if (type === 'sick') return 'מחלה';
+    if (type === 'day_off') return 'יום חופשי מאושר';
+    if (type === 'fixed_day_off') return 'יום חופשי קבוע';
+    return 'לא זמינה';
   }
 
 
@@ -159,7 +175,7 @@
     return textValue.length > max ? textValue.slice(0, max - 1) + '…' : textValue;
   }
 
-  function buildA4ScheduleCanvas() {
+  function buildA4ScheduleCanvas(options = {}) {
     const logicalWidth = 1754;
     const logicalHeight = 1240;
     const canvas = document.createElement('canvas');
@@ -170,21 +186,27 @@
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, logicalWidth, logicalHeight);
 
+    const weekStart = options.weekStart ? parseDateValue(options.weekStart) : state.weekStart;
+    const shiftRows = Array.isArray(options.shifts) ? options.shifts : (state.shifts || []);
+    const absenceRows = Array.isArray(options.scheduleAbsences) ? options.scheduleAbsences : (state.scheduleAbsences || []);
+    const generalRows = Array.isArray(options.generalDaysOff) ? options.generalDaysOff : generalDaysOffRows();
+    const generalOffFor = (iso) => generalRows.find((row) => String(row.event_date || row.date || '') === iso) || null;
+
     const margin = 28;
     const headerTop = 24;
     const headerHeight = 88;
     const dayHeaderTop = headerTop + headerHeight + 10;
     const dayHeaderHeight = 72;
-    const absenceHeight = 108;
+    const absenceHeight = 170;
     const footerHeight = 22;
     const tableWidth = logicalWidth - margin * 2;
-    const classColumnWidth = 162;
+    const classColumnWidth = 174;
     const classColumnX = margin + tableWidth - classColumnWidth;
     const dayAreaX = margin;
     const dayAreaWidth = tableWidth - classColumnWidth;
     const dayWidth = dayAreaWidth / 6;
     const classes = classRows();
-    const dates = Array.from({ length:6 }, (_, index) => addDays(state.weekStart, index));
+    const dates = Array.from({ length:6 }, (_, index) => addDays(weekStart, index));
     const tableBottom = logicalHeight - margin - footerHeight;
     const classesTop = dayHeaderTop + dayHeaderHeight;
     const classesBottom = tableBottom - absenceHeight;
@@ -193,14 +215,14 @@
 
     roundRect(ctx, margin, headerTop, tableWidth, headerHeight, 18, '#f4f3fb', '#ddddea', 1.2);
     text(ctx, 'שיבוץ שבועי · מעון הדס', logicalWidth - margin - 24, headerTop + 31, { size:30, weight:900, color:'#292d43' });
-    text(ctx, 'השבוע ' + orderedWeekLabel(state.weekStart), logicalWidth - margin - 24, headerTop + 64, { size:18.5, weight:800, color:'#62667b' });
+    text(ctx, 'השבוע ' + orderedWeekLabel(weekStart), logicalWidth - margin - 24, headerTop + 64, { size:18.5, weight:800, color:'#62667b' });
     text(ctx, 'A4 לרוחב · עמוד אחד', margin + 22, headerTop + 45, { size:14.5, weight:750, color:'#777b8f', align:'left' });
 
     ctx.fillStyle = '#efeff7';
     ctx.fillRect(classColumnX, dayHeaderTop, classColumnWidth, dayHeaderHeight);
     ctx.strokeStyle = '#d9dbe7';
     ctx.strokeRect(classColumnX, dayHeaderTop, classColumnWidth, dayHeaderHeight);
-    text(ctx, 'כיתה', classColumnX + classColumnWidth / 2, dayHeaderTop + dayHeaderHeight / 2, { size:19, weight:950, color:'#44485e', align:'center' });
+    text(ctx, 'כיתה', classColumnX + classColumnWidth / 2, dayHeaderTop + dayHeaderHeight / 2, { size:21, weight:950, color:'#44485e', align:'center' });
 
     dates.forEach((date, index) => {
       const x = dayAreaX + (5 - index) * dayWidth;
@@ -224,19 +246,19 @@
       ctx.fillRect(classColumnX, y, classColumnWidth, h);
       ctx.strokeStyle = '#dad9e7';
       ctx.strokeRect(classColumnX, y, classColumnWidth, h);
-      text(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, y + h / 2 - 9, { size:20, weight:950, color:'#4a4562', align:'center', maxWidth:classColumnWidth - 18 });
-      const weeklyCount = (state.shifts || []).filter((row) => row.class_id === classItem.id && dates.some((date) => row.shift_date === dateISO(date))).length;
-      text(ctx, weeklyCount + ' שיבוצים', classColumnX + classColumnWidth / 2, y + h / 2 + 20, { size:11.8, weight:700, color:'#858197', align:'center', maxWidth:classColumnWidth - 18 });
+      text(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, y + h / 2 - 10, { size:25, weight:950, color:'#4a4562', align:'center', maxWidth:classColumnWidth - 18 });
+      const weeklyCount = shiftRows.filter((row) => row.class_id === classItem.id && dates.some((date) => row.shift_date === dateISO(date))).length;
+      text(ctx, weeklyCount + ' שיבוצים', classColumnX + classColumnWidth / 2, y + h / 2 + 24, { size:12.8, weight:750, color:'#858197', align:'center', maxWidth:classColumnWidth - 18 });
 
       dates.forEach((date, index) => {
         const iso = dateISO(date);
         const x = dayAreaX + (5 - index) * dayWidth;
         ctx.strokeStyle = '#e3e4ec';
         ctx.strokeRect(x, y, dayWidth, h);
-        if (generalDayOffFor(iso)) return;
+        if (generalOffFor(iso)) return;
         const rows = typeof sortScheduleRows === 'function'
-          ? sortScheduleRows((state.shifts || []).filter((row) => row.class_id === classItem.id && row.shift_date === iso))
-          : (state.shifts || []).filter((row) => row.class_id === classItem.id && row.shift_date === iso);
+          ? sortScheduleRows(shiftRows.filter((row) => row.class_id === classItem.id && row.shift_date === iso))
+          : shiftRows.filter((row) => row.class_id === classItem.id && row.shift_date === iso);
         if (!rows.length) {
           text(ctx, '—', x + dayWidth / 2, y + h / 2, { size:18, weight:650, color:'#b1b3bf', align:'center' });
           return;
@@ -256,7 +278,7 @@
     });
 
     dates.forEach((date, index) => {
-      const off = generalDayOffFor(dateISO(date));
+      const off = generalOffFor(dateISO(date));
       if (!off) return;
       const x = dayAreaX + (5 - index) * dayWidth;
       const bodyH = classesBottom - classesTop;
@@ -290,31 +312,55 @@
     ctx.fillRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
     ctx.strokeStyle = '#e0d4bc';
     ctx.strokeRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
-    text(ctx, 'חופש / היעדרות', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 - 7, { size:15.5, weight:950, color:'#735f3e', align:'center', maxWidth:classColumnWidth - 16 });
-    text(ctx, 'לפי יום', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 + 18, { size:10.5, weight:700, color:'#9a886b', align:'center' });
+    text(ctx, 'חופש / היעדרות', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 - 12, { size:20.5, weight:950, color:'#735f3e', align:'center', maxWidth:classColumnWidth - 14 });
+    text(ctx, 'לפי יום', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 + 20, { size:13, weight:750, color:'#9a886b', align:'center' });
 
     dates.forEach((date, index) => {
       const x = dayAreaX + (5 - index) * dayWidth;
       ctx.strokeStyle = '#e6ddc9';
       ctx.strokeRect(x, absenceTop, dayWidth, absenceHeight);
-      const names = absenceNamesForDate(dateISO(date));
-      if (!names.length) {
-        text(ctx, '—', x + dayWidth / 2, absenceTop + absenceHeight / 2, { size:14, weight:650, color:'#b0aa9c', align:'center' });
+      const items = absenceEntriesForDate(dateISO(date), absenceRows);
+      if (!items.length) {
+        text(ctx, '—', x + dayWidth / 2, absenceTop + absenceHeight / 2, { size:16, weight:650, color:'#b0aa9c', align:'center' });
         return;
       }
-      const shown = names.slice(0, 5);
-      const lineHeight = Math.min(17.5, (absenceHeight - 18) / Math.max(1, shown.length));
-      let yy = absenceTop + 10 + lineHeight / 2;
-      shown.forEach((name) => {
-        text(ctx, name, x + dayWidth - 9, yy, { size:12.2, weight:800, color:'#6d5b3d', maxWidth:dayWidth - 18 });
-        yy += lineHeight;
+
+      const columns = items.length > 4 ? 2 : 1;
+      const rowsPerColumn = Math.ceil(items.length / columns);
+      const gapX = 5;
+      const gapY = 5;
+      const innerX = x + 7;
+      const innerY = absenceTop + 8;
+      const innerWidth = dayWidth - 14;
+      const innerHeight = absenceHeight - 16;
+      const cardWidth = (innerWidth - gapX * (columns - 1)) / columns;
+      const cardHeight = Math.max(27, Math.min(38, (innerHeight - gapY * (rowsPerColumn - 1)) / rowsPerColumn));
+
+      items.forEach((item, itemIndex) => {
+        const column = Math.floor(itemIndex / rowsPerColumn);
+        const row = itemIndex % rowsPerColumn;
+        const cardX = innerX + (columns - 1 - column) * (cardWidth + gapX);
+        const cardY = innerY + row * (cardHeight + gapY);
+        const worked = item.absence_type === 'day_off_worked';
+        const fill = worked ? '#edf9f1' : '#fff0f0';
+        const border = worked ? '#add7bb' : '#efb1b1';
+        const color = worked ? '#2f754a' : '#923b3b';
+        roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 8, fill, border, 1);
+        const name = item.employee_name || employeeById(item.employee_id)?.full_name || 'עובד';
+        const label = absencePdfLabel(item.absence_type);
+        if (cardHeight >= 34) {
+          text(ctx, name, cardX + cardWidth - 7, cardY + cardHeight * .35, { size:15.2, weight:900, color, maxWidth:cardWidth - 14 });
+          text(ctx, label, cardX + cardWidth - 7, cardY + cardHeight * .72, { size:10.4, weight:750, color, maxWidth:cardWidth - 14 });
+        } else {
+          text(ctx, name, cardX + cardWidth - 7, cardY + cardHeight / 2, { size:13.4, weight:850, color, maxWidth:cardWidth - 14 });
+        }
       });
-      if (names.length > shown.length) text(ctx, '+' + (names.length - shown.length) + ' נוספים', x + 9, absenceTop + absenceHeight - 10, { size:10.5, weight:700, color:'#8b795e', align:'left' });
     });
 
-    text(ctx, 'מעון הדס · ' + orderedWeekLabel(state.weekStart), logicalWidth - margin, logicalHeight - 15, { size:10.8, weight:700, color:'#8b8e9e' });
+    text(ctx, 'מעון הדס · ' + orderedWeekLabel(weekStart), logicalWidth - margin, logicalHeight - 15, { size:10.8, weight:700, color:'#8b8e9e' });
     return canvas;
   }
+
 
   function concatBytes(parts) {
     const total = parts.reduce((sum, part) => sum + part.length, 0);
