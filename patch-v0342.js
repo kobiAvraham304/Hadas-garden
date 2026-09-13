@@ -896,6 +896,10 @@
     #toast{z-index:2147483647!important;position:fixed!important}
     #toast:popover-open{display:block!important;position:fixed!important;inset:auto 18px 18px auto!important;margin:0!important;border:0!important;z-index:2147483647!important}
     .v031-validation-card.approved{border:2px solid #e68b91!important;background:#fff8f8!important}
+    .v032-validation-card.approved{border:2px solid #e68b91!important;background:#fff8f8!important}
+    .v032-validation-card.approved .v032-validation-icon{background:#fde7e8!important;color:#a73942!important}
+    .v032-validation-card.approved .v032-validation-copy>span{color:#a73942!important}
+    .v032-focus-ring,.v032-focus-column{outline-color:#d84f59!important;box-shadow:0 0 0 7px rgba(216,79,89,.14)!important}
     .v031-validation-card.approved .v031-validation-icon{background:#fde7e8!important;color:#a73942!important}
     .v031-validation-card.approved .v031-validation-copy>span{color:#a73942!important}
     .v036-approved-toggle{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 12px;border:1px solid #e5a1a5;border-radius:12px;background:#fff7f7;color:#9d3d45;font:inherit;font-weight:850;cursor:pointer}
