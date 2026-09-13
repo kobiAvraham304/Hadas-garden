@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.32.1 layers remain available under the 0.34 release bootstrap', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.35.0');
+  assert.equal(JSON.parse(read('package.json')).version, '0.36.0');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('handlers/health.js'), /databaseVersion:'0.35.0'/);
