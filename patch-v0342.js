@@ -626,9 +626,8 @@
         return;
       }
       if(action==='print'){
-        const win=window.open('','_blank');if(!win){showToast?.('יש לאפשר חלונות קופצים לצורך הדפסה','error');return;}
-        const src=context.canvas.toDataURL('image/jpeg',.98);
-        win.document.write(`<!doctype html><html dir="rtl"><head><title>שיבוץ מעון הדס</title><style>@page{size:A4 landscape;margin:5mm}html,body{margin:0}img{width:100%;height:auto;display:block}</style></head><body><img src="${src}" onload="window.print();window.onafterprint=()=>window.close()"></body></html>`);win.document.close();
+        printCanvasDirect(context.canvas);
+        return;
       }
     });
     dialog.querySelector('input[type="month"]').addEventListener('change',async(event)=>{context.month=event.target.value||monthKeyFromWeek();await refreshPreview();});
@@ -664,6 +663,91 @@
     try{if(navigator.clipboard?.writeText)await navigator.clipboard.writeText(value);else{const area=document.createElement('textarea');area.value=value;area.style.position='fixed';area.style.opacity='0';document.body.append(area);area.select();document.execCommand('copy');area.remove();}showToast?.('השיבוץ של היום הועתק','success');}
     catch{showToast?.('לא ניתן להעתיק את השיבוץ','error');}
   }
+  if (typeof renderMobileWeekDay === 'function' && !window.__hadasV036MobileDayRenderer) {
+    renderMobileWeekDay = function v036RenderMobileWeekDay(date, index) {
+      const iso = dateISO(date);
+      const dayRows = state.shifts.filter((shift) => shift.shift_date === iso);
+      const off = generalDayOffFor(iso);
+      const classResults = off ? [] : visibleScheduleClasses().map((item) => coverageFor(dayRows.filter((shift) => shift.class_id === item.id), iso));
+      const issues = off ? 0 : classResults.filter((result) => !result.ok).length;
+      const open = state.expandedWeekDay === index;
+      const status = off
+        ? '<span class="mobile-week-day-status v036-mobile-holiday-status">חופש כללי · ' + escapeHtml(off.title || 'יום חופשי') + '</span>'
+        : '<span class="mobile-week-day-status ' + (issues ? 'issue' : 'ok') + '">' + (issues ? issues + ' כיתות לבדיקה' : 'כל הכיתות תקינות') + '</span>';
+      const body = off
+        ? '<div class="v036-mobile-holiday-body"><strong>חופש כללי</strong><span>' + escapeHtml(off.title || 'יום חופשי') + '</span>' + (off.description ? '<small>' + escapeHtml(off.description) + '</small>' : '') + '</div>'
+        : visibleScheduleClasses().map((item) => renderMobileWeekClass(item, date)).join('');
+      return '<article class="mobile-week-day ' + (issues ? 'has-issue ' : '') + (open ? 'is-open' : '') + '" data-day-index="' + index + '">' +
+        '<button type="button" class="v036-mobile-day-toggle" aria-expanded="' + (open ? 'true' : 'false') + '">' +
+          '<span class="mobile-week-day-name"><strong>' + DAY_NAMES[date.getDay()] + '</strong><small>' + formatDate(date, { day:'2-digit', month:'2-digit' }) + '</small></span>' +
+          '<span class="mobile-week-day-stats"><b>' + new Set(dayRows.map((shift) => shift.employee_id)).size + '</b><small>עובדים</small></span>' +
+          status +
+          '<span class="mobile-week-chevron">⌄</span>' +
+        '</button>' +
+        '<div class="mobile-week-day-body"' + (open ? '' : ' hidden') + '>' + body + '</div>' +
+      '</article>';
+    };
+    window.__hadasV036MobileDayRenderer = true;
+  }
+
+  function installMobileScheduleToggle() {
+    const root = document.querySelector('#scheduleExport');
+    if (!root || root.dataset.v036MobileToggle === 'true') return;
+    root.dataset.v036MobileToggle = 'true';
+    root.addEventListener('click', (event) => {
+      const toggle = event.target.closest('.v036-mobile-day-toggle');
+      if (!toggle) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const card = toggle.closest('.mobile-week-day');
+      if (!card) return;
+      const nextOpen = !card.classList.contains('is-open');
+      root.querySelectorAll('.mobile-week-day').forEach((item) => {
+        item.classList.remove('is-open');
+        item.querySelector('.v036-mobile-day-toggle')?.setAttribute('aria-expanded', 'false');
+        const body = item.querySelector('.mobile-week-day-body');
+        if (body) body.hidden = true;
+      });
+      if (nextOpen) {
+        card.classList.add('is-open');
+        toggle.setAttribute('aria-expanded', 'true');
+        const body = card.querySelector('.mobile-week-day-body');
+        if (body) body.hidden = false;
+        state.expandedWeekDay = Number(card.dataset.dayIndex);
+      } else state.expandedWeekDay = null;
+    }, true);
+  }
+
+  function installScheduleToolsControl() {
+    const tools = document.querySelector('.schedule-tools-menu');
+    if (!tools) return;
+    const summary = tools.querySelector(':scope > summary');
+    if (summary && summary.dataset.v036ToolsToggle !== 'true') {
+      summary.dataset.v036ToolsToggle = 'true';
+      summary.addEventListener('click', (event) => {
+        if (!window.matchMedia('(max-width:820px)').matches) return;
+        event.preventDefault();
+        tools.open = !tools.open;
+      }, true);
+    }
+    const mode = window.matchMedia('(max-width:820px)').matches ? 'mobile' : 'desktop';
+    if (tools.dataset.v036ViewportMode !== mode) {
+      tools.dataset.v036ViewportMode = mode;
+      tools.open = mode === 'desktop';
+    }
+    if (!window.__hadasV036ToolsResize) {
+      window.__hadasV036ToolsResize = true;
+      window.addEventListener('resize', () => {
+        const menu = document.querySelector('.schedule-tools-menu');
+        if (!menu) return;
+        const nextMode = window.matchMedia('(max-width:820px)').matches ? 'mobile' : 'desktop';
+        if (menu.dataset.v036ViewportMode === nextMode) return;
+        menu.dataset.v036ViewportMode = nextMode;
+        menu.open = nextMode === 'desktop';
+      }, { passive:true });
+    }
+  }
+
   function enhanceScheduleDays(){
     const dates=Array.from({length:6},(_,i)=>addDays(state.weekStart,i));
     const headers=[...document.querySelectorAll('#scheduleExport .schedule-desktop-week thead th:not(.class-name)')];
@@ -696,8 +780,8 @@
       if(body&&date) body.insertAdjacentHTML('afterbegin',`<button type="button" class="secondary-btn v036-mobile-copy" data-copy-schedule-day="${dateISO(date)}">⧉ העתקת יום</button>`);
       if(off){
         day.querySelectorAll('.v027-cell-flag.closure').forEach((item)=>item.remove());
-        const summary=day.querySelector('summary');
-        if(summary) summary.insertAdjacentHTML('beforeend',`<span class="v036-mobile-general">חופש כללי · ${escapeHtml(off.title||'')}</span>`);
+        const summary=day.querySelector('.v036-mobile-day-toggle');
+        if(summary && !summary.querySelector('.v036-mobile-holiday-status')) summary.insertAdjacentHTML('beforeend',`<span class="v036-mobile-general">חופש כללי · ${escapeHtml(off.title||'')}</span>`);
       }
     });
   }
@@ -742,6 +826,8 @@
     stripSubstituteAvailability();
     installA4Button();
     installScheduleCopyEvents();
+    installMobileScheduleToggle();
+    installScheduleToolsControl();
     enhanceScheduleDays();
     document.documentElement.dataset.hadasA4 = 'v0360';
   }
