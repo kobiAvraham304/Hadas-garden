@@ -900,6 +900,10 @@
     .v031-validation-card.approved .v031-validation-copy>span{color:#a73942!important}
     .v036-approved-toggle{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 12px;border:1px solid #e5a1a5;border-radius:12px;background:#fff7f7;color:#9d3d45;font:inherit;font-weight:850;cursor:pointer}
     .v036-approved-toggle.active{background:#a9444d;color:#fff;border-color:#a9444d}
+    .v036-validation-head-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+    .v036-validation-head-actions>b{white-space:nowrap;font-size:12px;color:#a33f45;background:#fff0f0;padding:7px 10px;border-radius:999px}
+    .v036-approved-list{display:grid;gap:10px}
+    .day-class-card.attention-pulse{outline:3px solid #d84f59!important;outline-offset:3px!important;box-shadow:0 0 0 7px rgba(216,79,89,.12)!important}
     #v036PrintRoot{display:none}
     @media print{
       @page{size:A4 landscape;margin:0}
