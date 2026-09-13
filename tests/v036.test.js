@@ -78,14 +78,23 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /v036-copy-day-header::after/);
   assert.match(patch, /width:820px!important/);
   assert.match(patch, /size: 20\.5/);
+  assert.match(patch, /const classColumnX = margin \+ tableWidth - classColumnWidth/);
+  assert.match(patch, /const dateColumnX = margin \+ tableWidth - dateColumnWidth/);
+  assert.match(patch, /function printCanvasDirect/);
+  assert.doesNotMatch(patch, /window\.open\('',\s*'_blank'/);
+  assert.match(patch, /v036-mobile-day-toggle/);
+  assert.match(patch, /installMobileScheduleToggle/);
+  assert.match(patch, /schedule-tools-menu:not\(\[open\]\)>\.schedule-secondary-actions/);
+  assert.match(patch, /mobile-week-day-body\[hidden\]/);
+  assert.doesNotMatch(read('index.html'), /schedule-tools-menu" open/);
 });
 
 test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
   const entry = read('patch-v025.js');
   const index = read('index.html');
-  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf2'/);
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf3'/);
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0360hf2/);
+  assert.match(index, /patch-v025\.js\?v=0360hf3/);
 });
