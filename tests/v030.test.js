@@ -101,7 +101,7 @@ test('0.30 runtime stays intact while physical entrypoints advance to v0.34', ()
   assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
-  assert.match(entry, /const VERSION = '0\.35\.0'/);
+  assert.match(entry, /const VERSION = '0\\.36\\.0'/);
   assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321'/);
   assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
