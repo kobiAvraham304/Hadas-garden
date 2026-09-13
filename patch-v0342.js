@@ -329,9 +329,9 @@
       const cardH = Math.min(142, Math.max(112, bodyH * .42));
       const cardY = classesTop + (bodyH - cardH) / 2;
       roundRect(ctx, x + 12, cardY, dayWidth - 24, cardH, 17, '#fff3d4', '#e4c97f', 1.3);
-      fitText(ctx, 'חופש כללי', x + dayWidth / 2, cardY + 31, { size:22.5, minSize:18, weight:950, color:'#76551b', align:'center', maxWidth:dayWidth - 38 });
-      fitText(ctx, off.title || 'יום חופשי', x + dayWidth / 2, cardY + 66, { size:18.8, minSize:15, weight:900, color:'#866326', align:'center', maxWidth:dayWidth - 38 });
-      if (off.description) fitText(ctx, compactReason(off.description, 52), x + dayWidth / 2, cardY + 101, { size:13.5, minSize:10.5, weight:700, color:'#9a7942', align:'center', maxWidth:dayWidth - 42 });
+      fitText(ctx, 'חופש כללי', x + dayWidth / 2, cardY + 31, { size:24, minSize:19, weight:950, color:'#76551b', align:'center', maxWidth:dayWidth - 38, ellipsis:false });
+      fitText(ctx, off.title || 'יום חופשי', x + dayWidth / 2, cardY + 66, { size:20, minSize:15.5, weight:900, color:'#866326', align:'center', maxWidth:dayWidth - 38, ellipsis:false });
+      if (off.description) fitText(ctx, compactReason(off.description, 52), x + dayWidth / 2, cardY + 101, { size:14.5, minSize:10.8, weight:700, color:'#9a7942', align:'center', maxWidth:dayWidth - 42, ellipsis:false });
     });
 
     const absenceTop = classesBottom;
