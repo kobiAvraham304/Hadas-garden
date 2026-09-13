@@ -30,14 +30,79 @@
     const rest=new Map();for(const i of src){if(used.has(i))continue;const k=[i.code||'issue',dateOf(i),classOf(i)||'',employeeOf(i)||''].join('|');if(!rest.has(k))rest.set(k,[]);rest.get(k).push(i);}for(const g of rest.values()){const i=g[0],titles={fixed_day_off:'שיבוץ ביום חופשי קבוע',approved_absence:'שיבוץ בזמן חופשה / היעדרות',outside_fixed_hours:'שעות שונות מהקבוע',overlap:'חפיפת שיבוצים',teacher_fixed_class:'גננת מחוץ לכיתה הקבועה',forbidden_class:'אילוץ כיתה',max_weekly_hours:'חריגה משעות שבועיות',max_weekly_days:'חריגה מימי עבודה',outside_opening_hours:'מחוץ לשעות המעון',manual_rule_override:'שיבוץ ידני חריג',short_nonfixed_shift:'שיבוץ קצר במיוחד'};out.push(merge(g,status,{title:i.title||titles[i.code]||'בדיקת תקינות',text:`${detail(i)}${g.length>1?` ${g.length} מופעים דומים אוחדו להתראה אחת.`:''}`}));}
     return out.sort((a,b)=>dateOf(a).localeCompare(dateOf(b))||className(classOf(a)).localeCompare(className(classOf(b)),'he')||employeeName(employeeOf(a)).localeCompare(employeeName(employeeOf(b)),'he'));
   }
-  function presentation(){const r=validateScheduleClient(),approved=(r.warnings||[]).filter((i)=>i._v030Approved),warnings=(r.warnings||[]).filter((i)=>!i._v030Approved);return{errors:consolidate(r.errors||[],'error'),approved:consolidate(approved,'approved'),warnings:consolidate(warnings,'warning')};}
+  function presentation(){const r=validateScheduleClient(),approvedRows=[...(r.approved||[]),...(r.warnings||[]).filter((i)=>i._v030Approved||i.approved)],seen=new Set(),approved=approvedRows.filter((i)=>{const k=String(i._v030ApprovalKey||i.approval_key||i.id||'');if(seen.has(k))return false;seen.add(k);return true;}),warnings=(r.warnings||[]).filter((i)=>!i._v030Approved&&!i.approved);return{errors:consolidate(r.errors||[],'error'),approved:consolidate(approved,'approved'),warnings:consolidate(warnings,'warning')};}
   function focusTargets(g){const root=document.querySelector('#scheduleExport');if(!root)return[];const d=dateOf(g),c=classOf(g),e=employeeOf(g),ids=unique(originals(g).map((i)=>i.shift_id||i.shiftId));let shifts=ids.map((id)=>state.shifts.find((s)=>s.id===id)).filter(Boolean);if(!shifts.length&&e&&d)shifts=state.shifts.filter((s)=>s.shift_date===d&&s.employee_id===e&&(!c||s.class_id===c));const cards=shifts.map((s)=>root.querySelector(`.shift-item[data-shift-id="${s.id}"]`)).filter(Boolean);if(cards.length)return cards;const zones=[...root.querySelectorAll('[data-v025-drop-date][data-v025-drop-class]')].filter((z)=>(!d||z.dataset.v025DropDate===d)&&(!c||z.dataset.v025DropClass===c));return zones.length?zones:[];}
   function focus(g){try{switchTab('schedule');}catch{}state.scheduleMode='week';storageSet('localStorage','hadas-schedule-mode','week');const d=dateOf(g);if(d)state.expandedWeekDay=Math.min(5,Math.max(0,parseDateValue(d).getDay()));renderSchedule();requestAnimationFrame(()=>requestAnimationFrame(()=>{document.querySelectorAll('.v032-focus-ring,.v032-focus-column').forEach((x)=>x.classList.remove('v032-focus-ring','v032-focus-column'));const t=focusTargets(g);if(!t.length)return showToast('הבעיה מוצגת בתצוגת השבוע. לא נמצא שיבוץ יחיד לסימון.');const exact=Boolean(employeeOf(g)||t.length===1);t.forEach((x)=>x.classList.add(exact?'v032-focus-ring':'v032-focus-column'));t[0].scrollIntoView({behavior:'smooth',block:'center',inline:'center'});setTimeout(()=>t.forEach((x)=>x.classList.remove('v032-focus-ring','v032-focus-column')),5200);}));}
   function snapshot(i){return{code:i.code||'',date:dateOf(i),class_id:classOf(i)||'',employee_id:employeeOf(i)||'',time:i.time||i.start_time||'',start_time:i.start_time||'',end_time:i.end_time||'',count:i.count??null,expected:i.expected??null,message:messageOf(i)};}
   function localApproval(g,approve){if(!state.v030Validation)return;const keys=new Set(g._v032ApprovalKeys||[]),from=approve?'errors':'approved',to=approve?'approved':'errors',moved=(state.v030Validation[from]||[]).filter((i)=>keys.has(String(i.approval_key||i.id||'')));state.v030Validation[from]=(state.v030Validation[from]||[]).filter((i)=>!keys.has(String(i.approval_key||i.id||'')));state.v030Validation[to]=[...(state.v030Validation[to]||[]).filter((i)=>!keys.has(String(i.approval_key||i.id||''))),...moved.map((i)=>({...i,approved:approve}))];state.scheduleValidationCache={key:'',value:null};}
   function card(g,kind){const approved=kind==='approved',warning=kind==='warning',ctx=[dateOf(g)?dayLabel(dateOf(g)):'',classOf(g)?`כיתה ${className(classOf(g))}`:'',employeeOf(g)?employeeName(employeeOf(g)):''].filter(Boolean).join(' · ');return`<article class="v032-validation-card ${kind}"><div class="v032-validation-icon">${approved?'✓':warning?'i':'!'}</div><div class="v032-validation-copy"><span>${approved?'חריגה מאושרת':warning?'הערה':'דורש טיפול'}</span><strong>${escapeHtml(g.title||'בדיקת תקינות')}</strong>${ctx?`<small>${escapeHtml(ctx)}</small>`:''}<p>${escapeHtml(g.text||detail(g))}</p></div><div class="v032-validation-actions">${dateOf(g)||classOf(g)||employeeOf(g)?`<button type="button" class="ghost-btn" data-v032-focus="${escapeHtml(g.id)}">הצג בשיבוץ</button>`:''}${approved?`<button type="button" class="secondary-btn" data-v032-validation="revoke" data-v032-group="${escapeHtml(g.id)}">ביטול אישור</button>`:!warning?`<button type="button" class="primary-btn" data-v032-validation="approve" data-v032-group="${escapeHtml(g.id)}">אישור למרות החריגה</button>`:''}</div></article>`;}
-  function renderPanel(){const p=document.querySelector('#scheduleWarnings'),toggle=document.querySelector('#scheduleIssuesToggle'),count=document.querySelector('#scheduleIssuesCount');if(!p||!toggle||!count||!isManager())return;const d=presentation(),all=[...d.errors,...d.approved,...d.warnings];state.v032ValidationGroupMap=new Map(all.map((g)=>[g.id,g]));count.textContent=d.errors.length?`${d.errors.length} בעיות מרוכזות · ${d.approved.length} אושרו`:d.approved.length?`${d.approved.length} חריגות אושרו`:d.warnings.length?`${d.warnings.length} הערות`:'הכול תקין';toggle.classList.toggle('has-errors',d.errors.length>0);toggle.setAttribute('aria-expanded',String(Boolean(state.scheduleIssuesOpen)));p.classList.toggle('hidden',!state.scheduleIssuesOpen);if(!state.scheduleIssuesOpen)return;p.innerHTML=all.length?`<section class="v032-validation-panel"><header><div><strong>בדיקות תקינות לשבוע</strong><small>התראות דומות אוחדו. בכל שורה מוצגים היום, הכיתה והעובד כשיש עובד מסוים.</small></div><b>${d.errors.length?`${d.errors.length} דורשות טיפול`:'אין בעיות פתוחות'}</b></header><div class="v032-validation-list">${d.errors.map((x)=>card(x,'error')).join('')}${d.approved.map((x)=>card(x,'approved')).join('')}${d.warnings.map((x)=>card(x,'warning')).join('')}</div></section>`:'<div class="v027-validation-success"><span>✓</span><div><strong>השיבוץ עבר את בדיקות התקינות</strong><small>לא נמצאו בעיות או חריגות בשבוע הנבחר.</small></div></div>';}
-  function install(){const current=document.querySelector('#scheduleIssuesToggle');if(current&&!current.dataset.v032Installed){const clone=current.cloneNode(true);clone.dataset.v032Installed='true';current.replaceWith(clone);clone.addEventListener('click',async(e)=>{e.preventDefault();e.stopImmediatePropagation();state.scheduleIssuesOpen=!state.scheduleIssuesOpen;if(state.scheduleIssuesOpen&&!state.v030Validation){const c=document.querySelector('#scheduleIssuesCount');if(c)c.textContent='בודק…';try{await window.__hadasV030RefreshValidation?.({force:true,rerender:false});}catch{}}renderPanel();if(state.scheduleIssuesOpen)requestAnimationFrame(()=>document.querySelector('#scheduleWarnings')?.scrollIntoView({behavior:'smooth',block:'nearest'}));},true);}const p=document.querySelector('#scheduleWarnings');if(p&&!p.dataset.v032Events){p.dataset.v032Events='true';p.addEventListener('click',async(e)=>{const f=e.target.closest('[data-v032-focus]');if(f){e.preventDefault();e.stopImmediatePropagation();const g=state.v032ValidationGroupMap?.get(f.dataset.v032Focus);if(g)focus(g);return;}const a=e.target.closest('[data-v032-validation]');if(!a)return;e.preventDefault();e.stopImmediatePropagation();const g=state.v032ValidationGroupMap?.get(a.dataset.v032Group);if(!g)return;const approve=a.dataset.v032Validation==='approve';setBusy(a,true,approve?'מאשר…':'מבטל…');try{if(approve){const issues=originals(g).map((i)=>({approval_key:keyOf(i),snapshot:snapshot(i)})).filter((x)=>x.approval_key);await apiFetch('/api/shifts',{method:'POST',body:{action:'approve_issues',week_start:dateISO(state.weekStart),issues},timeout:8000});}else await apiFetch('/api/shifts',{method:'POST',body:{action:'revoke_issues',week_start:dateISO(state.weekStart),approval_keys:g._v032ApprovalKeys||[]},timeout:8000});localApproval(g,approve);state.scheduleIssuesOpen=true;renderSchedule();requestAnimationFrame(renderPanel);showToast(approve?'החריגה אושרה מיד':'אישור החריגה בוטל','success');}catch(err){showToast(err.message,'error');}finally{setBusy(a,false);}},true);}renderPanel();}
+  function renderPanel(){
+    const p=document.querySelector('#scheduleWarnings'),toggle=document.querySelector('#scheduleIssuesToggle'),count=document.querySelector('#scheduleIssuesCount');
+    if(!p||!toggle||!count||!isManager())return;
+    if(typeof state.v032ShowApproved!=='boolean')state.v032ShowApproved=false;
+    const d=presentation(),liveTotal=d.errors.length+d.warnings.length,all=[...d.errors,...d.approved,...d.warnings];
+    state.v032ValidationGroupMap=new Map(all.map((g)=>[g.id,g]));
+    count.textContent=d.errors.length?`${d.errors.length} בעיות מרוכזות`:d.warnings.length?`${d.warnings.length} הערות`:'הכול תקין';
+    toggle.classList.toggle('has-errors',d.errors.length>0);
+    toggle.setAttribute('aria-expanded',String(Boolean(state.scheduleIssuesOpen)));
+    p.classList.toggle('hidden',!state.scheduleIssuesOpen);
+    if(!state.scheduleIssuesOpen)return;
+    if(!liveTotal&&!d.approved.length){
+      p.innerHTML='<div class="v027-validation-success"><span>✓</span><div><strong>השיבוץ עבר את בדיקות התקינות</strong><small>לא נמצאו בעיות או חריגות בשבוע הנבחר.</small></div></div>';
+      return;
+    }
+    const approvedToggle=d.approved.length?`<button type="button" class="v036-approved-toggle ${state.v032ShowApproved?'active':''}" data-v032-toggle-approved>${state.v032ShowApproved?'הסתרת חריגות שאושרו':'הצגת חריגות שאושרו'} <b>${d.approved.length}</b></button>`:'';
+    const liveHtml=[...d.errors.map((x)=>card(x,'error')),...d.warnings.map((x)=>card(x,'warning'))].join('')||'<div class="v027-validation-success"><span>✓</span><div><strong>אין בעיות פתוחות</strong><small>חריגות שכבר אושרו אינן חוסמות את הפרסום.</small></div></div>';
+    const approvedHtml=state.v032ShowApproved?`<div class="v036-approved-list">${d.approved.map((x)=>card(x,'approved')).join('')}</div>`:'';
+    p.innerHTML=`<section class="v032-validation-panel"><header><div><strong>בדיקות תקינות לשבוע</strong><small>התראות דומות אוחדו. חריגות שאושרו מוצגות רק לפי בקשה.</small></div><div class="v036-validation-head-actions">${approvedToggle}<b>${d.errors.length?`${d.errors.length} דורשות טיפול`:'אין בעיות פתוחות'}</b></div></header><div class="v032-validation-list">${liveHtml}${approvedHtml}</div></section>`;
+  }
+  function install(){
+    const current=document.querySelector('#scheduleIssuesToggle');
+    if(current&&!current.dataset.v032Installed){
+      const clone=current.cloneNode(true);clone.dataset.v032Installed='true';current.replaceWith(clone);
+      clone.addEventListener('click',async(e)=>{
+        e.preventDefault();e.stopImmediatePropagation();state.scheduleIssuesOpen=!state.scheduleIssuesOpen;
+        if(state.scheduleIssuesOpen){
+          const c=document.querySelector('#scheduleIssuesCount');if(c)c.textContent='בודק…';
+          try{await window.__hadasV030RefreshValidation?.({force:true,rerender:false});}catch{}
+        }
+        renderPanel();
+        if(state.scheduleIssuesOpen)requestAnimationFrame(()=>document.querySelector('#scheduleWarnings')?.scrollIntoView({behavior:'smooth',block:'nearest'}));
+      },true);
+    }
+    const p=document.querySelector('#scheduleWarnings');
+    if(p&&!p.dataset.v032Events){
+      p.dataset.v032Events='true';
+      p.addEventListener('click',async(e)=>{
+        const approvedToggle=e.target.closest('[data-v032-toggle-approved]');
+        if(approvedToggle){e.preventDefault();e.stopImmediatePropagation();state.v032ShowApproved=!state.v032ShowApproved;renderPanel();return;}
+        const f=e.target.closest('[data-v032-focus]');
+        if(f){e.preventDefault();e.stopImmediatePropagation();const g=state.v032ValidationGroupMap?.get(f.dataset.v032Focus);if(g)focus(g);return;}
+        const a=e.target.closest('[data-v032-validation]');
+        if(!a)return;
+        e.preventDefault();e.stopImmediatePropagation();
+        const g=state.v032ValidationGroupMap?.get(a.dataset.v032Group);if(!g)return;
+        const approve=a.dataset.v032Validation==='approve';
+        setBusy(a,true,approve?'מאשר…':'מבטל…');
+        try{
+          if(approve){
+            const issues=originals(g).map((i)=>({approval_key:keyOf(i),snapshot:snapshot(i)})).filter((x)=>x.approval_key);
+            await apiFetch('/api/shifts',{method:'POST',body:{action:'approve_issues',week_start:dateISO(state.weekStart),issues},timeout:8000});
+          }else{
+            await apiFetch('/api/shifts',{method:'POST',body:{action:'revoke_issues',week_start:dateISO(state.weekStart),approval_keys:g._v032ApprovalKeys||[]},timeout:8000});
+          }
+          localApproval(g,approve);
+          await window.__hadasV030RefreshValidation?.({force:true,rerender:false});
+          state.scheduleIssuesOpen=true;
+          renderSchedule();
+          requestAnimationFrame(renderPanel);
+          showToast(approve?'החריגה אושרה מיד':'אישור החריגה בוטל','success');
+        }catch(err){showToast(err.message,'error');}
+        finally{setBusy(a,false);}
+      },true);
+    }
+    renderPanel();
+  }
   function arrows(){const p=document.querySelector('#prevWeekBtn'),n=document.querySelector('#nextWeekBtn');if(p){p.textContent='‹';p.title='שבוע קודם';}if(n){n.textContent='›';n.title='שבוע הבא';}}
   const oldRender=renderSchedule;renderSchedule=function(...args){const r=oldRender(...args);requestAnimationFrame(()=>{pinVersion();arrows();install();});return r;};
   window.__hadasV032RenderValidation=renderPanel;window.__hadasV032ConsolidateValidation=consolidate;install();arrows();pinVersion();
