@@ -161,7 +161,32 @@ function sortScheduleRows(rows=[]) { return [...rows].sort((a,b)=>shiftRoleRank(
 function activeTaskAssignments(employeeId=state.profile?.id) { const activeIds=new Set(state.tasks.filter((task)=>task.active).map((task)=>task.id)); return state.taskAssignees.filter((assignment)=>assignment.employee_id===employeeId&&assignment.status!=='done'&&activeIds.has(assignment.task_id)); }
 function fixedClassLabel(employeeId) { const employee=employeeById(employeeId); return employee?.primary_class_id ? (classById(employee.primary_class_id)?.name || '') : ''; }
 function currentWeekDates() { return Array.from({ length: 6 }, (_, index) => addDays(state.weekStart, index)); }
-function showToast(message, type = '') { const toast = $('#toast'); toast.textContent = message; toast.className = `toast ${type}`.trim(); clearTimeout(showToast.timer); showToast.timer = setTimeout(() => toast.classList.add('hidden'), 3800); }
+function showToast(message, type = '') {
+  const toast = $('#toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.className = `toast ${type}`.trim();
+  toast.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+  let topLayer = false;
+  if (typeof toast.showPopover === 'function') {
+    try {
+      toast.setAttribute('popover','manual');
+      if (!toast.matches(':popover-open')) toast.showPopover();
+      topLayer = true;
+    } catch {}
+  }
+  if (!topLayer) {
+    const openDialogs = [...document.querySelectorAll('dialog[open]')];
+    const topDialog = openDialogs[openDialogs.length - 1];
+    if (topDialog && toast.parentElement !== topDialog) topDialog.append(toast);
+  }
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => {
+    try { if (toast.matches(':popover-open')) toast.hidePopover(); } catch {}
+    toast.classList.add('hidden');
+    if (toast.parentElement !== document.body) document.body.append(toast);
+  }, type === 'error' ? 5200 : 3800);
+}
 function setScreen(id) { for (const screen of ['loadingScreen', 'loginScreen', 'passwordScreen', 'appShell']) $(`#${screen}`).classList.toggle('hidden', screen !== id); }
 function setBusy(button, busy, text = 'שומר…') {
   if (!button) return;
@@ -880,7 +905,9 @@ function validateScheduleClient() {
   const slot = Math.max(15, Number(state.settings.validation_slot_minutes || 30));
   const closingWindow = Math.max(15, Number(state.settings.closing_window_minutes || 30));
   const requireLeader = state.settings.require_leader !== false;
+  const generalDayOffDates = new Set((state.calendarEvents || []).filter((item) => item?.is_general_day_off).map((item) => String(item.event_date || '')));
   for (const date of currentWeekDates().map(dateISO)) {
+    if (generalDayOffDates.has(date)) continue;
     const close = timeToMinutes(closingTimeForDate(date));
     for (const classItem of state.classes.filter((item) => item.active)) {
       const staffProblems = []; const leaderProblems = [];
@@ -981,7 +1008,7 @@ function renderPublicationState() {
   const button=$('#publishScheduleBtn');
   if(button){
     const clean=Boolean(published)&&drafts===0;
-    button.classList.add('publication-toggle'); button.classList.toggle('is-published',clean); button.classList.toggle('has-drafts',drafts>0);
+    button.classList.add('publication-toggle'); button.classList.toggle('is-published',clean); button.classList.toggle('has-drafts',drafts>0); button.classList.toggle('is-unpublished',!clean);
     button.innerHTML=clean?'<span class="publication-toggle-dot"></span><span>מפורסם</span>':`<span class="publication-toggle-dot"></span><span>${published?'שינויים לא פורסמו':'לא פורסם'}</span>`;
   }
   const text=drafts
@@ -2100,7 +2127,19 @@ async function saveRequest(event){
   if(data.allow_schedule_on_day_off&&profileDayOffPatterns().length>1&&!data.available_fixed_day_weekday)return showToast('יש לבחור איזה יום חופשי קבוע ניתן לנצל','error');
   if(!data.allow_schedule_on_day_off)delete data.available_fixed_day_weekday;
   const file=form.elements.sick_certificate.files?.[0];if(file?.size>3*1024*1024)return showToast('אישור המחלה חייב להיות עד 3MB','error');
-  setBusy(button,true,'שולח…');try{if(file){data.attachment_data=await fileToDataUrl(file);data.attachment_name=file.name;}await apiFetch('/api/requests',{method:'POST',body:{action:'create',...data},timeout:20000});$('#requestDialog').close();await refreshAll();showToast(data.request_type==='swap'?'הבקשה נשלחה לאישור העובד שנבחר':'הבקשה נשלחה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}
+  setBusy(button,true,'שולח…');try{
+    if(file){data.attachment_data=await fileToDataUrl(file);data.attachment_name=file.name;}
+    const result=await apiFetch('/api/requests',{method:'POST',body:{action:'create',...data},timeout:20000});
+    $('#requestDialog').close();
+    if(result?.request){
+      state.requests=[result.request,...state.requests.filter((item)=>item.id!==result.request.id)];
+      renderRequests();
+      renderNavBadges();
+      renderDashboard();
+    }
+    showToast(data.request_type==='swap'?'הבקשה נשלחה לאישור העובד שנבחר':'הבקשה נשלחה','success');
+    setTimeout(()=>refreshAll().catch(()=>{}),0);
+  }catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}
 }
 function requestFlowHtml(request){const steps=request.request_type==='swap'?['נשלח','הסכמת העובד','אישור הנהלה','הוזרם']:['נשלח','אישור הנהלה','הוזרם'];let activeIndex=request.status==='pending'?0:request.status==='approved'?steps.length-2:request.status==='applied'?steps.length-1:0;if(request.request_type==='swap'&&request.status==='pending'&&request.target_approved)activeIndex=1;return `<div class="request-flow">${steps.map((step,index)=>`<span class="flow-step ${index<=activeIndex?'active':''}">${step}</span>`).join('<span>›</span>')}</div>`;}
 function requestActionState(request){if(request.request_type==='swap'&&request.status==='pending'&&!request.target_approved)return 'waiting_target';if(request.status==='pending')return 'needs_manager';if(request.status==='approved')return 'ready_apply';return 'closed';}
@@ -2109,12 +2148,12 @@ function renderRequestsBase(){
   syncFilterChips('#requestStatusChips',state.requestStatusFilter);
   const counts={pending:0,approved:0,applied:0,closed:0};const workflow={needs_manager:0,waiting_target:0,ready_apply:0};
   state.requests.forEach((request)=>{if(request.status==='pending')counts.pending++;else if(request.status==='approved')counts.approved++;else if(request.status==='applied')counts.applied++;else counts.closed++;const action=requestActionState(request);if(workflow[action]!==undefined)workflow[action]++;});
-  $('#requestSummary').innerHTML=`<button data-request-filter="pending"><strong>${counts.pending}</strong><span>ממתינים</span><small>בקשות שעדיין בטיפול</small></button><button data-request-filter="approved"><strong>${counts.approved}</strong><span>אושרו</span><small>מוכנות להזרמה</small></button><button data-request-filter="applied"><strong>${counts.applied}</strong><span>הוזרמו</span><small>עודכנו בשיבוץ</small></button><button data-request-filter="closed"><strong>${counts.closed}</strong><span>סגורות</span><small>נדחו או בוטלו</small></button>`;
-  $('#requestWorkflow').innerHTML=isManager()?`<button data-request-filter="pending" class="workflow-manager"><span>דורש החלטה</span><strong>${workflow.needs_manager}</strong></button><button data-request-filter="pending" class="workflow-target"><span>ממתין לעובד בהחלפה</span><strong>${workflow.waiting_target}</strong></button><button data-request-filter="approved" class="workflow-apply"><span>מוכן להזרמה</span><strong>${workflow.ready_apply}</strong></button>`:'';
+  $('#requestSummary').innerHTML=`<button data-request-filter="pending"><strong>${counts.pending}</strong><span>ממתינים</span><small>בקשות שעדיין בטיפול</small></button><button data-request-filter="approved"><strong>${counts.approved}</strong><span>אושרו</span><small>אושרו במערכת</small></button><button data-request-filter="applied"><strong>${counts.applied}</strong><span>הוזרמו</span><small>עודכנו בשיבוץ</small></button><button data-request-filter="closed"><strong>${counts.closed}</strong><span>סגורות</span><small>נדחו או בוטלו</small></button>`;
+  $('#requestWorkflow').innerHTML=isManager()?`<button data-request-filter="pending" class="workflow-manager"><span>דורש החלטה</span><strong>${workflow.needs_manager}</strong></button><button data-request-filter="pending" class="workflow-target"><span>ממתין לעובד בהחלפה</span><strong>${workflow.waiting_target}</strong></button>`:'';
   const term=state.requestSearch.trim().toLowerCase();
   const visible=state.requests.filter((request)=>{const statusOk=state.requestStatusFilter==='all'||request.status===state.requestStatusFilter||(state.requestStatusFilter==='open'&&['pending','approved'].includes(request.status))||(state.requestStatusFilter==='closed'&&['rejected','cancelled'].includes(request.status));const requester=employeeById(request.requester_id),target=employeeById(request.target_employee_id);const haystack=`${requester?.full_name||''} ${target?.full_name||''} ${request.reason||''} ${REQUEST_LABELS[request.request_type]||''}`.toLowerCase();return statusOk&&(!term||haystack.includes(term));});
   $('#requestsList').innerHTML=visible.length?visible.map((request)=>{const requester=employeeById(request.requester_id),target=employeeById(request.target_employee_id),statusClass=['rejected','cancelled'].includes(request.status)?'error':request.status==='applied'?'ok':'warn';const canApprove=isManager()&&request.status==='pending'&&(request.request_type!=='swap'||request.target_approved);const actionState=requestActionState(request);const fixedDay=request.available_fixed_day_weekday!==null&&request.available_fixed_day_weekday!==undefined?DAY_NAMES[Number(request.available_fixed_day_weekday)]:'';
-    return `<article class="request-card type-${request.request_type} action-${actionState}" data-request-id="${request.id}"><div class="card-heading"><div class="request-title"><span class="request-avatar">${REQUEST_ICONS[request.request_type]||'●'}</span><div><h3>${REQUEST_LABELS[request.request_type]||'בקשה'}</h3><p class="muted">${escapeHtml(requester?.full_name||'')} · ${requestDateLabel(request)}</p></div></div><span class="status-chip ${statusClass}">${REQUEST_STATUS_LABELS[request.status]}</span></div>${requestFlowHtml(request)}<div class="request-key-details"><div><small>פירוט</small><strong>${escapeHtml(request.reason||'ללא פירוט')}</strong></div>${request.requested_start||request.requested_end?`<div><small>שעות</small><strong>${timeHtml(request.requested_start,request.requested_end)}</strong></div>`:''}${request.request_type==='swap'?`<div><small>החלפה עם</small><strong>${escapeHtml(target?.full_name||'טרם נבחר')}</strong><span>${request.target_approved?'העובד אישר':'ממתין להסכמת העובד'}</span></div>`:''}${['leave','day_off'].includes(request.request_type)?`<div><small>עבודה ביום חופשי קבוע</small><strong>${request.allow_schedule_on_day_off?`אפשרי${fixedDay?` ביום ${fixedDay}`:''}`:'לא'}</strong></div>`:''}</div>${request.request_type==='leave'&&request.request_end_date&&Math.floor((parseDateValue(request.request_end_date)-parseDateValue(request.request_date))/86400000)+1>2?'<div class="notice warn"><strong>תזכורת:</strong> נדרשת גם בקשת חופשה ידנית.</div>':''}${request.has_attachment?`<div class="attachment-row"><span>📎 צורף אישור מחלה</span><button class="ghost-btn" data-action="attachment_url" data-id="${request.id}">צפייה באישור</button></div>`:''}${request.manager_note?`<div class="notice"><strong>הערת הנהלה:</strong> ${escapeHtml(request.manager_note)}</div>`:''}<div class="request-action-zone">${request.request_type==='swap'&&request.target_employee_id===state.profile.id&&!request.target_approved&&request.status==='pending'?`<button class="secondary-btn" data-action="target_accept" data-id="${request.id}">אישור ההחלפה</button><button class="danger-btn" data-action="target_reject" data-id="${request.id}">דחיית ההחלפה</button>`:''}${request.requester_id===state.profile.id&&request.status==='pending'?`<button class="ghost-btn" data-action="cancel" data-id="${request.id}">ביטול הבקשה</button>`:''}${canApprove?`<button class="primary-btn" data-action="approve" data-id="${request.id}">אישור מהיר</button><button class="danger-btn" data-action="reject" data-id="${request.id}">דחייה</button>`:''}${isManager()&&request.status==='pending'&&request.request_type==='swap'&&!request.target_approved?'<span class="small-note">ממתין לאישור העובד שנבחר לפני החלטת הנהלה.</span>':''}${isManager()&&request.status==='approved'?`<button class="publish-btn" data-action="apply" data-id="${request.id}">הזרמה לטיוטת השיבוץ</button>`:''}</div></article>`;}).join(''):'<div class="empty-state">אין בקשות לפי הסינון שנבחר.</div>';
+    return `<article class="request-card type-${request.request_type} action-${actionState}" data-request-id="${request.id}"><div class="card-heading"><div class="request-title"><span class="request-avatar">${REQUEST_ICONS[request.request_type]||'●'}</span><div><h3>${REQUEST_LABELS[request.request_type]||'בקשה'}</h3><p class="muted">${escapeHtml(requester?.full_name||'')} · ${requestDateLabel(request)}</p></div></div><span class="status-chip ${statusClass}">${REQUEST_STATUS_LABELS[request.status]}</span></div>${requestFlowHtml(request)}<div class="request-key-details"><div><small>פירוט</small><strong>${escapeHtml(request.reason||'ללא פירוט')}</strong></div>${request.requested_start||request.requested_end?`<div><small>שעות</small><strong>${timeHtml(request.requested_start,request.requested_end)}</strong></div>`:''}${request.request_type==='swap'?`<div><small>החלפה עם</small><strong>${escapeHtml(target?.full_name||'טרם נבחר')}</strong><span>${request.target_approved?'העובד אישר':'ממתין להסכמת העובד'}</span></div>`:''}${['leave','day_off'].includes(request.request_type)?`<div><small>עבודה ביום חופשי קבוע</small><strong>${request.allow_schedule_on_day_off?`אפשרי${fixedDay?` ביום ${fixedDay}`:''}`:'לא'}</strong></div>`:''}</div>${request.request_type==='leave'&&request.request_end_date&&Math.floor((parseDateValue(request.request_end_date)-parseDateValue(request.request_date))/86400000)+1>2?'<div class="notice warn"><strong>תזכורת:</strong> נדרשת גם בקשת חופשה ידנית.</div>':''}${request.has_attachment?`<div class="attachment-row"><span>📎 צורף אישור מחלה</span><button class="ghost-btn" data-action="attachment_url" data-id="${request.id}">צפייה באישור</button></div>`:''}${request.manager_note?`<div class="notice"><strong>הערת הנהלה:</strong> ${escapeHtml(request.manager_note)}</div>`:''}<div class="request-action-zone">${request.request_type==='swap'&&request.target_employee_id===state.profile.id&&!request.target_approved&&request.status==='pending'?`<button class="secondary-btn" data-action="target_accept" data-id="${request.id}">אישור ההחלפה</button><button class="danger-btn" data-action="target_reject" data-id="${request.id}">דחיית ההחלפה</button>`:''}${request.requester_id===state.profile.id&&request.status==='pending'?`<button class="ghost-btn" data-action="cancel" data-id="${request.id}">ביטול הבקשה</button>`:''}${canApprove?`<button class="primary-btn" data-action="approve" data-id="${request.id}">אישור מהיר</button><button class="danger-btn" data-action="reject" data-id="${request.id}">דחייה</button>`:''}${isManager()&&request.status==='pending'&&request.request_type==='swap'&&!request.target_approved?'<span class="small-note">ממתין לאישור העובד שנבחר לפני החלטת הנהלה.</span>':''}</div></article>`;}).join(''):'<div class="empty-state">אין בקשות לפי הסינון שנבחר.</div>';
 }
 async function handleRequestClickBase(event){const button=event.target.closest('[data-action]');if(!button)return;if(button.dataset.action==='attachment_url'){try{const result=await apiFetch('/api/requests',{method:'POST',body:{action:'attachment_url',id:button.dataset.id}});window.open(result.url,'_blank','noopener');}catch(error){showToast(error.message,'error');}return;}let body={id:button.dataset.id,action:button.dataset.action};if(button.dataset.action==='approve')body={...body,action:'decide',status:'approved',manager_note:''};if(button.dataset.action==='reject'){const note=prompt('אפשר לכתוב סיבה לדחייה:')||'';if(!confirm('לדחות את הבקשה?'))return;body={...body,action:'decide',status:'rejected',manager_note:note};}if(button.dataset.action==='apply'&&!confirm('להזרים את הבקשה לטיוטת השיבוץ?'))return;setBusy(button,true,button.dataset.action==='apply'?'מזרים…':'מעדכן…');try{await apiFetch('/api/requests',{method:'POST',body});await refreshAll();showToast('הבקשה עודכנה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
 
