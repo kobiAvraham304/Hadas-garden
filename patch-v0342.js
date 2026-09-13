@@ -3,7 +3,7 @@
   if (window.__hadasV0342Installed) return;
   window.__hadasV0342Installed = true;
 
-  const VERSION = '0.35.0';
+  const VERSION = '0.36.0';
   const SCALE = 2; // 1754×1240 logical -> 3508×2480 px, close to 300dpi A4 landscape.
 
   function isSubstitute(employeeOrId) {
