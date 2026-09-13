@@ -511,44 +511,101 @@
     let dialog=document.querySelector('#hadasUnifiedPdfDialog');
     if(dialog)return dialog;
     dialog=document.createElement('dialog'); dialog.id='hadasUnifiedPdfDialog'; dialog.className='v036-pdf-dialog';
-    dialog.innerHTML=`<form method="dialog" class="v036-pdf-shell"><header><div><strong>שיבוץ PDF</strong><small>תצוגה מקדימה והדפסה A4 לרוחב בעמוד אחד</small></div><button value="cancel" class="icon-round-btn" aria-label="סגירה">×</button></header><div class="v036-pdf-options"><div class="v036-pdf-tabs"><button type="button" data-pdf-mode="week" class="active">שבוע</button><button type="button" data-pdf-mode="month">חודש</button></div><label class="v036-month-field hidden">חודש <input type="month" value="${monthKeyFromWeek()}"></label></div><div class="v036-pdf-status">מכין תצוגה…</div><div class="v036-pdf-preview"></div><footer><button type="button" class="secondary-btn" data-pdf-action="save">⬇ שמירה</button><button type="button" class="secondary-btn" data-pdf-action="share">↗ שיתוף / WhatsApp</button><button type="button" class="primary-btn" data-pdf-action="print">🖨 הדפסה A4</button></footer></form>`;
+    dialog.innerHTML=`<form method="dialog" class="v036-pdf-shell"><header><div><strong>שיבוץ PDF</strong><small>שבוע: עמוד A4 אחד · חודש: קובץ אחד עם עמוד נפרד לכל שבוע</small></div><button value="cancel" class="icon-round-btn" aria-label="סגירה">×</button></header><div class="v036-pdf-options"><div class="v036-pdf-tabs"><button type="button" data-pdf-mode="week" class="active">שבוע</button><button type="button" data-pdf-mode="month">חודש</button></div><label class="v036-month-field hidden">חודש <input type="month" value="${monthKeyFromWeek()}"></label></div><div class="v036-pdf-status">מכין תצוגה…</div><div class="v036-pdf-preview"></div><footer><button type="button" class="secondary-btn" data-pdf-action="save">⬇ שמירה</button><button type="button" class="secondary-btn" data-pdf-action="share">↗ שיתוף / WhatsApp</button><button type="button" class="primary-btn" data-pdf-action="print">🖨 הדפסה A4</button></footer></form>`;
     document.body.append(dialog);
-    const context={mode:'week',canvas:null,blob:null,month:monthKeyFromWeek(),busy:false};
+    const context={mode:'week',canvases:[],blob:null,month:monthKeyFromWeek(),busy:false};
+
     async function refreshPreview(){
-      if(context.busy)return;context.busy=true;context.canvas=null;context.blob=null;
-      const status=dialog.querySelector('.v036-pdf-status'),preview=dialog.querySelector('.v036-pdf-preview');status.textContent='מכין תצוגה…';preview.innerHTML='';
+      if(context.busy)return;
+      context.busy=true;
+      context.canvases=[];
+      context.blob=null;
+      const status=dialog.querySelector('.v036-pdf-status');
+      const preview=dialog.querySelector('.v036-pdf-preview');
+      status.textContent='מכין תצוגה…';
+      preview.innerHTML='';
       try{
         await document.fonts?.ready;
-        if(context.mode==='week') context.canvas=buildA4ScheduleCanvas();
-        else {const payload=await monthSchedulePayload(context.month);context.canvas=buildMonthlyA4Canvas(context.month,payload);}
-        context.blob=await pdfFromCanvas(context.canvas);
-        context.canvas.classList.add('v036-pdf-canvas'); preview.append(context.canvas); status.textContent=context.mode==='week'?'שבוע · A4 לרוחב · עמוד אחד':'חודש · A4 לרוחב · עמוד אחד';
-      }catch(error){status.textContent=error?.message||'הכנת התצוגה נכשלה'; if(typeof showToast==='function')showToast(status.textContent,'error');}
-      finally{context.busy=false;}
+        if(context.mode==='week') {
+          context.canvases=[buildA4ScheduleCanvas()];
+        } else {
+          const pages=await monthSchedulePages(context.month);
+          context.canvases=pages.map((page)=>page.canvas);
+        }
+        context.blob=await pdfFromCanvases(context.canvases);
+        context.canvases.forEach((canvas,index)=>{
+          canvas.classList.add('v036-pdf-canvas');
+          if(context.mode==='week') { preview.append(canvas); return; }
+          const shell=document.createElement('section');
+          shell.className='v036-pdf-page-preview';
+          const label=document.createElement('strong');
+          label.textContent=`שבוע ${index + 1} מתוך ${context.canvases.length}`;
+          shell.append(label,canvas);
+          preview.append(shell);
+        });
+        status.textContent=context.mode==='week'
+          ? 'שבוע · A4 לרוחב · עמוד אחד'
+          : `חודש · ${context.canvases.length} עמודי A4 · עמוד נפרד לכל שבוע`;
+      }catch(error){
+        status.textContent=error?.message||'הכנת התצוגה נכשלה';
+        if(typeof showToast==='function')showToast(status.textContent,'error');
+      }finally{context.busy=false;}
     }
-    function filename(){return context.mode==='week'?`שיבוץ-מעון-הדס-${dateISO(state.weekStart)}.pdf`:`שיבוץ-מעון-הדס-${context.month}.pdf`;}
-    function saveBlob(){if(!context.blob)return;const url=URL.createObjectURL(context.blob),a=document.createElement('a');a.href=url;a.download=filename();document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);}
+
+    function filename(){
+      return context.mode==='week'
+        ? `שיבוץ-מעון-הדס-${dateISO(state.weekStart)}.pdf`
+        : `שיבוץ-מעון-הדס-${context.month}-שבועות.pdf`;
+    }
+    function saveBlob(){
+      if(!context.blob)return;
+      const url=URL.createObjectURL(context.blob),a=document.createElement('a');
+      a.href=url;a.download=filename();document.body.append(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),30000);
+    }
+
     dialog.addEventListener('click',async(event)=>{
-      const mode=event.target.closest('[data-pdf-mode]'); if(mode){context.mode=mode.dataset.pdfMode;dialog.querySelectorAll('[data-pdf-mode]').forEach((b)=>b.classList.toggle('active',b===mode));dialog.querySelector('.v036-month-field').classList.toggle('hidden',context.mode!=='month');await refreshPreview();return;}
-      const action=event.target.closest('[data-pdf-action]')?.dataset.pdfAction;if(!action)return;
-      if(!context.canvas||!context.blob){await refreshPreview();if(!context.canvas||!context.blob)return;}
+      const mode=event.target.closest('[data-pdf-mode]');
+      if(mode){
+        context.mode=mode.dataset.pdfMode;
+        dialog.querySelectorAll('[data-pdf-mode]').forEach((b)=>b.classList.toggle('active',b===mode));
+        dialog.querySelector('.v036-month-field').classList.toggle('hidden',context.mode!=='month');
+        await refreshPreview();
+        return;
+      }
+      const action=event.target.closest('[data-pdf-action]')?.dataset.pdfAction;
+      if(!action)return;
+      if(!context.canvases.length||!context.blob){
+        await refreshPreview();
+        if(!context.canvases.length||!context.blob)return;
+      }
       if(action==='save'){saveBlob();showToast?.('קובץ ה-PDF נשמר','success');return;}
       if(action==='share'){
         const file=new File([context.blob],filename(),{type:'application/pdf'});
-        if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){try{await navigator.share({files:[file],title:'שיבוץ מעון הדס'});}catch(error){if(error?.name!=='AbortError')throw error;}}
-        else {saveBlob();showToast?.('השיתוף הישיר לא זמין במכשיר הזה — הקובץ נשמר וניתן לשלוח אותו ב-WhatsApp','success');}
+        if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+          try{await navigator.share({files:[file],title:'שיבוץ מעון הדס'});}catch(error){if(error?.name!=='AbortError')throw error;}
+        } else {
+          saveBlob();
+          showToast?.('השיתוף הישיר לא זמין במכשיר הזה — הקובץ נשמר וניתן לשלוח אותו ב-WhatsApp','success');
+        }
         return;
       }
       if(action==='print'){
         try { dialog.close(); } catch {}
-        printCanvasDirect(context.canvas);
+        printCanvasesDirect(context.canvases);
         return;
       }
     });
-    dialog.querySelector('input[type="month"]').addEventListener('change',async(event)=>{context.month=event.target.value||monthKeyFromWeek();await refreshPreview();});
-    dialog.__hadasRefresh=refreshPreview; dialog.__hadasContext=context;
+
+    dialog.querySelector('input[type="month"]').addEventListener('change',async(event)=>{
+      context.month=event.target.value||monthKeyFromWeek();
+      await refreshPreview();
+    });
+    dialog.__hadasRefresh=refreshPreview;
+    dialog.__hadasContext=context;
     return dialog;
   }
+
   function openUnifiedPdf(event){
     event?.preventDefault?.();event?.stopImmediatePropagation?.();
     stripSubstituteAvailability();
