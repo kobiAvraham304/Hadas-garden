@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const {
   requireSession, parseBody, db, assertDb, emitEvent, audit, isManager, scheduleScope, canViewFullSchedule, notifyEmployees,
   send, handleError, httpError, israelDateISO,
@@ -8,6 +9,51 @@ const validateWeekUnapproved = schedule.validateWeekUnapproved || validateWeek;
 const { generateAutomaticSchedule, employeeAvailability, partialAsNeededIssue } = require('../lib/auto-schedule');
 const dailyOperations = require('./daily-operations');
 const { employeeCanLead, sourceClassCanRelease, loadContext: loadDailyContext } = dailyOperations;
+
+
+function validationApprovalKey(issue = {}) {
+  const stable = {
+    code: issue.code || '',
+    date: issue.date || '',
+    class_id: issue.class_id || issue.classId || '',
+    employee_id: issue.employee_id || '',
+    time: issue.time || issue.start_time || '',
+    end_time: issue.end_time || '',
+    count: issue.count ?? null,
+    expected: issue.expected ?? null,
+    message: issue.message || issue.text || '',
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(stable)).digest('hex').slice(0, 40);
+}
+function automaticApprovalMatchKey(issue = {}) {
+  return [
+    issue.code || '', issue.date || '', issue.class_id || issue.classId || '', issue.employee_id || '',
+    issue.start_time || issue.start || issue.time || '', issue.end_time || issue.end || '', issue.message || issue.text || '',
+  ].join('|');
+}
+async function persistAutomaticApprovals({ weekStart, plan, approvedIssues, caller }) {
+  const requested = Array.isArray(approvedIssues) ? approvedIssues : [];
+  if (!requested.length) return [];
+  const requestedKeys = new Set(requested.map(automaticApprovalMatchKey));
+  const approvable = new Set(['understaffed', 'missing_leader']);
+  const matched = (plan?.validation?.errors || []).filter((issue) => approvable.has(issue.code) && requestedKeys.has(automaticApprovalMatchKey(issue)));
+  if (!matched.length) return [];
+  const now = new Date().toISOString();
+  const rows = matched.map((issue) => ({
+    week_start: weekStart,
+    issue_key: validationApprovalKey(issue),
+    issue_snapshot: issue,
+    approved_by: caller.employee.id,
+    approved_at: now,
+  }));
+  assertDb(await db().from('hadas_schedule_issue_approvals').upsert(rows, { onConflict: 'week_start,issue_key' }), 'לא ניתן לשמור את אישורי החריגה מהשיבוץ האוטומטי');
+  await audit(caller.employee.id, 'approve_auto_schedule_issues', 'schedule', weekStart, {
+    count: rows.length,
+    issue_keys: rows.map((row) => row.issue_key),
+    codes: [...new Set(matched.map((issue) => issue.code))],
+  });
+  return rows.map((row) => row.issue_key);
+}
 
 function addDays(dateString, days) {
   const d = new Date(`${dateString}T12:00:00Z`);
@@ -109,7 +155,7 @@ async function validateShift(payload, id, overrideDayOff = false, overrideRules 
 async function loadAutomaticScheduleData(weekStart) {
   const weekEnd = addDays(weekStart, 5);
   const previousStart = addDays(weekStart, -7);
-  const [employeesR, classesR, settingsR, constraintsR, patternsR, requestsR, existingR, previousR] = await Promise.all([
+  const [employeesR, classesR, settingsR, constraintsR, patternsR, requestsR, existingR, previousR, generalDaysR] = await Promise.all([
     db().from('hadas_employees').select('*').eq('active', true),
     db().from('hadas_classes').select('*').eq('active', true).order('sort_order'),
     db().from('hadas_app_settings').select('*').eq('id', 1).single(),
@@ -118,6 +164,7 @@ async function loadAutomaticScheduleData(weekStart) {
     db().from('hadas_requests').select('*').in('request_type', ['leave', 'day_off', 'sick']).in('status', ['approved', 'applied']).lte('request_date', weekEnd),
     db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd),
     db().from('hadas_shifts').select('*').gte('shift_date', previousStart).lte('shift_date', addDays(previousStart, 5)),
+    db().from('hadas_calendar_events').select('id,title,description,event_date,event_type,is_general_day_off').eq('is_general_day_off', true).gte('event_date', weekStart).lte('event_date', weekEnd).order('event_date'),
   ]);
   return {
     employees: assertDb(employeesR, 'לא ניתן לטעון עובדים לשיבוץ האוטומטי') || [],
@@ -128,6 +175,7 @@ async function loadAutomaticScheduleData(weekStart) {
     requests: (assertDb(requestsR, 'לא ניתן לטעון חופשות ומחלות') || []).filter((row) => String(row.request_end_date || row.request_date) >= weekStart),
     existingShifts: assertDb(existingR, 'לא ניתן לטעון את השיבוץ הקיים') || [],
     previousShifts: assertDb(previousR, 'לא ניתן לטעון את השבוע הקודם') || [],
+    generalDaysOff: assertDb(generalDaysR, 'לא ניתן לטעון חופשות כלליות') || [],
   };
 }
 
@@ -245,7 +293,7 @@ module.exports = async function handler(req, res) {
       const weekEnd = addDays(weekStart, 5);
       const scope = scheduleScope(caller);
       const fullScheduleViewer = scope === 'full';
-      const [shiftsR, publicationR, changesR, ackR, requestsR, employeesR, patternsR, settingsR] = await Promise.all([
+      const [shiftsR, publicationR, changesR, ackR, requestsR, employeesR, patternsR, settingsR, generalDaysR] = await Promise.all([
         db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd).order('shift_date').order('start_time'),
         isManager(caller) ? db().from('hadas_schedule_publications').select('*').eq('week_start', weekStart).maybeSingle() : Promise.resolve({ data:null, error:null }),
         db().from('hadas_schedule_changes').select('*').eq('week_start', weekStart).is('published_revision', 'null').order('created_at'),
@@ -254,6 +302,7 @@ module.exports = async function handler(req, res) {
         fullScheduleViewer ? db().from('hadas_employees').select('id,full_name,active,fixed_day_off,is_schedulable,primary_class_id') : Promise.resolve({ data:[], error:null }),
         fullScheduleViewer ? db().from('hadas_employee_weekly_patterns').select('*') : Promise.resolve({ data:[], error:null }),
         db().from('hadas_app_settings').select('*').eq('id', 1).maybeSingle(),
+        db().from('hadas_calendar_events').select('id,title,description,event_date,event_type,is_general_day_off').eq('is_general_day_off', true).gte('event_date', weekStart).lte('event_date', weekEnd).order('event_date'),
       ]);
       let shifts = assertDb(shiftsR, 'לא ניתן לטעון שיבוצים') || [];
       const publication = assertDb(publicationR, 'לא ניתן לטעון מצב פרסום') || null;
@@ -263,6 +312,7 @@ module.exports = async function handler(req, res) {
       const employees = assertDb(employeesR, 'לא ניתן לטעון ימי חופש') || [];
       const weeklyPatterns = assertDb(patternsR, 'לא ניתן לטעון ימי עבודה קבועים') || [];
       const settings = assertDb(settingsR, 'לא ניתן לטעון הגדרות תקינה') || {};
+      const generalDaysOff = assertDb(generalDaysR, 'לא ניתן לטעון חופשות כלליות') || [];
       if (!isManager(caller)) {
         shifts = restoreLastPublished(shifts, scheduleChanges);
         if (scope === 'class') shifts = shifts.filter((row) => row.class_id === caller.employee.primary_class_id);
@@ -279,6 +329,7 @@ module.exports = async function handler(req, res) {
         publication: isManager(caller) ? publication : null,
         scheduleChanges: isManager(caller) ? scheduleChanges : [],
         scheduleAbsences,
+        generalDaysOff,
         acknowledgements,
         settings,
       });
@@ -317,14 +368,18 @@ module.exports = async function handler(req, res) {
       if (hardErrors.length) throw httpError(409, 'נשארו נקודות שחייבות תיקון לפני החלת השיבוץ. פתחו את הנקודה ובצעו תיקון בתצוגה המקדימה.', { errors:hardErrors, warnings:plan.validation.warnings });
       if (plan.validation.errors.length && !body.allow_incomplete) throw httpError(409, 'נשארו חוסרים בשיבוץ האוטומטי. ניתן לחזור לתצוגה המקדימה או לאשר יצירת טיוטה חלקית.', plan.validation);
       if (!plan.generated.length) throw httpError(409, mode === 'fill' ? 'לא נמצאו חוסרים שניתן למלא אוטומטית' : 'לא ניתן היה ליצור שיבוצים מהנתונים הקיימים');
-      if(mode==='rebuild'&&automaticSchedulesMatch(data.existingShifts,plan.generated,selectedDates))return send(res,200,{ok:true,count:0,mode,unchanged:true,metrics:plan.metrics,validation:plan.validation});
+      if(mode==='rebuild'&&automaticSchedulesMatch(data.existingShifts,plan.generated,selectedDates)){
+        const approvedKeys=await persistAutomaticApprovals({weekStart,plan,approvedIssues:body.approved_issues,caller});
+        return send(res,200,{ok:true,count:0,mode,unchanged:true,metrics:plan.metrics,validation:plan.validation,approved_keys:approvedKeys});
+      }
       const rows = plan.generated.map((row) => ({ ...row, status: 'draft', created_by: caller.employee.id }));
       const applied = assertDb(await db().rpc('hadas_apply_automatic_schedule',{
         p_week_start:weekStart,p_selected_dates:selectedDates,p_rows:rows,p_actor_id:caller.employee.id,p_mode:mode,
       }),'לא ניתן להחיל את השיבוץ האוטומטי כעסקה אחת') || {};
       const inserted=Array.isArray(applied.inserted)?applied.inserted:[];
+      const approvedKeys=await persistAutomaticApprovals({weekStart,plan,approvedIssues:body.approved_issues,caller});
       await emitEvent('shifts');
-      return send(res, 201, { ok: true, count: inserted.length, mode, metrics: plan.metrics, validation: plan.validation });
+      return send(res, 201, { ok: true, count: inserted.length, mode, metrics: plan.metrics, validation: plan.validation, approved_keys: approvedKeys });
     }
 
 
