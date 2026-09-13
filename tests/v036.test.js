@@ -62,17 +62,17 @@ test('0.36 automatic approvals use the same stable key as regular validation app
 
 test('0.36 schedule export is unified and keeps old image actions hidden', () => {
   const patch = read('patch-v0342.js');
-  assert.match(patch, /button\.textContent = 'שיבוץ PDF'/);
+  assert.match(patch, /button\.id='v036PdfBtn'/);
   assert.match(patch, /data-pdf-mode="week"/);
   assert.match(patch, /data-pdf-mode="month"/);
   assert.match(patch, /data-pdf-action="save"/);
   assert.match(patch, /data-pdf-action="share"/);
   assert.match(patch, /data-pdf-action="print"/);
-  assert.match(patch, /\['#imageBtn','#monthImageBtn','#v031PrintBtn'\]/);
+  assert.match(patch, /\['#printBtn','#imageBtn','#monthImageBtn','#v031PrintBtn'\]/);
   assert.match(patch, /data-copy-schedule-day/);
-  assert.match(patch, /v036-general-day/);
+  assert.match(patch, /v036-off-label/);
   assert.match(patch, /grid-template-columns:repeat\(6,minmax\(148px,1fr\)\)/);
-  assert.match(patch, /data-v036-pdf/);
+  assert.match(patch, /v036-pdf-launch/);
   assert.match(patch, /canShowUnifiedPdf/);
   assert.doesNotMatch(patch, />העתק יום<\/span>/);
   assert.match(patch, /v036-copy-day-header::after/);
@@ -83,9 +83,9 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
 test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
   const entry = read('patch-v025.js');
   const index = read('index.html');
-  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf1'/);
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf2'/);
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0360hf1/);
+  assert.match(index, /patch-v025\.js\?v=0360hf2/);
 });
