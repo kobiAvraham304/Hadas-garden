@@ -152,20 +152,23 @@ module.exports = async function handler(req,res) {
         if (certificate) await deletePrivateFile(CERTIFICATE_BUCKET,certificate.path);
         throw error;
       }
+      const postCreateTasks = [
+        audit(caller.employee.id,'create','request',request.id,{ type,on_behalf:onBehalf,requester_id:requesterId }),
+      ];
       if(onBehalf){
-        await notifyEmployees([requesterId],{type:'request',title:'נוספה עבורך בקשה במערכת',message:`${caller.employee.full_name} הזין/ה עבורך ${type==='leave'?'חופשה':type==='sick'?'מחלה':type==='day_off'?'יום חופשי':'בקשה'} (${requestRangeLabel(request)}).`,entityType:'request',entityId:request.id,actionRequired:false});
+        postCreateTasks.push(notifyEmployees([requesterId],{type:'request',title:'נוספה עבורך בקשה במערכת',message:`${caller.employee.full_name} הזין/ה עבורך ${type==='leave'?'חופשה':type==='sick'?'מחלה':type==='day_off'?'יום חופשי':'בקשה'} (${requestRangeLabel(request)}).`,entityType:'request',entityId:request.id,actionRequired:false}));
       }
       if (type === 'swap') {
-        await notifyEmployees([payload.target_employee_id],{
+        postCreateTasks.push(notifyEmployees([payload.target_employee_id],{
           type:'swap',title:'בקשת החלפה ממתינה לאישור שלך',
           message:`${onBehalf?'הנהלת המעון':caller.employee.full_name} ביקש/ה להחליף איתך בתאריך ${payload.request_date}.`,
           entityType:'request',entityId:request.id,actionRequired:true,
-        });
+        }));
       } else if(!onBehalf) {
         const manualNote = type === 'leave' && inclusiveDays(payload.request_date,payload.request_end_date) > 2 ? ' נדרשת גם השלמת טופס חופשה ידני.' : '';
-        await notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id);
+        postCreateTasks.push(notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id));
       }
-      await audit(caller.employee.id,'create','request',request.id,{ type,on_behalf:onBehalf,requester_id:requesterId });
+      await Promise.all(postCreateTasks);
       let finalRequest=request;
       if(onBehalf&&body.apply_now===true&&['leave','day_off'].includes(type)){
         const rpc=await db().rpc('hadas_apply_approved_request',{p_request_id:request.id,p_actor_id:caller.employee.id});
@@ -213,11 +216,29 @@ module.exports = async function handler(req,res) {
       if (request.request_type === 'swap' && body.status === 'approved' && !request.target_approved) throw httpError(409,'העובד שנבחר עדיין לא אישר את ההחלפה');
       const managerNote = String(body.manager_note || '').trim() || null;
       assertDb(await db().from('hadas_requests').update({ status:body.status,manager_note:managerNote,decided_by:caller.employee.id,decided_at:new Date().toISOString() }).eq('id',request.id),'לא ניתן לעדכן את הבקשה');
-      await clearRequestActionNotifications(request.id);
-      if(body.status==='approved')await notifyManagers({type:'request',title:'בקשה אושרה ומוכנה להזרמה',message:`הבקשה לתאריך ${requestRangeLabel(request)} אושרה. יש להזרים אותה לטיוטת השיבוץ.`,entityType:'request',entityId:request.id,actionRequired:true});
-      const statusText = body.status === 'approved' ? 'אושרה' : 'נדחתה';
-      await notifyEmployees([request.requester_id],{ type:'request',title:`הבקשה שלך ${statusText}`,message:managerNote || `בקשתך לתאריך ${requestRangeLabel(request)} ${statusText}.`,entityType:'request',entityId:request.id,actionRequired:false });
-      if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{ type:'swap',title:`בקשת ההחלפה ${statusText}`,message:`הבקשה לתאריך ${request.request_date} ${statusText} על ידי מנהלת המעון או אחראית השיבוץ.`,entityType:'request',entityId:request.id });
+      if (body.status === 'approved') {
+        const applied = await db().rpc('hadas_apply_approved_request',{ p_request_id:request.id,p_actor_id:caller.employee.id });
+        if (applied.error) {
+          await db().from('hadas_requests').update({ status:'pending',decided_by:null,decided_at:null }).eq('id',request.id);
+          throw httpError(409,applied.error.message || 'הבקשה אושרה אך לא ניתן היה לעדכן את השיבוץ');
+        }
+        await clearRequestActionNotifications(request.id);
+        await emitEvent('shifts');
+        await notifyEmployees([request.requester_id],{
+          type:'request',title:'הבקשה שלך אושרה והוזרמה לשיבוץ',
+          message:managerNote || `בקשתך לתאריך ${requestRangeLabel(request)} אושרה ועודכנה בטיוטת השיבוץ.`,
+          entityType:'request',entityId:request.id,actionRequired:false,
+        });
+        if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{
+          type:'swap',title:'בקשת ההחלפה אושרה והוזרמה',
+          message:`השיבוץ לתאריך ${request.request_date} עודכן בטיוטת השיבוץ.`,
+          entityType:'request',entityId:request.id,
+        });
+      } else {
+        await clearRequestActionNotifications(request.id);
+        await notifyEmployees([request.requester_id],{ type:'request',title:'הבקשה שלך נדחתה',message:managerNote || `בקשתך לתאריך ${requestRangeLabel(request)} נדחתה.`,entityType:'request',entityId:request.id,actionRequired:false });
+        if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{ type:'swap',title:'בקשת ההחלפה נדחתה',message:`הבקשה לתאריך ${request.request_date} נדחתה על ידי מנהלת המעון או אחראית השיבוץ.`,entityType:'request',entityId:request.id });
+      }
     } else if (action === 'apply') {
       if (!isManager(caller)) throw httpError(403,'אין הרשאה להזרים בקשה');
       if (request.status !== 'approved') throw httpError(409,'יש לאשר את הבקשה לפני הזרמתה');

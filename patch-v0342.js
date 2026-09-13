@@ -37,12 +37,13 @@
     });
   }
 
-  // Approved exceptions are historical decisions, not live staffing faults.
+  // Approved exceptions are historical decisions: keep them available for the
+  // explicit "show approved exceptions" view, but never mix them into live faults.
   function stripApprovedValidationState() {
     if (!state?.v030Validation) return;
-    state.v030Validation.approved = [];
     state.v030Validation.errors = (state.v030Validation.errors || []).filter((item) => !item.approved && !item._v030Approved);
     state.v030Validation.warnings = (state.v030Validation.warnings || []).filter((item) => !item.approved && !item._v030Approved && item.code !== 'manual_rule_override');
+    state.v030Validation.approved = state.v030Validation.approved || [];
   }
 
   if (typeof validateScheduleClient === 'function' && !window.__hadasV0342ValidationFilter) {
@@ -50,11 +51,16 @@
     validateScheduleClient = function v0342ValidateScheduleClient(...args) {
       stripApprovedValidationState();
       const result = previousValidateScheduleClient.apply(this, args) || { errors: [], warnings: [] };
+      const approved = [
+        ...(result.approved || []),
+        ...(result.warnings || []).filter((item) => item?.approved || item?._v030Approved),
+      ];
       const clean = (item) => !item?.approved && !item?._v030Approved && item?.code !== 'manual_rule_override';
       return {
         ...result,
         errors: (result.errors || []).filter(clean),
         warnings: (result.warnings || []).filter(clean),
+        approved,
       };
     };
     window.__hadasV0342ValidationFilter = true;
@@ -884,6 +890,24 @@
     .v036-pdf-status{padding:0 16px 8px;color:#6b6f83;font-size:.82rem;font-weight:800}.v036-pdf-preview{overflow:auto;margin:0 14px 12px;padding:10px;border:1px solid #dfe1e9;border-radius:16px;background:#d9dbe2;display:grid;place-items:center;gap:16px;overscroll-behavior:contain}.v036-pdf-page-preview{width:100%;display:grid;justify-items:center;gap:7px}.v036-pdf-page-preview>strong{justify-self:start;margin-inline:8px;padding:5px 9px;border-radius:999px;background:#fff;color:#64687b;font-size:.72rem;box-shadow:0 2px 8px rgba(31,33,58,.08)}.v036-pdf-canvas{display:block!important;width:min(100%,1040px)!important;height:auto!important;box-shadow:0 8px 25px rgba(31,33,58,.18);background:#fff}
     .v036-pdf-shell>footer{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:9px;padding:13px 16px;background:#fff;border-top:1px solid #e4e5ed}.v036-pdf-shell>footer button{min-height:44px!important;font-size:.86rem!important}
     html[data-hadas-role="manager"] #v036PdfBtn,html[data-hadas-role="teacher"] #v036PdfBtn,html[data-hadas-role="full"] #v036PdfBtn,html[data-hadas-role="lead"] #v036PdfBtn{display:inline-flex!important;visibility:visible!important}
+    #publishScheduleBtn.publication-toggle.is-unpublished{background:#d9545d!important;border-color:#c84650!important;color:#fff!important;box-shadow:0 5px 14px rgba(201,70,80,.18)!important}
+    #publishScheduleBtn.publication-toggle.is-unpublished .publication-toggle-dot{background:#fff!important;box-shadow:0 0 0 3px rgba(255,255,255,.22)!important}
+    #publishScheduleBtn.publication-toggle.is-published{background:#f6f7fa!important;border-color:#dfe1e9!important;color:#4c5267!important;box-shadow:none!important}
+    #toast{z-index:2147483647!important;position:fixed!important}
+    #toast:popover-open{display:block!important;position:fixed!important;inset:auto 18px 18px auto!important;margin:0!important;border:0!important;z-index:2147483647!important}
+    .v031-validation-card.approved{border:2px solid #e68b91!important;background:#fff8f8!important}
+    .v032-validation-card.approved{border:2px solid #e68b91!important;background:#fff8f8!important}
+    .v032-validation-card.approved .v032-validation-icon{background:#fde7e8!important;color:#a73942!important}
+    .v032-validation-card.approved .v032-validation-copy>span{color:#a73942!important}
+    .v032-focus-ring,.v032-focus-column{outline-color:#d84f59!important;box-shadow:0 0 0 7px rgba(216,79,89,.14)!important}
+    .v031-validation-card.approved .v031-validation-icon{background:#fde7e8!important;color:#a73942!important}
+    .v031-validation-card.approved .v031-validation-copy>span{color:#a73942!important}
+    .v036-approved-toggle{display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:8px 12px;border:1px solid #e5a1a5;border-radius:12px;background:#fff7f7;color:#9d3d45;font:inherit;font-weight:850;cursor:pointer}
+    .v036-approved-toggle.active{background:#a9444d;color:#fff;border-color:#a9444d}
+    .v036-validation-head-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:8px}
+    .v036-validation-head-actions>b{white-space:nowrap;font-size:12px;color:#a33f45;background:#fff0f0;padding:7px 10px;border-radius:999px}
+    .v036-approved-list{display:grid;gap:10px}
+    .day-class-card.attention-pulse{outline:3px solid #d84f59!important;outline-offset:3px!important;box-shadow:0 0 0 7px rgba(216,79,89,.12)!important}
     #v036PrintRoot{display:none}
     @media print{
       @page{size:A4 landscape;margin:0}

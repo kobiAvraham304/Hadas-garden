@@ -304,13 +304,25 @@
   function installValidationUx() {
     if (window.__v031ValidationUxInstalled) return;
     window.__v031ValidationUxInstalled = true;
+    if (typeof state.v031ShowApproved !== 'boolean') state.v031ShowApproved = false;
 
     function validationSnapshot() {
       const result = validateScheduleClient();
+      const approvedRows = [
+        ...(result.approved || []),
+        ...(result.warnings || []).filter((item) => item._v030Approved),
+      ];
+      const seen = new Set();
+      const approved = approvedRows.filter((item) => {
+        const key = String(item._v030ApprovalKey || item.approval_key || item.id || '');
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
       return {
         errors: result.errors || [],
-        approved: (result.warnings || []).filter((item) => item._v030Approved),
-        warnings: (result.warnings || []).filter((item) => !item._v030Approved),
+        approved,
+        warnings: (result.warnings || []).filter((item) => !item._v030Approved && !item.approved),
       };
     }
 
@@ -344,16 +356,43 @@
       const count = document.querySelector('#scheduleIssuesCount');
       if (!panel || !toggle || !count || !isManager()) return;
       const data = validationSnapshot();
-      const total = data.errors.length + data.approved.length + data.warnings.length;
-      count.textContent = data.errors.length ? `${data.errors.length} בעיות · ${data.approved.length} אושרו` : data.approved.length ? `${data.approved.length} חריגות אושרו` : data.warnings.length ? `${data.warnings.length} הערות` : 'הכול תקין';
+      const liveTotal = data.errors.length + data.warnings.length;
+      count.textContent = data.errors.length
+        ? `${data.errors.length} בעיות`
+        : data.warnings.length
+          ? `${data.warnings.length} הערות`
+          : 'הכול תקין';
       toggle.classList.toggle('has-errors', data.errors.length > 0);
-      toggle.classList.toggle('v027-all-good', total === 0);
+      toggle.classList.toggle('v027-all-good', liveTotal === 0);
       toggle.setAttribute('aria-expanded', String(Boolean(state.scheduleIssuesOpen)));
       panel.classList.toggle('hidden', !state.scheduleIssuesOpen);
       if (!state.scheduleIssuesOpen) return;
+
       const map = new Map([...data.errors, ...data.approved, ...data.warnings].map((item) => [String(item.id || item._v030ApprovalKey || item.approval_key || ''), item]));
       state.v031ValidationIssueMap = map;
-      panel.innerHTML = total ? `<section class="v031-validation-panel"><header><div><strong>בדיקות תקינות לשבוע</strong><small>אפשר לאשר חריגה נקודתית ולבטל את האישור בכל רגע.</small></div><b>${data.errors.length ? `${data.errors.length} דורשות טיפול` : 'אין בעיות פתוחות'}</b></header><div class="v031-validation-list">${data.errors.map((item) => card(item,'error')).join('')}${data.approved.map((item) => card(item,'approved')).join('')}${data.warnings.map((item) => card(item,'warning')).join('')}</div></section>` : '<div class="v027-validation-success"><span>✓</span><div><strong>השיבוץ עבר את בדיקות התקינות</strong><small>לא נמצאו בעיות או חריגות בשבוע הנבחר.</small></div></div>';
+      if (!liveTotal && !data.approved.length) {
+        panel.innerHTML = '<div class="v027-validation-success"><span>✓</span><div><strong>השיבוץ עבר את בדיקות התקינות</strong><small>לא נמצאו בעיות או חריגות בשבוע הנבחר.</small></div></div>';
+        return;
+      }
+
+      const approvedToggle = data.approved.length
+        ? `<button type="button" class="v036-approved-toggle ${state.v031ShowApproved ? 'active' : ''}" data-v031-toggle-approved>${state.v031ShowApproved ? 'הסתרת חריגות שאושרו' : 'הצגת חריגות שאושרו'} <b>${data.approved.length}</b></button>`
+        : '';
+      const approvedHtml = state.v031ShowApproved
+        ? `<div class="v036-approved-list">${data.approved.map((item) => card(item,'approved')).join('')}</div>`
+        : '';
+      const liveHtml = [
+        ...data.errors.map((item) => card(item,'error')),
+        ...data.warnings.map((item) => card(item,'warning')),
+      ].join('');
+      const liveStatus = liveTotal
+        ? liveHtml
+        : '<div class="v027-validation-success"><span>✓</span><div><strong>אין בעיות פתוחות</strong><small>השיבוץ תקין. חריגות שכבר אושרו מוסתרות עד שתבחר להציג אותן.</small></div></div>';
+
+      panel.innerHTML = `<section class="v031-validation-panel">
+        <header><div><strong>בדיקות תקינות לשבוע</strong><small>חריגות שאושרו אינן חוסמות פרסום ומוצגות רק לפי בקשה.</small></div><div class="v036-validation-head-actions">${approvedToggle}<b>${data.errors.length ? `${data.errors.length} דורשות טיפול` : 'אין בעיות פתוחות'}</b></div></header>
+        <div class="v031-validation-list">${liveStatus}${approvedHtml}</div>
+      </section>`;
     }
 
     function installToggle() {
@@ -380,6 +419,12 @@
     if (panel && !panel.dataset.v031Events) {
       panel.dataset.v031Events = 'true';
       panel.addEventListener('click', async (event) => {
+        const approvedToggle = event.target.closest('[data-v031-toggle-approved]');
+        if (approvedToggle) {
+          state.v031ShowApproved = !state.v031ShowApproved;
+          renderPanel();
+          return;
+        }
         const focus = event.target.closest('[data-v031-focus-issue]');
         if (focus) {
           const issue = state.v031ValidationIssueMap?.get(focus.dataset.v031FocusIssue);

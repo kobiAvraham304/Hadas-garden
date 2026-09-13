@@ -112,15 +112,18 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /installMobileScheduleToggle/);
   assert.match(patch, /schedule-tools-menu:not\(\[open\]\)>\.schedule-secondary-actions/);
   assert.match(patch, /mobile-week-day-body\[hidden\]/);
+  assert.match(patch, /state\.v030Validation\.approved = state\.v030Validation\.approved \|\| \[\]/);
+  assert.match(patch, /v036-approved-toggle/);
+  assert.match(patch, /publication-toggle\.is-unpublished/);
   assert.doesNotMatch(read('index.html'), /schedule-tools-menu" open/);
 });
 
 test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
   const entry = read('patch-v025.js');
   const index = read('index.html');
-  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf6'/);
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf7'/);
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0360hf6/);
+  assert.match(index, /patch-v025\.js\?v=0360hf7/);
 });

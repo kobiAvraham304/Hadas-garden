@@ -28,10 +28,11 @@ test('0.30 manager preapproval is explicit and self requests remain server-guard
   assert.equal(truthy(true), true);
   assert.equal(truthy('on'), true);
   assert.equal(truthy('false'), false);
-  assert.match(requests, /managerSubmitted && \(truthy\(body\.pre_approved\) \|\| truthy\(body\.apply_now\)\)/);
-  assert.match(requests, /!managerSubmitted && updated\.status !== 'pending'/);
+  assert.match(requests, /if \(!managerSubmitted\)/);
+  assert.match(requests, /created\.status !== 'pending'/);
   assert.match(requests, /manager_preapproved/);
   assert.match(requests, /finishManagerPreapprovedSwap/);
+  assert.match(requests, /hadas_apply_approved_request/);
   assert.match(requests, /target_approved/);
   assert.match(patch, /אושר מראש/);
   assert.match(patch, /!onBehalf/);
@@ -43,7 +44,7 @@ test('0.30 schedule validation approvals are deterministic, reversible and affec
   const second = validationIssueKey({ code:'understaffed', date:'2026-08-30', class_id:'x', time:'09:00', count:3, expected:4, message:'בעיה' });
   const changed = validationIssueKey({ code:'understaffed', date:'2026-08-30', class_id:'x', time:'09:00', count:2, expected:4, message:'בעיה' });
   assert.equal(first, second);
-  assert.notEqual(first, changed);
+  assert.equal(first, changed, 'coverage approvals stay stable when the post-apply count/range changes');
   const shifts = read('lib/shifts-v030.js');
   assert.match(shifts, /hadas_schedule_issue_approvals/);
   assert.match(shifts, /action === 'approve_issue'/);
@@ -103,7 +104,7 @@ test('0.30 runtime stays intact while physical entrypoints advance to v0.34', ()
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
   assert.match(entry, /const VERSION = '0\.36\.0'/);
   assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321'/);
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf7'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await loadScript\(V034, 'v034'\)/);
