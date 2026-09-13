@@ -28,10 +28,11 @@ test('0.30 manager preapproval is explicit and self requests remain server-guard
   assert.equal(truthy(true), true);
   assert.equal(truthy('on'), true);
   assert.equal(truthy('false'), false);
-  assert.match(requests, /managerSubmitted && \(truthy\(body\.pre_approved\) \|\| truthy\(body\.apply_now\)\)/);
-  assert.match(requests, /!managerSubmitted && updated\.status !== 'pending'/);
+  assert.match(requests, /if \(!managerSubmitted\)/);
+  assert.match(requests, /created\.status !== 'pending'/);
   assert.match(requests, /manager_preapproved/);
   assert.match(requests, /finishManagerPreapprovedSwap/);
+  assert.match(requests, /hadas_apply_approved_request/);
   assert.match(requests, /target_approved/);
   assert.match(patch, /אושר מראש/);
   assert.match(patch, /!onBehalf/);
