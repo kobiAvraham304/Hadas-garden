@@ -79,8 +79,20 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /width:820px!important/);
   assert.match(patch, /size: 20\.5/);
   assert.match(patch, /const classColumnX = margin \+ tableWidth - classColumnWidth/);
-  assert.match(patch, /const dateColumnX = margin \+ tableWidth - dateColumnWidth/);
   assert.match(patch, /function printCanvasDirect/);
+  assert.match(patch, /async function pdfFromCanvases/);
+  assert.match(patch, /function monthWeekStarts/);
+  assert.match(patch, /async function monthSchedulePages/);
+  assert.match(patch, /printCanvasesDirect\(context\.canvases\)/);
+  assert.match(patch, /עמוד נפרד לכל שבוע/);
+  assert.match(patch, /v036-pdf-page-preview/);
+  assert.match(patch, /absence_type === 'day_off_worked'/);
+  assert.match(patch, /#edf9f1/);
+  assert.match(patch, /#fff0f0/);
+  assert.doesNotMatch(patch, /\+.*נוספים/);
+  assert.match(patch, /size:25, weight:950/);
+  assert.match(patch, /const absenceHeight = 170/);
+  assert.match(patch, /className = 'v036-print-page'/);
   assert.doesNotMatch(patch, /window\.open\('',\s*'_blank'/);
   assert.match(patch, /v036-mobile-day-toggle/);
   assert.match(patch, /installMobileScheduleToggle/);
@@ -92,9 +104,9 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
 test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
   const entry = read('patch-v025.js');
   const index = read('index.html');
-  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf3'/);
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf4'/);
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0360hf3/);
+  assert.match(index, /patch-v025\.js\?v=0360hf4/);
 });
