@@ -77,7 +77,7 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.doesNotMatch(patch, />העתק יום<\/span>/);
   assert.match(patch, /v036-copy-day-header::after/);
   assert.match(patch, /width:820px!important/);
-  assert.match(patch, /size: 20\.5/);
+  assert.match(patch, /size:22/);
   assert.match(patch, /const classColumnX = margin \+ tableWidth - classColumnWidth/);
   assert.match(patch, /function printCanvasDirect/);
   assert.match(patch, /async function pdfFromCanvases/);
@@ -89,9 +89,15 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /absence_type === 'day_off_worked'/);
   assert.match(patch, /#edf9f1/);
   assert.match(patch, /#fff0f0/);
+  assert.match(patch, /const approvedLeave = item\.absence_type === 'leave'/);
+  assert.match(patch, /approvedLeave \? '#fff0f0' : '#f8f8fb'/);
+  assert.match(patch, /approvedLeave \? '#efb1b1' : '#d9dbe5'/);
+  assert.match(patch, /function fitText/);
+  assert.match(patch, /const compact = height < 48/);
+  assert.doesNotMatch(patch, /const fill = worked \? '#edf9f1' : '#fff0f0'/);
   assert.doesNotMatch(patch, /\+.*נוספים/);
-  assert.match(patch, /size:25, weight:950/);
-  assert.match(patch, /const absenceHeight = 170/);
+  assert.match(patch, /size:27, minSize:20, weight:950/);
+  assert.match(patch, /const absenceHeight = 184/);
   assert.match(patch, /className = 'v036-print-page'/);
   assert.doesNotMatch(patch, /window\.open\('',\s*'_blank'/);
   assert.match(patch, /v036-mobile-day-toggle/);
@@ -104,9 +110,9 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
 test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
   const entry = read('patch-v025.js');
   const index = read('index.html');
-  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf4'/);
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0360hf5'/);
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0360hf4/);
+  assert.match(index, /patch-v025\.js\?v=0360hf5/);
 });
