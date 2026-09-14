@@ -228,7 +228,7 @@
         const zone = document.querySelector(`[data-request-id="${request.id}"] .request-action-zone`);
         if (!zone || zone.querySelector(`[data-v030-delete-request="${request.id}"]`)) continue;
         const applied = request.status === 'applied';
-        zone.insertAdjacentHTML('afterbegin', `<button type="button" class="danger-btn v030-delete-request" data-v030-delete-request="${request.id}">${applied ? 'מחיקה וביטול ההזרמה' : 'מחיקת הבקשה'}</button>`);
+        zone.insertAdjacentHTML('afterbegin', `<button type="button" class="danger-btn v030-delete-request" data-v030-delete-request="${request.id}">${applied ? 'מחיקה והחזרת השיבוץ' : 'מחיקת הבקשה'}</button>`);
       }
       return result;
     };
@@ -243,7 +243,7 @@
         ? 'למחוק את הבקשה שכבר עודכנה בשיבוץ? המערכת תנסה להחזיר אוטומטית את השיבוץ למצב שלפני האישור ולהסיר את החופשה מלוח השנה. אם השיבוץ השתנה מאז, המחיקה תיחסם כדי לא לדרוס נתונים.'
         : 'למחוק את הבקשה שאושרה? היא תוסר גם מזמינות הצוות ומלוח השנה.';
       if (!confirm(message)) return;
-      setBusy(button, true, applied ? 'מבטל ומוחק…' : 'מוחק…');
+      setBusy(button, true, applied ? 'מחזיר ומוחק…' : 'מוחק…');
       try {
         const result = await apiFetch('/api/requests', { method:'POST', body:{ action:'delete_request', id:button.dataset.v030DeleteRequest }, timeout:16000 });
         state.weekCache.clear(); state.calendarCache.clear();
