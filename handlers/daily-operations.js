@@ -60,36 +60,32 @@ function targetNeedsLeader(context, operation, shift, range) {
   return !otherLeaders.some((row) => !unavailableInRange(context, row.employee_id, operation.operation_date, range.start, range.end, operation.id));
 }
 
-function buildSuggestions(context, operation, shift) {
+function buildSuggestionsDetailed(context, operation, shift) {
   const range = affectedRange(operation, shift);
-  if (!range.start || !range.end || minutes(range.end) <= minutes(range.start)) return [];
+  const fallback = { candidates:[], rejected:[], range, neededRole:'staff', needsLeader:false };
+  if (!range.start || !range.end || minutes(range.end) <= minutes(range.start)) return fallback;
   const needsLeader = targetNeedsLeader(context, operation, shift, range);
-  const ranked = rankCandidates({
+  const neededRole = needsLeader ? (shift.shift_role || 'lead') : 'staff';
+  const ranking = rankCandidates({
     ...context,
     date: operation.operation_date,
     classId: operation.class_id,
     start: range.start,
     end: range.end,
-    neededRole: needsLeader ? (shift.shift_role || 'lead') : 'staff',
+    neededRole,
     excludedEmployeeId: operation.employee_id,
     excludeShiftId: shift.id,
-  }).candidates;
-
-  return ranked.slice(0, 24).map((candidate) => ({
-    employee_id: candidate.employee_id,
-    full_name: candidate.full_name,
-    job_title: candidate.job_title,
+  });
+  const candidates = (ranking.candidates || []).slice(0, 24).map((candidate) => ({
+    ...candidate,
     replacement_type: candidate.candidate_type === 'transfer' ? 'transfer' : 'replacement',
-    from_class_id: candidate.from_class_id,
-    from_class_name: candidate.from_class_name,
     start_time: range.start,
     end_time: range.end,
-    score: candidate.score,
-    reasons: candidate.reasons,
-    cautions: candidate.cautions || [],
-    recommended: candidate.recommended,
-    recommendation_level: candidate.recommendation_level,
   }));
+  return { candidates, rejected:ranking.rejected || [], range, neededRole, needsLeader };
+}
+function buildSuggestions(context, operation, shift) {
+  return buildSuggestionsDetailed(context, operation, shift).candidates;
 }
 
 function validateReport(type, body, shift) {
@@ -163,13 +159,32 @@ module.exports = async function handler(req, res) {
     }
 
     const context = await loadContext(operation.operation_date);
-    const suggestions = buildSuggestions(context, operation, shift);
-    if (action === 'suggestions') return send(res, 200, { ok: true, suggestions, range: affectedRange(operation, shift) });
+    const matching = buildSuggestionsDetailed(context, operation, shift);
+    const suggestions = matching.candidates;
+    if (action === 'suggestions') {
+      return send(res, 200, {
+        ok:true,
+        suggestions,
+        candidates:suggestions,
+        rejected:matching.rejected,
+        range:matching.range,
+        needed_role:matching.neededRole,
+        needs_leader:matching.needsLeader,
+        summary:{
+          total:suggestions.length,
+          recommended:suggestions.filter((item) => item.recommended).length,
+          direct:suggestions.filter((item) => item.candidate_type === 'direct').length,
+          transfers:suggestions.filter((item) => item.candidate_type === 'transfer').length,
+          rejected:matching.rejected.length,
+        },
+      });
+    }
     if (action === 'assign') {
       const employeeId = String(body.employee_id || ''); const replacementType = String(body.replacement_type || '');
       if (!REPLACEMENT_TYPES.has(replacementType)) throw httpError(400, 'סוג ההחלפה אינו תקין');
       const chosen = suggestions.find((item) => item.employee_id === employeeId && item.replacement_type === replacementType);
       if (!chosen) throw httpError(409, 'העובד כבר אינו זמין להחלפה זו');
+      if (body.source_shift_id && String(body.source_shift_id) !== String(chosen.source_shift_id || '')) throw httpError(409, 'השיבוץ המקורי השתנה. יש לרענן את אפשרויות הכיסוי');
       const update = { replacement_employee_id: employeeId, replacement_from_class_id: chosen.from_class_id, replacement_type: replacementType, replacement_start: chosen.start_time, replacement_end: chosen.end_time, status: 'resolved', resolved_by: caller.employee.id, resolved_at: new Date().toISOString() };
       assertDb(await db().from('hadas_daily_operations').update(update).eq('id', operation.id), 'לא ניתן לשמור את ההחלפה');
       await notifyEmployees([employeeId], { type: 'daily_operation', title: 'שינוי תפעולי להיום', message: `נקבע עבורך ${replacementType === 'transfer' ? 'מעבר זמני' : 'שיבוץ החלפה'} לכיתה אחרת בין ${chosen.start_time}–${chosen.end_time}.`, entityType: 'daily_operation', entityId: operation.id, actionRequired: false });
@@ -185,6 +200,7 @@ module.exports = async function handler(req, res) {
 };
 
 module.exports.buildSuggestions = buildSuggestions;
+module.exports.buildSuggestionsDetailed = buildSuggestionsDetailed;
 module.exports.sourceClassCanRelease = sourceClassCanRelease;
 module.exports.affectedRange = affectedRange;
 module.exports.unavailableInRange = unavailableInRange;
