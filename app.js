@@ -2201,6 +2201,8 @@ function requestFlowHtml(request){const steps=request.request_type==='swap'?['נ
 function requestActionState(request){if(request.request_type==='swap'&&request.status==='pending'&&!request.target_approved)return 'waiting_target';if(request.status==='pending')return 'needs_manager';return 'closed';}
 function handleRequestSummaryClick(event){const button=event.target.closest('[data-request-filter]');if(!button)return;state.requestStatusFilter=button.dataset.requestFilter;$('#requestStatusFilter').value=state.requestStatusFilter;syncFilterChips('#requestStatusChips',state.requestStatusFilter);renderRequests();}
 function renderRequestsBase(){
+  if(state.requestStatusFilter==='applied') state.requestStatusFilter='approved';
+  const requestStatusSelect=$('#requestStatusFilter'); if(requestStatusSelect) requestStatusSelect.value=state.requestStatusFilter;
   syncFilterChips('#requestStatusChips',state.requestStatusFilter);
   const counts={pending:0,approved:0,closed:0};const workflow={needs_manager:0,waiting_target:0};
   state.requests.forEach((request)=>{if(request.status==='pending')counts.pending++;else if(['approved','applied'].includes(request.status))counts.approved++;else counts.closed++;const action=requestActionState(request);if(workflow[action]!==undefined)workflow[action]++;});
