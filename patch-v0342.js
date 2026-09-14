@@ -908,6 +908,22 @@
     .v036-validation-head-actions>b{white-space:nowrap;font-size:12px;color:#a33f45;background:#fff0f0;padding:7px 10px;border-radius:999px}
     .v036-approved-list{display:grid;gap:10px}
     .day-class-card.attention-pulse{outline:3px solid #d84f59!important;outline-offset:3px!important;box-shadow:0 0 0 7px rgba(216,79,89,.12)!important}
+    .v026-selected-employee-copy{min-width:0;display:grid!important;gap:5px!important;line-height:1.35}
+    .v026-selected-employee-label{display:block!important;margin:0 0 1px!important;line-height:1.3!important;letter-spacing:0!important}
+    .v026-selected-employee-copy strong{display:block!important;margin:0!important;line-height:1.35!important}
+    .v026-selected-employee-copy span{display:block!important;margin-top:1px!important;line-height:1.45!important}
+    .employee-picker-current{display:grid!important;gap:8px!important;padding:12px 13px!important;border:1px solid #dfe1ec!important;border-radius:14px!important;background:#fafaff!important}
+    .employee-picker-current>div:first-child{display:grid;gap:3px}
+    .employee-picker-current>div:first-child small{font-size:.72rem;color:#73778a;font-weight:800}
+    .employee-picker-current>div:first-child strong{font-size:1rem;color:#34384e}
+    .shift-worker-reasons{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .shift-worker-reason{display:inline-flex;align-items:center;min-height:27px;padding:5px 8px;border-radius:999px;border:1px solid #dfe1e9;background:#f7f8fb;color:#565c70;font-size:.72rem;font-weight:850;line-height:1.25}
+    .shift-worker-reason.tone-busy{border-color:#efc0a2;background:#fff5ee;color:#914d24}
+    .shift-worker-reason.tone-leave{border-color:#efb2b5;background:#fff0f1;color:#9c3942}
+    .shift-worker-reason.tone-off{border-color:#e8d7a0;background:#fff8e6;color:#84621f}
+    .shift-worker-reason.tone-rule{border-color:#d7d9e5;background:#f6f6fa;color:#616579}
+    .rejected-worker-copy{min-width:0;display:grid;gap:5px}
+    .rejected-worker-row .shift-worker-reasons{margin-top:2px}
     #v036PrintRoot{display:none}
     @media print{
       @page{size:A4 landscape;margin:0}
@@ -919,6 +935,13 @@
       body.v036-printing #v036PrintRoot img{display:block!important;width:100%!important;height:100%!important;object-fit:contain!important}
     }
     @media(max-width:820px){
+      .v026-selected-employee{gap:10px!important;padding:12px!important}
+      .v026-selected-employee-copy{gap:6px!important}
+      .shift-worker-reasons{gap:5px}
+      .shift-worker-reason{font-size:.74rem;white-space:normal;text-align:right}
+      .rejected-worker-row{align-items:stretch!important}
+      .rejected-worker-row>button{width:100%!important;justify-content:center!important}
+
       #appVersionBadge{display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;top:calc(env(safe-area-inset-top) + 66px)!important;left:7px!important;bottom:auto!important;z-index:140!important;background:rgba(255,255,255,.96)!important;font-size:.66rem!important;padding:4px 8px!important}
       .schedule-secondary-actions #v036PdfBtn{grid-column:1/-1!important;min-height:44px!important;font-size:.76rem!important;width:100%!important;justify-content:center!important}
       .schedule-tools-menu:not([open])>.schedule-secondary-actions{display:none!important}
