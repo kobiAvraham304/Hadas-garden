@@ -15,6 +15,7 @@ test('0.36 request UI hides technical applied state while preserving compatibili
   assert.doesNotMatch(app, /<span>הוזרמו<\/span>/);
   assert.match(app, /applied: 'אושר'/);
   assert.match(app, /\['approved','applied'\]\.includes\(request\.status\)/);
+  assert.match(app, /requestStatusFilter==='applied'\) state\.requestStatusFilter='approved'/);
   assert.match(handler, /hadas_apply_approved_request/);
   assert.match(handler, /action === 'apply'/);
 });
