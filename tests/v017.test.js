@@ -100,7 +100,7 @@ test('0.17 cache headers force mobile browsers to receive the current UI', () =>
 test('0.17 rejected candidate explanations are present in both employee picker and replacement dialog', () => {
   const app=read('app.js');
   assert.match(app,/function rejectedReasonsHtml/);
-  assert.match(app,/למה עובדים אחרים לא הופיעו/);
+  assert.match(app,/למה שאר הצוות לא הוצע/);
   assert.match(app,/state\.shiftPickerRejected = result\.rejected/);
   assert.match(app,/const rejectedHtml = rejectedReasonsHtml/);
 });
