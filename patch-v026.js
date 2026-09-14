@@ -403,7 +403,7 @@
     bar = document.createElement('div');
     bar.id = 'v026SelectedEmployeeBar';
     bar.className = 'v026-selected-employee hidden';
-    bar.innerHTML = '<div><small>עובד בשיבוץ</small><strong id="v026SelectedEmployeeName">—</strong><span id="v026SelectedEmployeeMeta"></span></div><button id="v026ChangeEmployeeBtn" type="button" class="secondary-btn">החלפת עובד</button>';
+    bar.innerHTML = '<div class="v026-selected-employee-copy"><small class="v026-selected-employee-label">עובד/ת בשיבוץ הנוכחי</small><strong id="v026SelectedEmployeeName">—</strong><span id="v026SelectedEmployeeMeta"></span></div><button id="v026ChangeEmployeeBtn" type="button" class="secondary-btn">החלפת עובד</button>';
     const search = picker.querySelector('.employee-picker-search');
     picker.insertBefore(bar, search || picker.firstChild);
     bar.querySelector('#v026ChangeEmployeeBtn').addEventListener('click', () => {
@@ -472,7 +472,7 @@
       field = document.createElement('label');
       field.id = 'v026PreApprovedField';
       field.className = 'v026-preapproved hidden';
-      field.innerHTML = '<input type="checkbox" name="pre_approved" value="true"><span><strong>מאושר מראש</strong><small>סימון זה ישמור את הבקשה כמאושרת מיד. ללא סימון היא תישמר כממתינה לאישור, גם כשהוזנה על ידי משבצת/מנהלת.</small></span>';
+      field.innerHTML = '<input type="checkbox" name="pre_approved" value="true"><span><strong>אישור מנהלת מראש</strong><small>סימון זה מאשר את הבקשה מראש. לאחר השלמת התנאים הנדרשים, המערכת תעדכן את השיבוץ אוטומטית.</small></span>';
       form.querySelector('.modal-actions')?.before(field);
     }
     const onBehalf = isManager() && !document.querySelector('#requestRequesterField')?.classList.contains('hidden');
