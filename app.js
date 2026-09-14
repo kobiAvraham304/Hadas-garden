@@ -2487,7 +2487,7 @@ function renderDailyMatchingResults(data,context){
     const remaining=recommended.length?other:other.slice(1);
     groups=`<div class="daily-matching-groups"><section class="daily-primary-options"><h4>${recommended.length?'אפשרויות מומלצות':'האפשרות הזמינה כרגע'}</h4><div class="daily-modern-grid">${primary.map(dailySuggestionCandidateCard).join('')}</div></section>${remaining.length?`<details class="daily-other-options"><summary>אפשרויות נוספות <b>${remaining.length}</b></summary><div class="daily-modern-grid">${remaining.map(dailySuggestionCandidateCard).join('')}</div></details>`:''}</div>`;
   }else{
-    groups='<div class="daily-no-safe-option"><strong>לא נמצאה אפשרות כיסוי בטוחה כרגע</strong><p>המערכת לא תמשוך עובדת מכיתה אחרת אם הדבר יוריד את כיתת המקור מתחת לתקינה. אפשר לעדכן את טווח החוסר או לסגור ללא כיסוי.</p></div>';
+    groups='<div class="daily-no-safe-option"><strong>לא נמצאה אפשרות כיסוי בטוחה כרגע</strong><p>המערכת לא תמשוך עובד/ת מכיתה אחרת אם הדבר יוריד את כיתת המקור מתחת לתקינה. אפשר לעדכן את טווח החוסר או לסגור ללא כיסוי.</p></div>';
   }
   return intro+groups+dailyRejectedReasonHtml(data.rejected||[],{...context,range});
 }
