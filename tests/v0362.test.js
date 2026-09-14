@@ -60,7 +60,7 @@ test('0.36 role and mobile guards remain intact across schedule and administrati
   assert.match(v033, /return 'regular'/);
   assert.match(v033, /setHidden\('#publishScheduleBtn', kind !== 'manager'\)/);
   assert.match(v033, /setHidden\('#scheduleIssuesToggle', kind !== 'manager'\)/);
-  assert.match(css, /@media \(max-width: 760px\)/);
+  assert.match(css, /@media \(max-width:\s*760px\)/);
   assert.match(css, /scroll-snap-type:x mandatory/);
   assert.match(data, /publication: manager \? publication : null/);
   assert.match(shifts, /publication: isManager\(caller\) \? publication : null/);
