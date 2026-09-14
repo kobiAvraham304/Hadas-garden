@@ -1,7 +1,7 @@
 /* מערכת ניהול שיבוצים מעון הדס — שכבת ממשק 0.31.0 */
 (() => {
   const VERSION = '0.31.0';
-  const PREVIOUS_PATCH = '/patch-v030.js?v=0310';
+  const PREVIOUS_PATCH = '/patch-v030.js?v=0310hf8';
   const EXPORT_SCALE = 3;
 
   function pinVersion() {
