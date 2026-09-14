@@ -403,7 +403,7 @@
     bar = document.createElement('div');
     bar.id = 'v026SelectedEmployeeBar';
     bar.className = 'v026-selected-employee hidden';
-    bar.innerHTML = '<div class="v026-selected-employee-copy"><small class="v026-selected-employee-label">עובד/ת בשיבוץ הנוכחי</small><strong id="v026SelectedEmployeeName">—</strong><span id="v026SelectedEmployeeMeta"></span></div><button id="v026ChangeEmployeeBtn" type="button" class="secondary-btn">החלפת עובד</button>';
+    bar.innerHTML = '<div class="v026-selected-employee-copy"><small class="v026-selected-employee-label">עובד/ת בשיבוץ הנוכחי</small><strong id="v026SelectedEmployeeName">—</strong><span id="v026SelectedEmployeeMeta"></span></div><div class="v026-selected-employee-action"><button id="v026ChangeEmployeeBtn" type="button" class="secondary-btn">בחירת עובד/ת אחר/ת</button><small>פותח את רשימת העובדים — אין שינוי עד לחיצה על “שמירת השיבוץ”.</small></div>';
     const search = picker.querySelector('.employee-picker-search');
     picker.insertBefore(bar, search || picker.firstChild);
     bar.querySelector('#v026ChangeEmployeeBtn').addEventListener('click', () => {
