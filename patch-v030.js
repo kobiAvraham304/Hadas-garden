@@ -191,7 +191,7 @@
       const checkbox = field.querySelector('input[name="pre_approved"]');
       const strong = field.querySelector('strong');
       const small = field.querySelector('small');
-      if (strong) strong.textContent = 'אושר מראש';
+      if (strong) strong.textContent = 'אישור מנהלת מראש';
       if (!onBehalf) {
         if (checkbox) { checkbox.checked = false; checkbox.disabled = true; }
         return;
@@ -202,8 +202,8 @@
       }
       const type = selectedRequestType();
       if (small) small.textContent = type === 'swap'
-        ? 'אישור ההנהלה ניתן מראש. העובד שנבחר עדיין חייב לאשר את ההחלפה; לאחר אישורו לא יידרש אישור הנהלה נוסף.'
-        : 'הבקשה תישמר כמאושרת על ידי ההנהלה ולא תעבור שוב למסלול אישור. ניתן יהיה להזרים אותה לשיבוץ לפי הצורך.';
+        ? 'אישור ההנהלה ניתן מראש. לאחר שהעובד שנבחר יאשר את ההחלפה, המערכת תעדכן את השיבוץ אוטומטית.'
+        : 'הבקשה תאושר מיד על ידי ההנהלה ותעודכן אוטומטית בשיבוץ, ללא שלב אישור נוסף.';
     }
 
     openRequestDialog = function v030OpenRequestDialog(options = {}) {
