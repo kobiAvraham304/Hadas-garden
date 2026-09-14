@@ -240,7 +240,7 @@
       const request = state.requests.find((item) => item.id === button.dataset.v030DeleteRequest);
       const applied = request?.status === 'applied';
       const message = applied
-        ? 'למחוק את הבקשה שכבר הוזרמה? המערכת תנסה להחזיר אוטומטית את השיבוץ למצב שלפני ההזרמה ולהסיר את החופשה מלוח השנה. אם השיבוץ השתנה מאז, המחיקה תיחסם כדי לא לדרוס נתונים.'
+        ? 'למחוק את הבקשה שכבר עודכנה בשיבוץ? המערכת תנסה להחזיר אוטומטית את השיבוץ למצב שלפני האישור ולהסיר את החופשה מלוח השנה. אם השיבוץ השתנה מאז, המחיקה תיחסם כדי לא לדרוס נתונים.'
         : 'למחוק את הבקשה שאושרה? היא תוסר גם מזמינות הצוות ומלוח השנה.';
       if (!confirm(message)) return;
       setBusy(button, true, applied ? 'מבטל ומוחק…' : 'מוחק…');
@@ -269,7 +269,7 @@
       const button = event.target.closest('[data-v030-calendar-delete-request]');
       if (!button) return;
       event.preventDefault(); event.stopImmediatePropagation();
-      if (!confirm('למחוק את החופשה המאושרת? אם היא כבר הוזרמה לשיבוץ, המערכת תחזיר את השיבוץ למצב שלפני ההזרמה.')) return;
+      if (!confirm('למחוק את החופשה המאושרת? אם היא כבר עודכנה בשיבוץ, המערכת תחזיר את השיבוץ למצב שלפני האישור.')) return;
       setBusy(button, true, 'מוחק ומסנכרן…');
       try {
         const result = await apiFetch('/api/calendar', {
