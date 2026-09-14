@@ -75,6 +75,7 @@ function buildSuggestionsDetailed(context, operation, shift) {
     neededRole,
     excludedEmployeeId: operation.employee_id,
     excludeShiftId: shift.id,
+    allowPartialTransfer: true,
   });
   const candidates = (ranking.candidates || []).slice(0, 24).map((candidate) => ({
     ...candidate,
