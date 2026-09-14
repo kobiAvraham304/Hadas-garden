@@ -90,9 +90,9 @@ test('0.17 cache headers force mobile browsers to receive the current UI', () =>
   const index=read('index.html');
   const vercel=JSON.parse(read('vercel.json'));
   assert.match(index,/styles\.css\?v=0350/);
-  assert.match(index,/app\.js\?v=0360hf9/);
+  assert.match(index,/app\.js\?v=0360hf10/);
   assert.match(index,/patch-v025\.css\?v=0350/);
-  assert.match(index,/patch-v025\.js\?v=0360hf9/);
+  assert.match(index,/patch-v025\.js\?v=0360hf10/);
   const serialized=JSON.stringify(vercel);
   assert.match(serialized,/no-store/);
 });
@@ -100,7 +100,7 @@ test('0.17 cache headers force mobile browsers to receive the current UI', () =>
 test('0.17 rejected candidate explanations are present in both employee picker and replacement dialog', () => {
   const app=read('app.js');
   assert.match(app,/function rejectedReasonsHtml/);
-  assert.match(app,/למה עובדים אחרים לא הופיעו/);
+  assert.match(app,/למה שאר הצוות לא הוצע/);
   assert.match(app,/state\.shiftPickerRejected = result\.rejected/);
   assert.match(app,/const rejectedHtml = rejectedReasonsHtml/);
 });

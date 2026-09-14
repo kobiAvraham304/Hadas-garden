@@ -37,8 +37,8 @@ test('0.36 shift editor explains real unavailability and assignment conflicts', 
   assert.match(app, /חופשה מאושרת/);
   assert.match(app, /יום חופשי קבוע/);
   assert.match(app, /משובץ\/ת ב־/);
-  assert.match(app, /state\.shifts \|\| \[\]/);
-  assert.match(app, /overlaps\(start, end, shift\.start_time, shift\.end_time\)/);
+  assert.match(app, /state\.shifts\s*\|\|\s*\[\]/);
+  assert.match(app, /overlaps\(start,\s*end,\s*shift\.start_time,\s*shift\.end_time\)/);
   assert.match(app, /shift-worker-reasons/);
   assert.match(v026, /v026-selected-employee-copy/);
   assert.match(v026, /עובד\/ת בשיבוץ הנוכחי/);
@@ -72,11 +72,11 @@ test('0.36 hf8 cache chain delivers all changed request and shift layers', () =>
   const v033 = read('patch-v033.js');
   const v032 = read('patch-v032.js');
   const v031 = read('patch-v031.js');
-  assert.match(index, /app\.js\?v=0360hf9/);
-  assert.match(index, /patch-v025\.js\?v=0360hf9/);
-  assert.match(entry, /patch-v026\.js\?v=0321hf8/);
+  assert.match(index, /app\.js\?v=0360hf10/);
+  assert.match(index, /patch-v025\.js\?v=0360hf10/);
+  assert.match(entry, /patch-v026\.js\?v=0321hf10/);
   assert.match(entry, /patch-v033\.js\?v=0333hf8/);
-  assert.match(entry, /patch-v0342\.js\?v=0360hf9/);
+  assert.match(entry, /patch-v0342\.js\?v=0360hf10/);
   assert.match(v033, /patch-v032\.js\?v=0321hf8/);
   assert.match(v032, /patch-v031\.js\?v=0321hf8/);
   assert.match(v031, /patch-v030\.js\?v=0310hf8/);

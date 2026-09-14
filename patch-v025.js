@@ -1,11 +1,11 @@
 /* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.36.0 */
 (() => {
   const VERSION = '0.36.0';
-  const V026 = '/patch-v026.js?v=0321hf8';
+  const V026 = '/patch-v026.js?v=0321hf10';
   const V033 = '/patch-v033.js?v=0333hf8';
   const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
   const V034 = '/patch-v034.js?v=0350';
-  const V0342 = '/patch-v0342.js?v=0360hf9';
+  const V0342 = '/patch-v0342.js?v=0360hf10';
   const V0343 = '/patch-v0343.js?v=0350';
   const V0345 = '/patch-v0345.js?v=0360';
 

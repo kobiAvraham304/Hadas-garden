@@ -32,8 +32,8 @@
   <link rel="stylesheet" href="/styles.css?v=0350" />
   <link rel="stylesheet" href="/patch-v025.css?v=0350" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0360hf9" defer></script>
-  <script src="/patch-v025.js?v=0360hf9" defer></script>
+  <script src="/app.js?v=0360hf10" defer></script>
+  <script src="/patch-v025.js?v=0360hf10" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -263,12 +263,12 @@
         <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
         <input type="hidden" name="shift_role" value="staff" />
         <section class="full-field shift-employee-picker unified-shift-picker" aria-labelledby="shiftEmployeePickerTitle">
-          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד / מחליף</strong><small>המומלצים מופיעים ראשונים באותה רשימה, יחד עם זמינות, התאמה וסיבת חסימה.</small></div><div class="picker-status-group"><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div></div>
+          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד / מחליף</strong><small>אם עובד/ת כבר משובץ/ת בכיתה אחרת, יוצגו כאן שם הכיתה והשעות. העברה תוצע רק כשהיא בטוחה ותקינה.</small></div><div class="picker-status-group"><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div></div>
           <div id="shiftRecommendations" class="hidden" aria-hidden="true"></div>
           <input name="employee_id" type="hidden" required />
           <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש לפי שם או תפקיד" autocomplete="off" /></label>
           <div id="shiftEmployeeOptionsList" class="shift-employee-options" role="listbox" aria-label="עובדים זמינים"></div>
-          <small id="shiftEmployeeHint">בחירה רגילה מכבדת את כל הכללים. מנהלת יכולה לבחור במפורש “שיבוץ ידני חריג” לעובד שנחסם, והחריגה תישמר ותסומן.</small>
+          <small id="shiftEmployeeHint">בחרו עובד/ת מתוך הרשימה. אין שינוי בשיבוץ עד לחיצה על “שמירת השיבוץ”.</small>
         </section>
         <label class="full-field">הערה גלויה<input name="public_note" placeholder="לדוגמה: עד 12:30 או ישיבה מקצועית" /></label>
       </div>
@@ -484,7 +484,7 @@
     <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת דיווח</button></div>
   </form></dialog>
 
-  <dialog id="dailySuggestionsDialog" class="modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">כיסוי מיידי</p><h3>אפשרויות החלפה והעברה</h3><p class="muted">האפשרויות מדורגות לפי התאמה, תקינה, העדפות ושעות עבודה.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="dailySuggestionsList" class="cards-list"></div></div></dialog>
+  <dialog id="dailySuggestionsDialog" class="modal daily-coverage-modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">כיסוי מיידי</p><h3>מציאת כיסוי</h3><p class="muted">קודם מוצגות אפשרויות בטוחות. העברה מכיתה אחרת תוצע רק אם כיתת המקור נשארת בתקינה.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="dailySuggestionsList" class="daily-coverage-results"></div></div></dialog>
 
   <dialog id="dailyAttendanceDialog" class="modal">
     <form id="dailyAttendanceForm" method="dialog" class="modal-card">

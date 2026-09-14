@@ -1122,12 +1122,19 @@ function selectedShiftCandidate() {
 }
 function candidateTypeText(candidate) {
   return candidate?.candidate_type === 'transfer'
-    ? `העברה בטוחה מ${candidate.from_class_name ? `כיתת ${candidate.from_class_name}` : 'כיתה אחרת'}`
+    ? `ניתן להעביר מ${candidate.from_class_name ? `כיתת ${candidate.from_class_name}` : 'כיתה אחרת'}`
     : 'פנוי/ה לשיבוץ';
+}
+function candidateSourceAssignmentText(candidate) {
+  if (candidate?.candidate_type !== 'transfer') return '';
+  const className = candidate.from_class_name || classById(candidate.from_class_id)?.name || 'כיתה אחרת';
+  const start = trimTime(candidate.source_start_time || candidate.current_day_shifts?.find((row)=>row.id===candidate.source_shift_id)?.start_time);
+  const end = trimTime(candidate.source_end_time || candidate.current_day_shifts?.find((row)=>row.id===candidate.source_shift_id)?.end_time);
+  return `משובץ/ת כרגע ב־${className}${start&&end?` · ${start}–${end}`:''}`;
 }
 function candidateMetaText(candidate) {
   const reasons = (candidate?.reasons || []).slice(0, 2);
-  return [candidate?.job_title, candidateTypeText(candidate), ...reasons].filter(Boolean).join(' · ');
+  return [candidate?.job_title, ...reasons].filter(Boolean).join(' · ');
 }
 function candidateCautionsHtml(candidate) {
   const cautions = candidate?.cautions || [];
@@ -1137,19 +1144,47 @@ function rejectedReasonsHtml(rejected = []) {
   const query=String(state.shiftPickerQuery||'').trim().toLowerCase();
   const rows=rejected.filter((item)=>{ const employee=employeeById(item.employee_id); const hay=`${item.full_name||''} ${employee?.job_title||''} ${fixedClassLabel(item.employee_id)} ${item.reason||''}`.toLowerCase(); return !query||hay.includes(query); });
   if (!rows.length) return '';
-  return `<details class="matching-rejected-details"><summary>למה עובדים אחרים לא הופיעו? · עובדים שלא עברו את הכללים <b>${rows.length}</b></summary><div class="rejected-worker-list">${rows.map((item)=>{ const employee=employeeById(item.employee_id); const className=fixedClassLabel(item.employee_id); return `<article class="rejected-worker-row"><div><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,className?`כיתה קבועה: ${className}`:''].filter(Boolean).join(' · '))}</small><em>${escapeHtml(item.reason||'לא עבר/ה את בדיקות ההתאמה')}</em></div><button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">שיבוץ ידני חריג</button></article>`; }).join('')}</div></details>`;
+  return `<details class="matching-rejected-details"><summary>עובדים שלא עברו את כללי השיבוץ <b>${rows.length}</b></summary><div class="rejected-worker-list">${rows.map((item)=>{ const employee=employeeById(item.employee_id); const className=fixedClassLabel(item.employee_id); return `<article class="rejected-worker-row"><div><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,className?`כיתה קבועה: ${className}`:''].filter(Boolean).join(' · '))}</small><em>${escapeHtml(item.reason||'לא עבר/ה את בדיקות ההתאמה')}</em></div></article>`; }).join('')}</div></details>`;
 }
 function suggestionCandidateCard(candidate, { actionLabel = 'בחירת העובד', shift = false } = {}) {
   const recommendationText = candidate.recommended ? 'מומלץ' : 'אפשרות נוספת';
-  return `<article class="suggestion-card level-${candidate.recommendation_level || 'possible'} ${candidate.recommended ? 'is-recommended' : 'is-possible'}"><div class="card-heading"><div><span class="candidate-type-badge ${candidate.candidate_type === 'transfer' ? 'transfer' : 'direct'}">${escapeHtml(candidateTypeText(candidate))}</span><span class="recommendation-label">${recommendationText}</span><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${escapeHtml(candidate.availability?.start_time || '')}–${escapeHtml(candidate.availability?.end_time || '')}</p></div>${scoreScaleHtml(candidate.score)}</div><ul class="reason-list">${(candidate.reasons || []).map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>${candidateCautionsHtml(candidate)}<button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role || 'staff'}" data-candidate-type="${candidate.candidate_type || 'direct'}" data-source-shift="${candidate.source_shift_id || ''}">${shift ? 'החלת ההחלפה' : actionLabel}</button></article>`;
+  const source = candidateSourceAssignmentText(candidate);
+  const sourceHtml = source ? `<div class="candidate-source-assignment"><strong>שיבוץ נוכחי</strong><span>${escapeHtml(source.replace(/^משובץ\/ת כרגע ב־/,''))}</span></div>` : '';
+  return `<article class="suggestion-card level-${candidate.recommendation_level || 'possible'} ${candidate.recommended ? 'is-recommended' : 'is-possible'}"><div class="card-heading"><div><span class="candidate-type-badge ${candidate.candidate_type === 'transfer' ? 'transfer' : 'direct'}">${escapeHtml(candidateTypeText(candidate))}</span><span class="recommendation-label">${recommendationText}</span><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${escapeHtml(candidate.availability?.start_time || '')}–${escapeHtml(candidate.availability?.end_time || '')}</p></div>${scoreScaleHtml(candidate.score)}</div>${sourceHtml}<ul class="reason-list">${(candidate.reasons || []).map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>${candidateCautionsHtml(candidate)}<button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role || 'staff'}" data-candidate-type="${candidate.candidate_type || 'direct'}" data-source-shift="${candidate.source_shift_id || ''}">${shift ? (candidate.candidate_type==='transfer'?'העברת השיבוץ לכיתה זו':'בחירת העובד/ת') : actionLabel}</button></article>`;
 }
 
+function shiftCurrentAssignments(employeeId) {
+  const form=$('#shiftForm');
+  const date=String(form?.elements.shift_date?.value||'');
+  const start=String(form?.elements.start_time?.value||'');
+  const end=String(form?.elements.end_time?.value||'');
+  const currentShiftId=String(form?.elements.id?.value||'');
+  if(!date||!start||!end)return [];
+  return (state.shifts||[]).filter((shift)=>
+    shift.employee_id===employeeId &&
+    shift.shift_date===date &&
+    String(shift.id||'')!==currentShiftId &&
+    overlaps(start,end,shift.start_time,shift.end_time)
+  ).map((shift)=>({
+    id:shift.id,
+    class_id:shift.class_id,
+    class_name:classById(shift.class_id)?.name||'כיתה אחרת',
+    start_time:trimTime(shift.start_time),
+    end_time:trimTime(shift.end_time),
+  }));
+}
+function shiftAssignmentHtml(employeeId, candidate=null) {
+  const rows=candidate?.candidate_type==='transfer'
+    ? [{ class_name:candidate.from_class_name||classById(candidate.from_class_id)?.name||'כיתה אחרת', start_time:trimTime(candidate.source_start_time), end_time:trimTime(candidate.source_end_time) }]
+    : shiftCurrentAssignments(employeeId);
+  if(!rows.length)return '';
+  return rows.map((row)=>`<div class="shift-current-assignment"><span>משובץ/ת כרגע</span><strong>${escapeHtml(row.class_name)} · <bdi dir="ltr">${escapeHtml(row.start_time||'')}–${escapeHtml(row.end_time||'')}</bdi></strong></div>`).join('');
+}
 function shiftWorkerAvailabilityDetails(employeeId, backendReason = '') {
   const form = $('#shiftForm');
   const date = String(form?.elements.shift_date?.value || '');
   const start = String(form?.elements.start_time?.value || '');
   const end = String(form?.elements.end_time?.value || '');
-  const currentShiftId = String(form?.elements.id?.value || '');
   const details = [];
   const tones = [];
 
@@ -1173,18 +1208,9 @@ function shiftWorkerAvailabilityDetails(employeeId, backendReason = '') {
     details.push('יום חופשי קבוע'); tones.push('off');
   }
 
-  if (date && start && end) {
-    const conflicts = (state.shifts || []).filter((shift) =>
-      shift.employee_id === employeeId &&
-      shift.shift_date === date &&
-      String(shift.id || '') !== currentShiftId &&
-      overlaps(start, end, shift.start_time, shift.end_time)
-    );
-    for (const shift of conflicts) {
-      const className = classById(shift.class_id)?.name || 'כיתה אחרת';
-      const text = `משובץ/ת ב־${className} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`;
-      if (!details.includes(text)) { details.push(text); tones.push('busy'); }
-    }
+  for(const assignment of shiftCurrentAssignments(employeeId)){
+    const text=`משובץ/ת ב־${assignment.class_name} · ${assignment.start_time}–${assignment.end_time}`;
+    if(!details.includes(text)){details.push(text);tones.push('busy');}
   }
 
   const cleanedBackend = String(backendReason || '').trim();
@@ -1195,26 +1221,38 @@ function shiftWorkerAvailabilityDetails(employeeId, backendReason = '') {
   if (!details.length) { details.push(cleanedBackend || 'לא זמין/ה בטווח שנבחר'); tones.push('rule'); }
   return details.map((text,index)=>({ text, tone:tones[index] || 'rule' }));
 }
-function shiftWorkerAvailabilityHtml(employeeId, backendReason = '') {
+function shiftWorkerAvailabilityHtml(employeeId, backendReason = '', { includeBusy=true } = {}) {
   return shiftWorkerAvailabilityDetails(employeeId, backendReason)
+    .filter((item)=>includeBusy||item.tone!=='busy')
     .map((item)=>`<span class="shift-worker-reason tone-${item.tone}">${escapeHtml(item.text)}</span>`).join('');
+}
+function shiftManualOverrideAllowed(item) {
+  if(shiftCurrentAssignments(item.employee_id).length)return false;
+  const reason=String(item.reason||'');
+  return !/(אינו פעיל לשיבוץ|טרם התחיל|סיים\/ה לעבוד|אינו מתאים לתפקיד|קיימים כמה שיבוצים חופפים)/.test(reason);
 }
 function renderShiftEmployeePicker() {
   const form = $("#shiftForm"); const target = $("#shiftEmployeeOptionsList"); if (!form || !target) return;
   const selectedId = form.elements.employee_id.value;
+  const targetClassName=classById(form.elements.class_id.value)?.name||'הכיתה שנבחרה';
   const query = String(state.shiftPickerQuery || '').trim().toLowerCase();
-  const rows = state.shiftPickerCandidates.filter((candidate) => !query || `${candidate.full_name} ${candidate.job_title} ${fixedClassLabel(candidate.employee_id)}`.toLowerCase().includes(query));
+  const rows = state.shiftPickerCandidates.filter((candidate) => !query || `${candidate.full_name} ${candidate.job_title} ${candidate.from_class_name||''} ${fixedClassLabel(candidate.employee_id)}`.toLowerCase().includes(query));
   const recommended = rows.filter((item) => item.recommended !== false && normalizeDisplayScore(item.score) >= 62);
   const possible = rows.filter((item) => !recommended.includes(item));
-  const card = (candidate) => `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''} ${candidate.candidate_type === 'transfer' ? 'is-transfer' : ''} ${candidate.recommended ? 'is-recommended' : 'is-possible'}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small>${candidate.cautions?.length ? `<em>${escapeHtml(candidate.cautions[0])}</em>` : ''}</span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
+  const card = (candidate) => {
+    const transfer=candidate.candidate_type==='transfer';
+    const assignment=transfer?shiftAssignmentHtml(candidate.employee_id,candidate):'';
+    const transferHint=transfer?`<span class="shift-transfer-result">בחירה תעביר את השיבוץ מ־${escapeHtml(candidate.from_class_name||'הכיתה הנוכחית')} אל ${escapeHtml(targetClassName)} לאחר שמירה.</span>`:'';
+    return `<button type="button" class="shift-employee-option ${candidate.employee_id === selectedId ? 'selected' : ''} ${transfer ? 'is-transfer' : ''} ${candidate.recommended ? 'is-recommended' : 'is-possible'}" data-picker-employee="${candidate.employee_id}" data-picker-role="${candidate.suggested_role || 'staff'}" role="option" aria-selected="${candidate.employee_id === selectedId}"><span class="employee-option-avatar">${escapeHtml(initials(candidate.full_name))}</span><span class="employee-option-copy"><strong>${escapeHtml(candidate.full_name)}</strong><small>${escapeHtml(candidateMetaText(candidate))}</small>${assignment}${transferHint}${candidate.cautions?.length ? `<em>${escapeHtml(candidate.cautions[0])}</em>` : ''}</span>${scoreScaleHtml(candidate.score, 'מידת התאמה', true)}</button>`;
+  };
   const selectedEmployee = employeeById(selectedId);
   let selectedFallback = '';
   if (selectedEmployee && !state.shiftPickerCandidates.some((item) => item.employee_id === selectedId)) {
     const rejected = state.shiftPickerRejected.find((item)=>item.employee_id===selectedId);
-    selectedFallback = `<div class="employee-picker-current"><div><small>עובד/ת בשיבוץ הנוכחי</small><strong>${escapeHtml(selectedEmployee.full_name)}</strong></div><div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(selectedId,rejected?.reason||'')}</div></div>`;
+    selectedFallback = `<div class="employee-picker-current"><div><small>עובד/ת בשיבוץ הנוכחי</small><strong>${escapeHtml(selectedEmployee.full_name)}</strong></div>${shiftAssignmentHtml(selectedId)}<div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(selectedId,rejected?.reason||'',{includeBusy:false})}</div></div>`;
   }
   const blocked=state.shiftPickerRejected.filter((item)=>{const employee=employeeById(item.employee_id);const details=shiftWorkerAvailabilityDetails(item.employee_id,item.reason).map((x)=>x.text).join(' ');const hay=`${item.full_name||''} ${employee?.job_title||''} ${fixedClassLabel(item.employee_id)} ${details}`.toLowerCase();return !query||hay.includes(query);});
-  const blockedHtml=blocked.length?`<div class="employee-option-group blocked-employees"><span>לא זמינים / דורשים חריגה (${blocked.length})</span>${blocked.map((item)=>{const employee=employeeById(item.employee_id);return `<div class="rejected-worker-row"><div class="rejected-worker-copy"><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,fixedClassLabel(item.employee_id)?`כיתה קבועה: ${fixedClassLabel(item.employee_id)}`:''].filter(Boolean).join(' · '))}</small><div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(item.employee_id,item.reason)}</div></div>${isManager()?`<button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">בחירה כחריגה</button>`:''}</div>`;}).join('')}</div>`:'';
+  const blockedHtml=blocked.length?`<details class="employee-option-group blocked-employees" open><summary>לא זמינים כרגע <b>${blocked.length}</b></summary><div class="blocked-employee-list">${blocked.map((item)=>{const employee=employeeById(item.employee_id);const assignment=shiftAssignmentHtml(item.employee_id);const overrideAllowed=isManager()&&shiftManualOverrideAllowed(item);return `<div class="rejected-worker-row"><div class="rejected-worker-copy"><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,fixedClassLabel(item.employee_id)?`כיתה קבועה: ${fixedClassLabel(item.employee_id)}`:''].filter(Boolean).join(' · '))}</small>${assignment}<div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(item.employee_id,item.reason,{includeBusy:false})}</div></div>${overrideAllowed?`<button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">בחירה ידנית חריגה</button>`:assignment?`<span class="shift-blocked-action">לא ניתן לבחור כל עוד קיים שיבוץ חופף</span>`:''}</div>`;}).join('')}</div></details>`:'';
   target.innerHTML = `${selectedFallback}${recommended.length ? `<div class="employee-option-group"><span>מומלצים (${recommended.length})</span>${recommended.map(card).join('')}</div>` : ''}${possible.length ? `<div class="employee-option-group"><span>אפשרויות נוספות שעברו בדיקות (${possible.length})</span>${possible.map(card).join('')}</div>` : ''}${!rows.length&&!blocked.length ? '<div class="empty-state compact">לא נמצאו עובדים מתאימים.</div>' : ''}${blockedHtml}`;
   const selected = selectedShiftCandidate();
   const pill = $('#shiftEmployeeSelectedScore');
@@ -1241,7 +1279,20 @@ function updateShiftEmployeeHint() {
   const form = $("#shiftForm"); const employeeId = form.elements.employee_id.value;
   const candidate = state.shiftPickerCandidates.find((item) => item.employee_id === employeeId);
   const employee = employeeById(employeeId); const hint = $("#shiftEmployeeHint"); if (!hint) return;
-  const manual=form.elements.override_rules.value==='true'; const rejected=state.shiftPickerRejected.find((item)=>item.employee_id===employeeId); const blockedDetails=employee?shiftWorkerAvailabilityDetails(employeeId,rejected?.reason||'').map((item)=>item.text):[]; hint.textContent = manual ? `חריגה ידנית: ${form.elements.override_reason.value}. השיבוץ יסומן כחריגה ולא ישפיע על המלצות אוטומטיות.` : candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,3).join(" · ")}` : employee ? `${employee.job_title || 'עובד/ת'} · ${blockedDetails.join(' · ')}. ניתן לבחור רק כשיבוץ ידני חריג.` : "בחרו עובד מתוך הרשימה.";
+  const manual=form.elements.override_rules.value==='true';
+  const rejected=state.shiftPickerRejected.find((item)=>item.employee_id===employeeId);
+  const blockedDetails=employee?shiftWorkerAvailabilityDetails(employeeId,rejected?.reason||'').map((item)=>item.text):[];
+  if(manual){
+    hint.textContent=`בחירה ידנית חריגה: ${form.elements.override_reason.value}. השינוי יתבצע רק אחרי לחיצה על “שמירת השיבוץ”.`;
+  }else if(candidate?.candidate_type==='transfer'){
+    hint.textContent=`${candidateSourceAssignmentText(candidate)}. בחירה ושמירה יעבירו את השיבוץ לכיתה ${classById(form.elements.class_id.value)?.name||'שנבחרה'}.`;
+  }else if(candidate){
+    hint.textContent=`התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,3).join(" · ")}. אין שינוי עד שמירת השיבוץ.`;
+  }else if(employee){
+    hint.textContent=`${employee.job_title || 'עובד/ת'} · ${blockedDetails.join(' · ')}.`;
+  }else{
+    hint.textContent="בחרו עובד/ת מתוך הרשימה. המערכת תציג במפורש אם קיים שיבוץ בכיתה אחרת.";
+  }
 }
 function renderShiftRecommendations(candidates = []) {
   const target=$("#shiftRecommendations"),status=$("#shiftRecommendationStatus");
@@ -2351,47 +2402,93 @@ async function saveDailyReport(event){
   event.preventDefault();const form=event.currentTarget,button=form.querySelector('button[value="default"]'),data=formObject(form),operationId=form.dataset.operationId;data.action=operationId?'update_report':'report';if(operationId)data.id=operationId;setBusy(button,true);
   try{const result=await apiFetch('/api/daily-operations',{method:'POST',body:data});$('#dailyReportDialog').close();invalidateDailyCache();await loadDailyOperations(state.dailyDate,{force:true});showToast(operationId?'הדיווח עודכן':'הדיווח נשמר','success');if(result.operation?.id&&!operationId)await loadDailySuggestions(result.operation.id);}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}
 }
-function dailyRecommendationLabel(item){if(item.score>=80)return 'התאמה מצוינת';if(item.score>=62)return 'מומלץ';return 'אפשרות נוספת';}
+function dailyRecommendationLabel(item){
+  const score=normalizeDisplayScore(item?.score);
+  if(score>=86)return 'התאמה מצוינת';
+  if(score>=72)return 'התאמה טובה';
+  if(score>=62)return 'מתאים/ה';
+  return 'אפשרות גיבוי';
+}
+function dailyCandidateSourceText(item){
+  if(item?.candidate_type!=='transfer'&&item?.replacement_type!=='transfer')return '';
+  const className=item.from_class_name||classById(item.from_class_id)?.name||'כיתה אחרת';
+  const start=trimTime(item.source_start_time);
+  const end=trimTime(item.source_end_time);
+  return `${className}${start&&end?` · ${start}–${end}`:''}`;
+}
 function dailySuggestionCandidateCard(item){
   const transfer=item.candidate_type==='transfer'||item.replacement_type==='transfer';
-  const typeLabel=transfer
-    ? `העברה בטוחה מ${item.from_class_name?`כיתת ${item.from_class_name}`:'כיתה אחרת'}`
-    : 'פנוי/ה לשיבוץ';
+  const score=normalizeDisplayScore(item.score);
   const rangeStart=trimTime(item.start_time||item.availability?.start_time);
   const rangeEnd=trimTime(item.end_time||item.availability?.end_time);
-  const cautionHtml=(item.cautions||[]).length?`<ul class="candidate-cautions">${item.cautions.slice(0,3).map((text)=>`<li>${escapeHtml(text)}</li>`).join('')}</ul>`:'';
-  return `<article class="suggestion-card daily-modern-candidate level-${item.recommendation_level||'possible'} ${item.recommended?'is-recommended':'is-possible'} ${transfer?'is-transfer':'is-direct'}">
-    <div class="card-heading">
-      <div><span class="candidate-type-badge ${transfer?'transfer':'direct'}">${escapeHtml(typeLabel)}</span><span class="recommendation-label">${escapeHtml(dailyRecommendationLabel(item))}</span><h3>${escapeHtml(item.full_name)}</h3><p class="muted">${escapeHtml(item.job_title||'')} · <bdi dir="ltr">${escapeHtml(rangeStart)}–${escapeHtml(rangeEnd)}</bdi></p></div>
-      ${scoreScaleHtml(item.score,'מידת התאמה')}
+  const source=dailyCandidateSourceText(item);
+  const topReasons=(item.reasons||[]).slice(0,3);
+  const cautions=(item.cautions||[]).slice(0,2);
+  const typeLabel=transfer?'העברה זמנית בטוחה':'פנוי/ה לכיסוי';
+  const sourceHtml=transfer?`<div class="daily-option-source"><span>משובץ/ת כרגע</span><strong>${escapeHtml(source)}</strong><small>המעבר יהיה תפעולי רק ל־<bdi dir="ltr">${escapeHtml(rangeStart)}–${escapeHtml(rangeEnd)}</bdi>. השיבוץ השבועי לא משתנה.</small></div>`:'';
+  const reasonsHtml=topReasons.length?`<div class="daily-reason-chips">${topReasons.map((reason)=>`<span>${escapeHtml(reason)}</span>`).join('')}</div>`:'';
+  const cautionHtml=cautions.length?`<div class="daily-option-cautions">${cautions.map((text)=>`<span>⚠ ${escapeHtml(text)}</span>`).join('')}</div>`:'';
+  const actionLabel=transfer?`העברה זמנית מ־${item.from_class_name||'הכיתה הנוכחית'}`:'בחירה לכיסוי';
+  return `<article class="daily-coverage-option ${item.recommended?'is-recommended':'is-possible'} ${transfer?'is-transfer':'is-direct'}">
+    <div class="daily-option-main">
+      <div class="daily-option-identity">
+        <div class="daily-option-badges"><span class="daily-option-type">${escapeHtml(typeLabel)}</span><span class="daily-option-level">${escapeHtml(dailyRecommendationLabel(item))}</span></div>
+        <h3>${escapeHtml(item.full_name)}</h3>
+        <p>${escapeHtml(item.job_title||'')} · כיסוי <bdi dir="ltr">${escapeHtml(rangeStart)}–${escapeHtml(rangeEnd)}</bdi></p>
+      </div>
+      <div class="daily-score-badge"><strong>${score}</strong><span>/100</span><small>התאמה</small></div>
     </div>
-    <ul class="reason-list">${(item.reasons||[]).map((reason)=>`<li>${escapeHtml(reason)}</li>`).join('')}</ul>
+    ${sourceHtml}
+    ${reasonsHtml}
     ${cautionHtml}
-    ${transfer?`<div class="notice daily-transfer-notice">אפשר להעביר מכיתת <strong>${escapeHtml(item.from_class_name||classById(item.from_class_id)?.name||'אחרת')}</strong> בלי לפגוע בתקינת המקור.</div>`:''}
-    <button class="primary-btn full-width" data-daily-suggestion="assign" data-employee-id="${item.employee_id}" data-replacement-type="${transfer?'transfer':'replacement'}" data-source-shift-id="${escapeHtml(item.source_shift_id||'')}">${transfer?'ביצוע מעבר בטוח':'שיבוץ ככיסוי'}</button>
+    <button class="primary-btn daily-cover-action" data-daily-suggestion="assign" data-employee-id="${item.employee_id}" data-replacement-type="${transfer?'transfer':'replacement'}" data-source-shift-id="${escapeHtml(item.source_shift_id||'')}">${escapeHtml(actionLabel)}</button>
   </article>`;
+}
+function dailyRejectionCategory(reason=''){
+  const text=String(reason);
+  if(/תקינת כיתת המקור|משובץ\/ת|שיבוץ בכיתה אחרת|שיבוצים חופפים/.test(text))return 'משובצים / לא ניתן לשחרר';
+  if(/חופשה|מחלה|חופשי|נעדר|דווח/.test(text))return 'חופשה / היעדרות';
+  if(/טווח|שעות|זמין/.test(text))return 'שעות לא מתאימות';
+  if(/תפקיד|גננת|מורשה/.test(text))return 'תפקיד לא מתאים';
+  if(/פעיל/.test(text))return 'לא חלק ממערך השיבוץ';
+  return 'כלל שיבוץ אחר';
 }
 function dailyRejectedReasonHtml(rejected=[],context={}){
   if(!rejected.length)return '';
   const start=String(context.range?.start||''),end=String(context.range?.end||''),shiftId=String(context.shiftId||'');
-  const rows=rejected.map((item)=>{
+  const enriched=rejected.map((item)=>{
     const employee=employeeById(item.employee_id);
     const conflicts=(state.dailyShifts||[]).filter((shift)=>shift.employee_id===item.employee_id&&String(shift.id)!==shiftId&&(!start||!end||overlaps(start,end,shift.start_time,shift.end_time)));
-    const conflictLabels=conflicts.map((shift)=>`משובץ/ת ב־${classById(shift.class_id)?.name||'כיתה אחרת'} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`);
-    const reasons=[String(item.reason||'לא עבר/ה את בדיקות ההתאמה'),...conflictLabels].filter((value,index,array)=>value&&array.indexOf(value)===index);
-    return `<article class="daily-rejected-worker"><div><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד/ת')}</strong><small>${escapeHtml([employee?.job_title,fixedClassLabel(item.employee_id)?`כיתה קבועה: ${fixedClassLabel(item.employee_id)}`:''].filter(Boolean).join(' · '))}</small></div><div class="shift-worker-reasons">${reasons.map((reason)=>`<span class="shift-worker-reason tone-rule">${escapeHtml(reason)}</span>`).join('')}</div></article>`;
+    const assignments=conflicts.map((shift)=>({className:classById(shift.class_id)?.name||'כיתה אחרת',start:trimTime(shift.start_time),end:trimTime(shift.end_time)}));
+    const reason=String(item.reason||'לא עבר/ה את בדיקות ההתאמה');
+    return {item,employee,assignments,reason,category:dailyRejectionCategory(reason)};
+  });
+  const counts=new Map();
+  for(const row of enriched)counts.set(row.category,(counts.get(row.category)||0)+1);
+  const summaryChips=[...counts.entries()].map(([label,count])=>`<span>${escapeHtml(label)} <b>${count}</b></span>`).join('');
+  const rows=enriched.map(({item,employee,assignments,reason})=>{
+    const assignmentHtml=assignments.length?`<div class="daily-rejected-assignment">${assignments.map((row)=>`<span>משובץ/ת ב־<strong>${escapeHtml(row.className)}</strong> · <bdi dir="ltr">${escapeHtml(row.start)}–${escapeHtml(row.end)}</bdi></span>`).join('')}</div>`:'';
+    return `<article class="daily-rejected-worker"><div class="daily-rejected-person"><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד/ת')}</strong><small>${escapeHtml([employee?.job_title,fixedClassLabel(item.employee_id)?`כיתה קבועה: ${fixedClassLabel(item.employee_id)}`:''].filter(Boolean).join(' · '))}</small></div><div class="daily-rejected-explanation">${assignmentHtml}<p>${escapeHtml(reason)}</p></div></article>`;
   }).join('');
-  return `<details class="daily-matching-rejected"><summary>למה עובדים אחרים לא זמינים? <b>${rejected.length}</b></summary><div class="daily-rejected-list">${rows}</div></details>`;
+  return `<details class="daily-matching-rejected"><summary><div><strong>למה שאר הצוות לא הוצע?</strong><small>${rejected.length} עובדים נבדקו ונפסלו לפי כללי בטיחות ותקינה</small></div><span class="daily-rejected-toggle">הצגת פירוט</span></summary><div class="daily-rejected-summary">${summaryChips}</div><div class="daily-rejected-list">${rows}</div></details>`;
 }
 function renderDailyMatchingResults(data,context){
   const candidates=data.candidates||data.suggestions||[];
   const recommended=candidates.filter((item)=>item.recommended);
   const other=candidates.filter((item)=>!item.recommended);
-  const summary=data.summary||{};
   const range=data.range||context.range||{};
   const targetClass=classById(context.classId);
-  const intro=`<div class="daily-matching-intro"><div><span>אותו מנגנון התאמה של עריכת שיבוץ</span><strong>${escapeHtml(targetClass?.name||'כיסוי תפעולי')} · <bdi dir="ltr">${escapeHtml(trimTime(range.start))}–${escapeHtml(trimTime(range.end))}</bdi></strong><small>נבדקו זמינות, חופשות, שיבוצים קיימים, תקינה, תפקיד, העדפות ושעות.</small></div><div class="daily-matching-counts"><b>${Number(summary.recommended??recommended.length)} מומלצים</b><span>${Number(summary.total??candidates.length)} אפשרויות</span></div></div>`;
-  const groups=candidates.length?`<div class="daily-matching-groups">${recommended.length?`<section><h4>מומלצים</h4><div class="daily-modern-grid">${recommended.map(dailySuggestionCandidateCard).join('')}</div></section>`:''}${other.length?`<section><h4>אפשרויות נוספות</h4><div class="daily-modern-grid">${other.map(dailySuggestionCandidateCard).join('')}</div></section>`:''}</div>`:'<div class="empty-state"><strong>לא נמצאה כרגע אפשרות כיסוי בטוחה</strong><span>אפשר לעדכן את הדיווח או לסגור ללא כיסוי. עובדים שנפסלו מופיעים למטה עם הסיבה.</span></div>';
+  const bestCount=recommended.length;
+  const countLabel=bestCount?`${bestCount} מומלצים`:candidates.length?`${candidates.length} אפשרויות בטוחות`:'אין אפשרות בטוחה';
+  const intro=`<section class="daily-coverage-summary"><div class="daily-coverage-need"><span>נדרש כיסוי</span><strong>${escapeHtml(targetClass?.name||'כיתה')} · <bdi dir="ltr">${escapeHtml(trimTime(range.start))}–${escapeHtml(trimTime(range.end))}</bdi></strong><small>מוצגות רק אפשרויות שמכסות את כל הטווח. העברה מכיתה אחרת מוצעת רק אם כיתת המקור נשארת בתקינה.</small></div><div class="daily-coverage-status ${bestCount?'ok':candidates.length?'warn':'none'}"><strong>${escapeHtml(countLabel)}</strong><span>${candidates.length} עברו את כל הבדיקות</span></div></section>`;
+  let groups='';
+  if(candidates.length){
+    const primary=recommended.length?recommended:(other.length?[other[0]]:[]);
+    const remaining=recommended.length?other:other.slice(1);
+    groups=`<div class="daily-matching-groups"><section class="daily-primary-options"><h4>${recommended.length?'אפשרויות מומלצות':'האפשרות הזמינה כרגע'}</h4><div class="daily-modern-grid">${primary.map(dailySuggestionCandidateCard).join('')}</div></section>${remaining.length?`<details class="daily-other-options"><summary>אפשרויות נוספות <b>${remaining.length}</b></summary><div class="daily-modern-grid">${remaining.map(dailySuggestionCandidateCard).join('')}</div></details>`:''}</div>`;
+  }else{
+    groups='<div class="daily-no-safe-option"><strong>לא נמצאה אפשרות כיסוי בטוחה כרגע</strong><p>המערכת לא תמשוך עובד/ת מכיתה אחרת אם הדבר יוריד את כיתת המקור מתחת לתקינה. אפשר לעדכן את טווח החוסר או לסגור ללא כיסוי.</p></div>';
+  }
   return intro+groups+dailyRejectedReasonHtml(data.rejected||[],{...context,range});
 }
 async function loadDailySuggestions(id){
