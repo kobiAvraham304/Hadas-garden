@@ -12,7 +12,7 @@ const SHIFT_ROLE_LABELS = { teacher: 'גננת/גנן — אחראי/ת כיתה
 const SHIFT_ROLE_SHORT_LABELS = { teacher: 'גננת/גנן', lead: 'מוביל/ה', staff: 'צוות', replacement: 'מילוי מקום' };
 const SHIFT_STATUS_LABELS = { draft: 'ממתין לפרסום', published: 'פורסם' };
 const REQUEST_LABELS = { leave: 'חופשה', day_off: 'יום חופשי', late_start: 'התחלה מאוחרת', early_finish: 'סיום מוקדם', sick: 'מחלה', swap: 'החלפת שיבוץ', other: 'בקשה ישנה' };
-const REQUEST_STATUS_LABELS = { pending: 'ממתין', approved: 'אושר', rejected: 'נדחה', applied: 'הוזרם', cancelled: 'בוטל' };
+const REQUEST_STATUS_LABELS = { pending: 'ממתין', approved: 'אושר', rejected: 'נדחה', applied: 'אושר', cancelled: 'בוטל' };
 const REQUEST_ICONS = { leave: '☀', day_off: '⌂', late_start: '◷', early_finish: '◴', sick: '✚', swap: '↔', other: '✎' };
 const ATTENDANCE_LABELS = { scheduled: 'טרם עודכן', present: 'נכח', late: 'איחר', left_early: 'שוחרר מוקדם', absent: 'נעדר', sick: 'מחלה', replacement: 'החליף עובד' };
 const EVENT_LABELS = { holiday: 'חופשה/חג', approved_leave: 'חופשה מאושרת', meeting: 'ישיבה', training: 'הדרכה', birthday: 'יום הולדת', activity: 'פעילות', other: 'אחר' };
@@ -1144,6 +1144,61 @@ function suggestionCandidateCard(candidate, { actionLabel = 'בחירת העוב
   return `<article class="suggestion-card level-${candidate.recommendation_level || 'possible'} ${candidate.recommended ? 'is-recommended' : 'is-possible'}"><div class="card-heading"><div><span class="candidate-type-badge ${candidate.candidate_type === 'transfer' ? 'transfer' : 'direct'}">${escapeHtml(candidateTypeText(candidate))}</span><span class="recommendation-label">${recommendationText}</span><h3>${escapeHtml(candidate.full_name)}</h3><p class="muted">${escapeHtml(candidate.job_title)} · ${escapeHtml(candidate.availability?.start_time || '')}–${escapeHtml(candidate.availability?.end_time || '')}</p></div>${scoreScaleHtml(candidate.score)}</div><ul class="reason-list">${(candidate.reasons || []).map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>${candidateCautionsHtml(candidate)}<button class="primary-btn" data-action="use-suggestion" data-id="${candidate.employee_id}" data-role="${candidate.suggested_role || 'staff'}" data-candidate-type="${candidate.candidate_type || 'direct'}" data-source-shift="${candidate.source_shift_id || ''}">${shift ? 'החלת ההחלפה' : actionLabel}</button></article>`;
 }
 
+function shiftWorkerAvailabilityDetails(employeeId, backendReason = '') {
+  const form = $('#shiftForm');
+  const date = String(form?.elements.shift_date?.value || '');
+  const start = String(form?.elements.start_time?.value || '');
+  const end = String(form?.elements.end_time?.value || '');
+  const currentShiftId = String(form?.elements.id?.value || '');
+  const details = [];
+  const tones = [];
+
+  const absenceLabels = {
+    leave:'חופשה מאושרת',
+    sick:'מחלה מאושרת',
+    day_off:'יום חופשי מאושר',
+    fixed_day_off:'יום חופשי קבוע',
+  };
+  for (const row of (state.scheduleAbsences || []).filter((item) =>
+    item.employee_id === employeeId &&
+    item.absence_date === date &&
+    item.absence_type !== 'day_off_worked'
+  )) {
+    const label = absenceLabels[row.absence_type] || row.label || 'לא זמין/ה';
+    if (!details.includes(label)) { details.push(label); tones.push(row.absence_type === 'leave' || row.absence_type === 'sick' ? 'leave' : 'off'); }
+  }
+
+  const pattern = date ? employeePatternForDate(employeeId, date) : null;
+  if (pattern?.day_type === 'day_off' && !details.includes('יום חופשי קבוע')) {
+    details.push('יום חופשי קבוע'); tones.push('off');
+  }
+
+  if (date && start && end) {
+    const conflicts = (state.shifts || []).filter((shift) =>
+      shift.employee_id === employeeId &&
+      shift.shift_date === date &&
+      String(shift.id || '') !== currentShiftId &&
+      overlaps(start, end, shift.start_time, shift.end_time)
+    );
+    for (const shift of conflicts) {
+      const className = classById(shift.class_id)?.name || 'כיתה אחרת';
+      const text = `משובץ/ת ב־${className} · ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`;
+      if (!details.includes(text)) { details.push(text); tones.push('busy'); }
+    }
+  }
+
+  const cleanedBackend = String(backendReason || '').trim();
+  const generic = ['לא זמין כרגע','לא עבר/ה את בדיקות ההתאמה'];
+  if (cleanedBackend && !generic.includes(cleanedBackend) && !details.some((item) => cleanedBackend.includes(item) || item.includes(cleanedBackend))) {
+    details.push(cleanedBackend); tones.push('rule');
+  }
+  if (!details.length) { details.push(cleanedBackend || 'לא זמין/ה בטווח שנבחר'); tones.push('rule'); }
+  return details.map((text,index)=>({ text, tone:tones[index] || 'rule' }));
+}
+function shiftWorkerAvailabilityHtml(employeeId, backendReason = '') {
+  return shiftWorkerAvailabilityDetails(employeeId, backendReason)
+    .map((item)=>`<span class="shift-worker-reason tone-${item.tone}">${escapeHtml(item.text)}</span>`).join('');
+}
 function renderShiftEmployeePicker() {
   const form = $("#shiftForm"); const target = $("#shiftEmployeeOptionsList"); if (!form || !target) return;
   const selectedId = form.elements.employee_id.value;
@@ -1155,12 +1210,12 @@ function renderShiftEmployeePicker() {
   const selectedEmployee = employeeById(selectedId);
   let selectedFallback = '';
   if (selectedEmployee && !state.shiftPickerCandidates.some((item) => item.employee_id === selectedId)) {
-    selectedFallback = `<div class="employee-picker-current"><strong>העובד הנוכחי: ${escapeHtml(selectedEmployee.full_name)}</strong><small>העובד אינו זמין לפי כללי ההמלצה הנוכחיים. שינוי השיבוץ ידרוש בחירת עובד מתאים.</small></div>`;
+    const rejected = state.shiftPickerRejected.find((item)=>item.employee_id===selectedId);
+    selectedFallback = `<div class="employee-picker-current"><div><small>עובד/ת בשיבוץ הנוכחי</small><strong>${escapeHtml(selectedEmployee.full_name)}</strong></div><div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(selectedId,rejected?.reason||'')}</div></div>`;
   }
-  const rejectedSummary = rejectedReasonsHtml(state.shiftPickerRejected);
-  const blocked=state.shiftPickerRejected.filter((item)=>{const employee=employeeById(item.employee_id);const hay=`${item.full_name||''} ${employee?.job_title||''} ${item.reason||''}`.toLowerCase();return !query||hay.includes(query);});
-  const blockedHtml=blocked.length?`<div class="employee-option-group blocked-employees"><span>כל העובדים שלא עברו בדיקה (${blocked.length})</span>${blocked.map((item)=>{const employee=employeeById(item.employee_id);return `<div class="rejected-worker-row"><div><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml(employee?.job_title||'')}</small><em>${escapeHtml(item.reason||'לא זמין כרגע')}</em></div>${isManager()?`<button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">בחירה כחריגה</button>`:''}</div>`;}).join('')}</div>`:'';
-  target.innerHTML = `${selectedFallback}${recommended.length ? `<div class="employee-option-group"><span>מומלצים (${recommended.length})</span>${recommended.map(card).join('')}</div>` : ''}${possible.length ? `<div class="employee-option-group"><span>אפשרויות נוספות שעברו בדיקות (${possible.length})</span>${possible.map(card).join('')}</div>` : ''}${!rows.length&&!blocked.length ? '<div class="empty-state compact">לא נמצאו עובדים מתאימים.</div>' : ''}${blockedHtml}${rejectedSummary}`;
+  const blocked=state.shiftPickerRejected.filter((item)=>{const employee=employeeById(item.employee_id);const details=shiftWorkerAvailabilityDetails(item.employee_id,item.reason).map((x)=>x.text).join(' ');const hay=`${item.full_name||''} ${employee?.job_title||''} ${fixedClassLabel(item.employee_id)} ${details}`.toLowerCase();return !query||hay.includes(query);});
+  const blockedHtml=blocked.length?`<div class="employee-option-group blocked-employees"><span>לא זמינים / דורשים חריגה (${blocked.length})</span>${blocked.map((item)=>{const employee=employeeById(item.employee_id);return `<div class="rejected-worker-row"><div class="rejected-worker-copy"><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,fixedClassLabel(item.employee_id)?`כיתה קבועה: ${fixedClassLabel(item.employee_id)}`:''].filter(Boolean).join(' · '))}</small><div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(item.employee_id,item.reason)}</div></div>${isManager()?`<button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">בחירה כחריגה</button>`:''}</div>`;}).join('')}</div>`:'';
+  target.innerHTML = `${selectedFallback}${recommended.length ? `<div class="employee-option-group"><span>מומלצים (${recommended.length})</span>${recommended.map(card).join('')}</div>` : ''}${possible.length ? `<div class="employee-option-group"><span>אפשרויות נוספות שעברו בדיקות (${possible.length})</span>${possible.map(card).join('')}</div>` : ''}${!rows.length&&!blocked.length ? '<div class="empty-state compact">לא נמצאו עובדים מתאימים.</div>' : ''}${blockedHtml}`;
   const selected = selectedShiftCandidate();
   const pill = $('#shiftEmployeeSelectedScore');
   if (selected) { pill.textContent = `${normalizeDisplayScore(selected.score)}/100`; pill.classList.remove('hidden'); }
@@ -1186,7 +1241,7 @@ function updateShiftEmployeeHint() {
   const form = $("#shiftForm"); const employeeId = form.elements.employee_id.value;
   const candidate = state.shiftPickerCandidates.find((item) => item.employee_id === employeeId);
   const employee = employeeById(employeeId); const hint = $("#shiftEmployeeHint"); if (!hint) return;
-  const manual=form.elements.override_rules.value==='true'; hint.textContent = manual ? `חריגה ידנית: ${form.elements.override_reason.value}. השיבוץ יסומן כחריגה ולא ישפיע על המלצות אוטומטיות.` : candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,3).join(" · ")}` : employee ? `${employee.job_title} אינו מופיע כרגע כמועמד רגיל. אפשר לבחור אותו רק דרך “שיבוץ ידני חריג”.` : "בחרו עובד מתוך הרשימה.";
+  const manual=form.elements.override_rules.value==='true'; const rejected=state.shiftPickerRejected.find((item)=>item.employee_id===employeeId); const blockedDetails=employee?shiftWorkerAvailabilityDetails(employeeId,rejected?.reason||'').map((item)=>item.text):[]; hint.textContent = manual ? `חריגה ידנית: ${form.elements.override_reason.value}. השיבוץ יסומן כחריגה ולא ישפיע על המלצות אוטומטיות.` : candidate ? `התאמה ${normalizeDisplayScore(candidate.score)} מתוך 100: ${candidate.reasons.slice(0,3).join(" · ")}` : employee ? `${employee.job_title || 'עובד/ת'} · ${blockedDetails.join(' · ')}. ניתן לבחור רק כשיבוץ ידני חריג.` : "בחרו עובד מתוך הרשימה.";
 }
 function renderShiftRecommendations(candidates = []) {
   const target=$("#shiftRecommendations"),status=$("#shiftRecommendationStatus");
@@ -2142,21 +2197,23 @@ async function saveRequest(event){
     setTimeout(()=>refreshAll().catch(()=>{}),0);
   }catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}
 }
-function requestFlowHtml(request){const steps=request.request_type==='swap'?['נשלח','הסכמת העובד','אישור הנהלה','הוזרם']:['נשלח','אישור הנהלה','הוזרם'];let activeIndex=request.status==='pending'?0:request.status==='approved'?steps.length-2:request.status==='applied'?steps.length-1:0;if(request.request_type==='swap'&&request.status==='pending'&&request.target_approved)activeIndex=1;return `<div class="request-flow">${steps.map((step,index)=>`<span class="flow-step ${index<=activeIndex?'active':''}">${step}</span>`).join('<span>›</span>')}</div>`;}
-function requestActionState(request){if(request.request_type==='swap'&&request.status==='pending'&&!request.target_approved)return 'waiting_target';if(request.status==='pending')return 'needs_manager';if(request.status==='approved')return 'ready_apply';return 'closed';}
+function requestFlowHtml(request){const steps=request.request_type==='swap'?['נשלח','הסכמת העובד','אישור הנהלה']:['נשלח','אישור הנהלה'];let activeIndex=request.status==='pending'?0:steps.length-1;if(request.request_type==='swap'&&request.status==='pending'&&request.target_approved)activeIndex=1;return `<div class="request-flow">${steps.map((step,index)=>`<span class="flow-step ${index<=activeIndex?'active':''}">${step}</span>`).join('<span>›</span>')}</div>`;}
+function requestActionState(request){if(request.request_type==='swap'&&request.status==='pending'&&!request.target_approved)return 'waiting_target';if(request.status==='pending')return 'needs_manager';return 'closed';}
 function handleRequestSummaryClick(event){const button=event.target.closest('[data-request-filter]');if(!button)return;state.requestStatusFilter=button.dataset.requestFilter;$('#requestStatusFilter').value=state.requestStatusFilter;syncFilterChips('#requestStatusChips',state.requestStatusFilter);renderRequests();}
 function renderRequestsBase(){
+  if(state.requestStatusFilter==='applied') state.requestStatusFilter='approved';
+  const requestStatusSelect=$('#requestStatusFilter'); if(requestStatusSelect) requestStatusSelect.value=state.requestStatusFilter;
   syncFilterChips('#requestStatusChips',state.requestStatusFilter);
-  const counts={pending:0,approved:0,applied:0,closed:0};const workflow={needs_manager:0,waiting_target:0,ready_apply:0};
-  state.requests.forEach((request)=>{if(request.status==='pending')counts.pending++;else if(request.status==='approved')counts.approved++;else if(request.status==='applied')counts.applied++;else counts.closed++;const action=requestActionState(request);if(workflow[action]!==undefined)workflow[action]++;});
-  $('#requestSummary').innerHTML=`<button data-request-filter="pending"><strong>${counts.pending}</strong><span>ממתינים</span><small>בקשות שעדיין בטיפול</small></button><button data-request-filter="approved"><strong>${counts.approved}</strong><span>אושרו</span><small>אושרו במערכת</small></button><button data-request-filter="applied"><strong>${counts.applied}</strong><span>הוזרמו</span><small>עודכנו בשיבוץ</small></button><button data-request-filter="closed"><strong>${counts.closed}</strong><span>סגורות</span><small>נדחו או בוטלו</small></button>`;
+  const counts={pending:0,approved:0,closed:0};const workflow={needs_manager:0,waiting_target:0};
+  state.requests.forEach((request)=>{if(request.status==='pending')counts.pending++;else if(['approved','applied'].includes(request.status))counts.approved++;else counts.closed++;const action=requestActionState(request);if(workflow[action]!==undefined)workflow[action]++;});
+  $('#requestSummary').innerHTML=`<button data-request-filter="pending"><strong>${counts.pending}</strong><span>ממתינים</span><small>בקשות שעדיין בטיפול</small></button><button data-request-filter="approved"><strong>${counts.approved}</strong><span>אושרו</span><small>אושרו ועודכנו אוטומטית</small></button><button data-request-filter="closed"><strong>${counts.closed}</strong><span>סגורות</span><small>נדחו או בוטלו</small></button>`;
   $('#requestWorkflow').innerHTML=isManager()?`<button data-request-filter="pending" class="workflow-manager"><span>דורש החלטה</span><strong>${workflow.needs_manager}</strong></button><button data-request-filter="pending" class="workflow-target"><span>ממתין לעובד בהחלפה</span><strong>${workflow.waiting_target}</strong></button>`:'';
   const term=state.requestSearch.trim().toLowerCase();
-  const visible=state.requests.filter((request)=>{const statusOk=state.requestStatusFilter==='all'||request.status===state.requestStatusFilter||(state.requestStatusFilter==='open'&&['pending','approved'].includes(request.status))||(state.requestStatusFilter==='closed'&&['rejected','cancelled'].includes(request.status));const requester=employeeById(request.requester_id),target=employeeById(request.target_employee_id);const haystack=`${requester?.full_name||''} ${target?.full_name||''} ${request.reason||''} ${REQUEST_LABELS[request.request_type]||''}`.toLowerCase();return statusOk&&(!term||haystack.includes(term));});
+  const visible=state.requests.filter((request)=>{const statusOk=state.requestStatusFilter==='all'||(state.requestStatusFilter==='approved'&&['approved','applied'].includes(request.status))||(state.requestStatusFilter==='pending'&&request.status==='pending')||(state.requestStatusFilter==='open'&&request.status==='pending')||(state.requestStatusFilter==='closed'&&['rejected','cancelled'].includes(request.status));const requester=employeeById(request.requester_id),target=employeeById(request.target_employee_id);const haystack=`${requester?.full_name||''} ${target?.full_name||''} ${request.reason||''} ${REQUEST_LABELS[request.request_type]||''}`.toLowerCase();return statusOk&&(!term||haystack.includes(term));});
   $('#requestsList').innerHTML=visible.length?visible.map((request)=>{const requester=employeeById(request.requester_id),target=employeeById(request.target_employee_id),statusClass=['rejected','cancelled'].includes(request.status)?'error':request.status==='applied'?'ok':'warn';const canApprove=isManager()&&request.status==='pending'&&(request.request_type!=='swap'||request.target_approved);const actionState=requestActionState(request);const fixedDay=request.available_fixed_day_weekday!==null&&request.available_fixed_day_weekday!==undefined?DAY_NAMES[Number(request.available_fixed_day_weekday)]:'';
     return `<article class="request-card type-${request.request_type} action-${actionState}" data-request-id="${request.id}"><div class="card-heading"><div class="request-title"><span class="request-avatar">${REQUEST_ICONS[request.request_type]||'●'}</span><div><h3>${REQUEST_LABELS[request.request_type]||'בקשה'}</h3><p class="muted">${escapeHtml(requester?.full_name||'')} · ${requestDateLabel(request)}</p></div></div><span class="status-chip ${statusClass}">${REQUEST_STATUS_LABELS[request.status]}</span></div>${requestFlowHtml(request)}<div class="request-key-details"><div><small>פירוט</small><strong>${escapeHtml(request.reason||'ללא פירוט')}</strong></div>${request.requested_start||request.requested_end?`<div><small>שעות</small><strong>${timeHtml(request.requested_start,request.requested_end)}</strong></div>`:''}${request.request_type==='swap'?`<div><small>החלפה עם</small><strong>${escapeHtml(target?.full_name||'טרם נבחר')}</strong><span>${request.target_approved?'העובד אישר':'ממתין להסכמת העובד'}</span></div>`:''}${['leave','day_off'].includes(request.request_type)?`<div><small>עבודה ביום חופשי קבוע</small><strong>${request.allow_schedule_on_day_off?`אפשרי${fixedDay?` ביום ${fixedDay}`:''}`:'לא'}</strong></div>`:''}</div>${request.request_type==='leave'&&request.request_end_date&&Math.floor((parseDateValue(request.request_end_date)-parseDateValue(request.request_date))/86400000)+1>2?'<div class="notice warn"><strong>תזכורת:</strong> נדרשת גם בקשת חופשה ידנית.</div>':''}${request.has_attachment?`<div class="attachment-row"><span>📎 צורף אישור מחלה</span><button class="ghost-btn" data-action="attachment_url" data-id="${request.id}">צפייה באישור</button></div>`:''}${request.manager_note?`<div class="notice"><strong>הערת הנהלה:</strong> ${escapeHtml(request.manager_note)}</div>`:''}<div class="request-action-zone">${request.request_type==='swap'&&request.target_employee_id===state.profile.id&&!request.target_approved&&request.status==='pending'?`<button class="secondary-btn" data-action="target_accept" data-id="${request.id}">אישור ההחלפה</button><button class="danger-btn" data-action="target_reject" data-id="${request.id}">דחיית ההחלפה</button>`:''}${request.requester_id===state.profile.id&&request.status==='pending'?`<button class="ghost-btn" data-action="cancel" data-id="${request.id}">ביטול הבקשה</button>`:''}${canApprove?`<button class="primary-btn" data-action="approve" data-id="${request.id}">אישור מהיר</button><button class="danger-btn" data-action="reject" data-id="${request.id}">דחייה</button>`:''}${isManager()&&request.status==='pending'&&request.request_type==='swap'&&!request.target_approved?'<span class="small-note">ממתין לאישור העובד שנבחר לפני החלטת הנהלה.</span>':''}</div></article>`;}).join(''):'<div class="empty-state">אין בקשות לפי הסינון שנבחר.</div>';
 }
-async function handleRequestClickBase(event){const button=event.target.closest('[data-action]');if(!button)return;if(button.dataset.action==='attachment_url'){try{const result=await apiFetch('/api/requests',{method:'POST',body:{action:'attachment_url',id:button.dataset.id}});window.open(result.url,'_blank','noopener');}catch(error){showToast(error.message,'error');}return;}let body={id:button.dataset.id,action:button.dataset.action};if(button.dataset.action==='approve')body={...body,action:'decide',status:'approved',manager_note:''};if(button.dataset.action==='reject'){const note=prompt('אפשר לכתוב סיבה לדחייה:')||'';if(!confirm('לדחות את הבקשה?'))return;body={...body,action:'decide',status:'rejected',manager_note:note};}if(button.dataset.action==='apply'&&!confirm('להזרים את הבקשה לטיוטת השיבוץ?'))return;setBusy(button,true,button.dataset.action==='apply'?'מזרים…':'מעדכן…');try{await apiFetch('/api/requests',{method:'POST',body});await refreshAll();showToast('הבקשה עודכנה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
+async function handleRequestClickBase(event){const button=event.target.closest('[data-action]');if(!button)return;if(button.dataset.action==='attachment_url'){try{const result=await apiFetch('/api/requests',{method:'POST',body:{action:'attachment_url',id:button.dataset.id}});window.open(result.url,'_blank','noopener');}catch(error){showToast(error.message,'error');}return;}let body={id:button.dataset.id,action:button.dataset.action};if(button.dataset.action==='approve')body={...body,action:'decide',status:'approved',manager_note:''};if(button.dataset.action==='reject'){const note=prompt('אפשר לכתוב סיבה לדחייה:')||'';if(!confirm('לדחות את הבקשה?'))return;body={...body,action:'decide',status:'rejected',manager_note:note};}if(button.dataset.action==='apply'&&!confirm('לעדכן את הבקשה בשיבוץ?'))return;setBusy(button,true,'מעדכן…');try{await apiFetch('/api/requests',{method:'POST',body});await refreshAll();showToast('הבקשה עודכנה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
 
 const DAILY_OPERATION_LABELS={sick:'מחלה',absent:'היעדרות',late:'איחור',early_release:'שחרור מוקדם',other:'אחר'};
 const DAILY_STATUS_TONES={scheduled:'neutral',present:'ok',replacement:'ok',late:'warn',left_early:'warn',absent:'error',sick:'error'};

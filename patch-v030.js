@@ -191,7 +191,7 @@
       const checkbox = field.querySelector('input[name="pre_approved"]');
       const strong = field.querySelector('strong');
       const small = field.querySelector('small');
-      if (strong) strong.textContent = 'אושר מראש';
+      if (strong) strong.textContent = 'אישור מנהלת מראש';
       if (!onBehalf) {
         if (checkbox) { checkbox.checked = false; checkbox.disabled = true; }
         return;
@@ -202,8 +202,8 @@
       }
       const type = selectedRequestType();
       if (small) small.textContent = type === 'swap'
-        ? 'אישור ההנהלה ניתן מראש. העובד שנבחר עדיין חייב לאשר את ההחלפה; לאחר אישורו לא יידרש אישור הנהלה נוסף.'
-        : 'הבקשה תישמר כמאושרת על ידי ההנהלה ולא תעבור שוב למסלול אישור. ניתן יהיה להזרים אותה לשיבוץ לפי הצורך.';
+        ? 'אישור ההנהלה ניתן מראש. לאחר שהעובד שנבחר יאשר את ההחלפה, המערכת תעדכן את השיבוץ אוטומטית.'
+        : 'הבקשה תאושר מיד על ידי ההנהלה ותעודכן אוטומטית בשיבוץ, ללא שלב אישור נוסף.';
     }
 
     openRequestDialog = function v030OpenRequestDialog(options = {}) {
@@ -228,7 +228,7 @@
         const zone = document.querySelector(`[data-request-id="${request.id}"] .request-action-zone`);
         if (!zone || zone.querySelector(`[data-v030-delete-request="${request.id}"]`)) continue;
         const applied = request.status === 'applied';
-        zone.insertAdjacentHTML('afterbegin', `<button type="button" class="danger-btn v030-delete-request" data-v030-delete-request="${request.id}">${applied ? 'מחיקה וביטול ההזרמה' : 'מחיקת הבקשה'}</button>`);
+        zone.insertAdjacentHTML('afterbegin', `<button type="button" class="danger-btn v030-delete-request" data-v030-delete-request="${request.id}">${applied ? 'מחיקה והחזרת השיבוץ' : 'מחיקת הבקשה'}</button>`);
       }
       return result;
     };
@@ -240,10 +240,10 @@
       const request = state.requests.find((item) => item.id === button.dataset.v030DeleteRequest);
       const applied = request?.status === 'applied';
       const message = applied
-        ? 'למחוק את הבקשה שכבר הוזרמה? המערכת תנסה להחזיר אוטומטית את השיבוץ למצב שלפני ההזרמה ולהסיר את החופשה מלוח השנה. אם השיבוץ השתנה מאז, המחיקה תיחסם כדי לא לדרוס נתונים.'
+        ? 'למחוק את הבקשה שכבר עודכנה בשיבוץ? המערכת תנסה להחזיר אוטומטית את השיבוץ למצב שלפני האישור ולהסיר את החופשה מלוח השנה. אם השיבוץ השתנה מאז, המחיקה תיחסם כדי לא לדרוס נתונים.'
         : 'למחוק את הבקשה שאושרה? היא תוסר גם מזמינות הצוות ומלוח השנה.';
       if (!confirm(message)) return;
-      setBusy(button, true, applied ? 'מבטל ומוחק…' : 'מוחק…');
+      setBusy(button, true, applied ? 'מחזיר ומוחק…' : 'מוחק…');
       try {
         const result = await apiFetch('/api/requests', { method:'POST', body:{ action:'delete_request', id:button.dataset.v030DeleteRequest }, timeout:16000 });
         state.weekCache.clear(); state.calendarCache.clear();
@@ -269,7 +269,7 @@
       const button = event.target.closest('[data-v030-calendar-delete-request]');
       if (!button) return;
       event.preventDefault(); event.stopImmediatePropagation();
-      if (!confirm('למחוק את החופשה המאושרת? אם היא כבר הוזרמה לשיבוץ, המערכת תחזיר את השיבוץ למצב שלפני ההזרמה.')) return;
+      if (!confirm('למחוק את החופשה המאושרת? אם היא כבר עודכנה בשיבוץ, המערכת תחזיר את השיבוץ למצב שלפני האישור.')) return;
       setBusy(button, true, 'מוחק ומסנכרן…');
       try {
         const result = await apiFetch('/api/calendar', {

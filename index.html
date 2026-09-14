@@ -32,8 +32,8 @@
   <link rel="stylesheet" href="/styles.css?v=0350" />
   <link rel="stylesheet" href="/patch-v025.css?v=0350" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0360hf7" defer></script>
-  <script src="/patch-v025.js?v=0360hf7" defer></script>
+  <script src="/app.js?v=0360hf8" defer></script>
+  <script src="/patch-v025.js?v=0360hf8" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -159,15 +159,15 @@
 
       <section id="requestsPanel" class="panel">
         <div class="section-heading">
-          <div><p class="eyebrow">חופשות, מחלה והחלפות</p><h2>בקשות</h2><p class="muted">ניהול ברור ומהיר של כל בקשה עד להזרמה בשיבוץ.</p></div>
+          <div><p class="eyebrow">חופשות, מחלה והחלפות</p><h2>בקשות</h2><p class="muted">ניהול ברור ומהיר של כל בקשה עד לאישור ולעדכון האוטומטי בשיבוץ.</p></div>
           <div class="request-heading-actions"><button id="newEmployeeRequestBtn" class="secondary-btn manager-only hidden"><span>＋</span> בקשה חדשה לעובד</button><button id="newRequestBtn" class="primary-btn"><span>＋</span> בקשה חדשה</button></div>
         </div>
         <div id="requestSummary" class="request-summary request-summary-actions"></div>
         <div id="requestWorkflow" class="request-workflow"></div>
         <div class="filter-toolbar polished-filter request-filter-toolbar">
           <div class="filter-block"><span class="filter-label">מצב בקשה</span><div id="requestStatusChips" class="filter-chips" role="group" aria-label="סינון מצב בקשה">
-            <button type="button" class="filter-chip active" data-value="open">פתוחות</button><button type="button" class="filter-chip" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="pending">ממתינים</button><button type="button" class="filter-chip" data-value="approved">אושרו</button><button type="button" class="filter-chip" data-value="applied">הוזרמו</button><button type="button" class="filter-chip" data-value="closed">סגורות</button>
-          </div><select id="requestStatusFilter" class="sr-only" tabindex="-1" aria-hidden="true"><option value="open">פתוחות</option><option value="all">הכול</option><option value="pending">ממתינים</option><option value="approved">אושרו</option><option value="applied">הוזרמו</option><option value="closed">סגורות</option></select></div>
+            <button type="button" class="filter-chip active" data-value="open">פתוחות</button><button type="button" class="filter-chip" data-value="all">הכול</button><button type="button" class="filter-chip" data-value="pending">ממתינים</button><button type="button" class="filter-chip" data-value="approved">אושרו</button><button type="button" class="filter-chip" data-value="closed">סגורות</button>
+          </div><select id="requestStatusFilter" class="sr-only" tabindex="-1" aria-hidden="true"><option value="open">פתוחות</option><option value="all">הכול</option><option value="pending">ממתינים</option><option value="approved">אושרו</option><option value="closed">סגורות</option></select></div>
           <label class="search-field enhanced-search"><span>חיפוש</span><span class="search-input-wrap"><span aria-hidden="true">⌕</span><input id="requestSearch" type="search" placeholder="שם עובד, סוג או פירוט" /></span></label>
         </div>
         <div id="requestsList" class="request-board"></div>

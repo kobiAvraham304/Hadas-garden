@@ -90,9 +90,9 @@ test('0.17 cache headers force mobile browsers to receive the current UI', () =>
   const index=read('index.html');
   const vercel=JSON.parse(read('vercel.json'));
   assert.match(index,/styles\.css\?v=0350/);
-  assert.match(index,/app\.js\?v=0360hf7/);
+  assert.match(index,/app\.js\?v=0360hf8/);
   assert.match(index,/patch-v025\.css\?v=0350/);
-  assert.match(index,/patch-v025\.js\?v=0360hf7/);
+  assert.match(index,/patch-v025\.js\?v=0360hf8/);
   const serialized=JSON.stringify(vercel);
   assert.match(serialized,/no-store/);
 });

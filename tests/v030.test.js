@@ -34,9 +34,9 @@ test('0.30 manager preapproval is explicit and self requests remain server-guard
   assert.match(requests, /finishManagerPreapprovedSwap/);
   assert.match(requests, /hadas_apply_approved_request/);
   assert.match(requests, /target_approved/);
-  assert.match(patch, /אושר מראש/);
+  assert.match(patch, /אישור מנהלת מראש/);
   assert.match(patch, /!onBehalf/);
-  assert.match(patch, /העובד שנבחר עדיין חייב לאשר/);
+  assert.match(patch, /לאחר שהעובד שנבחר יאשר/);
 });
 
 test('0.30 schedule validation approvals are deterministic, reversible and affect publishing', () => {
@@ -103,8 +103,8 @@ test('0.30 runtime stays intact while physical entrypoints advance to v0.34', ()
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
   assert.match(entry, /const VERSION = '0\.36\.0'/);
-  assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321'/);
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf7'/);
+  assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321hf8'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf8'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await loadScript\(V034, 'v034'\)/);

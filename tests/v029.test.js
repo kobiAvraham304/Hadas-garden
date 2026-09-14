@@ -85,5 +85,5 @@ test('0.29 stale client entrypoints resolve through legacy behavior into the cur
   assert.match(legacyPatch(), /const VERSION = '0\.29\.0'/);
   assert.match(legacyPatch(), /PREVIOUS_PATCH = '\/patch-v028\.js\?v=0290'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
-  assert.match(read('patch-v031.js'), /PREVIOUS_PATCH = '\/patch-v030\.js\?v=0310'/);
+  assert.match(read('patch-v031.js'), /PREVIOUS_PATCH = '\/patch-v030\.js\?v=0310hf8'/);
 });
