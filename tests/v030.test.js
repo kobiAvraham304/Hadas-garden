@@ -36,7 +36,7 @@ test('0.30 manager preapproval is explicit and self requests remain server-guard
   assert.match(requests, /target_approved/);
   assert.match(patch, /אישור מנהלת מראש/);
   assert.match(patch, /!onBehalf/);
-  assert.match(patch, /העובד שנבחר עדיין חייב לאשר/);
+  assert.match(patch, /לאחר שהעובד שנבחר יאשר/);
 });
 
 test('0.30 schedule validation approvals are deterministic, reversible and affect publishing', () => {
