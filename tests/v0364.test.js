@@ -109,10 +109,10 @@ test('0.36 low-score coverage is explicitly backup-only and requires confirmatio
   const app=read('app.js');
   const patch=read('patch-v0342.js');
   assert.match(app,/return 'גיבוי בלבד'/);
-  assert.match(app,/אין התאמה מומלצת/);
-  assert.match(app,/לא מומלץ אוטומטית/);
+  assert.match(app,/אין כרגע כיסוי מומלץ/);
+  assert.match(app,/לא מומלצת אוטומטית/);
   assert.match(app,/data-recommended=/);
-  assert.match(app,/בחירה כגיבוי/);
+  assert.match(app,/בחירה חריגה/);
   assert.match(app,/אינה אפשרות מומלצת \(ציון/);
   assert.doesNotMatch(app,/אפשרויות בטוחות/);
   assert.match(patch,/\.daily-coverage-option\.is-backup/);
