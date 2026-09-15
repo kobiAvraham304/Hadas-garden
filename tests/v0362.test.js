@@ -41,7 +41,7 @@ test('0.36 shift editor explains real unavailability and assignment conflicts', 
   assert.match(app, /overlaps\(start,\s*end,\s*shift\.start_time,\s*shift\.end_time\)/);
   assert.match(app, /shift-worker-reasons/);
   assert.match(v026, /v026-selected-employee-copy/);
-  assert.match(v026, /עובד\/ת בשיבוץ הנוכחי/);
+  assert.match(v026, /השיבוץ שנערך כרגע/);
   assert.match(patch, /\.v026-selected-employee-copy/);
   assert.match(patch, /gap:5px/);
 });
