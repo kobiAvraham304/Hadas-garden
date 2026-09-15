@@ -87,7 +87,7 @@ test('0.36 shift editor makes existing class assignment and replacement behavior
   assert.match(app,/משובץ\/ת כרגע/);
   assert.match(app,/מה יקרה בשמירה\?/);
   assert.match(app,/לא ייווצר שיבוץ כפול/);
-  assert.match(app,/כבר משובצת — השיבוץ הזה יועבר/);
+  assert.match(app,/קיים שיבוץ — השיבוץ הזה יועבר/);
   assert.match(app,/כבר משובץ\/ת בטווח הזה — לא ניתן ליצור שיבוץ כפול/);
   assert.match(v026,/בחירת עובד\/ת אחר\/ת/);
   assert.match(v026,/רק פותח את רשימת המועמדים/);
