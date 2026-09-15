@@ -19,8 +19,8 @@ test('0.36 daily coverage never presents a sub-threshold candidate as a normal s
 test('0.36 shift editor makes an existing class assignment impossible to miss', () => {
   const app = read('app.js');
   const v026 = read('patch-v026.js');
-  assert.match(app, /כבר משובצת בכיתה אחרת/);
-  assert.match(app, /כבר משובצת — השיבוץ הזה יועבר/);
+  assert.match(app, /כבר קיים שיבוץ בכיתה אחרת/);
+  assert.match(app, /קיים שיבוץ — השיבוץ הזה יועבר/);
   assert.match(app, /בחירה למרות החסימה/);
   assert.match(app, /זו חריגה ידנית בלבד/);
   assert.match(v026, /בחירת עובד\/ת אחר\/ת/);
