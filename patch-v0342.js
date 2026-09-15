@@ -973,6 +973,39 @@
     .shift-blocked-action{display:inline-flex;align-items:center;max-width:180px;padding:6px 8px;border-radius:9px;background:#f0f1f4;color:#747887;font-size:.61rem;font-weight:800;line-height:1.35;text-align:center}
     .v026-selected-employee-action{display:grid;gap:4px;justify-items:end;max-width:230px}.v026-selected-employee-action small{max-width:230px;text-align:end;font-size:.61rem!important;line-height:1.35!important;color:#7a7f92!important}
 
+    /* hf11 — coverage decision clarity + explicit shift transfer state */
+    #dailySuggestionsDialog{width:min(1180px,calc(100% - 20px))!important;max-width:1180px!important}
+    #dailySuggestionsDialog .modal-card{width:100%!important;max-width:none!important;max-height:min(92vh,920px)!important;overflow:hidden!important}
+    #dailySuggestionsList.daily-coverage-results{width:100%!important;min-width:0!important;max-height:calc(92vh - 170px)!important;overflow:auto!important;align-content:start!important;padding:2px 4px 10px!important}
+    .daily-matching-groups,.daily-primary-options,.daily-backup-options,.daily-modern-grid,.daily-other-options{width:100%!important;min-width:0!important;justify-self:stretch!important}
+    .daily-coverage-summary{width:100%!important;box-sizing:border-box!important}
+    .daily-coverage-option{width:100%!important;box-sizing:border-box!important;grid-template-columns:minmax(0,1fr) 190px!important;grid-template-areas:"decision decision" "main action" "source action" "reasons action" "cautions action"!important;align-items:stretch!important}
+    .daily-coverage-option.is-backup{border:2px solid #e8c575!important;background:linear-gradient(135deg,#fffaf0,#fff)!important;box-shadow:0 6px 18px rgba(153,111,33,.08)!important}
+    .daily-option-decision{grid-area:decision;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 11px;border-radius:11px;font-size:.72rem}
+    .daily-option-decision strong{font-size:.78rem}.daily-option-decision span{line-height:1.45}
+    .daily-option-decision.ok{background:#eaf8ef;color:#286c4d}.daily-option-decision.warn{background:#fff1cf;color:#77551d;border:1px solid #edcf87}
+    .daily-score-badge.ok{border-color:#b9dfca!important;background:#f2fbf5!important}.daily-score-badge.warn{border-color:#e6c375!important;background:#fff8e8!important}.daily-score-badge.warn strong{color:#9a681f!important}
+    .daily-backup-warning{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:10px;padding:12px 14px;border:1px solid #e8c575;border-radius:14px;background:#fff7e4;color:#74531d}
+    .daily-backup-warning strong{font-size:.86rem;white-space:nowrap}.daily-backup-warning span{font-size:.72rem;line-height:1.55}
+    .daily-cover-action.is-backup-action{border:1px solid #d8a94c!important;background:#fff8e7!important;color:#78551d!important;font-weight:900!important}
+    .daily-cover-action.is-backup-action:hover{background:#ffefc6!important}
+    .daily-option-cautions>strong{font-size:.68rem;color:#7f5a1f}.daily-option-cautions{padding:8px 10px;border-radius:10px;background:#fffaf0}
+    .shift-current-assignment{border:1px solid #dfe3f3!important;background:#f7f8ff!important;padding:7px 9px!important;border-radius:10px!important}
+    .shift-current-assignment.is-source{border-color:#aebce9!important;background:#eef2ff!important}
+    .shift-current-assignment.is-source>span{color:#4d5f9e!important;font-weight:950!important}
+    .shift-transfer-result{display:block!important;margin-top:6px!important;padding:8px 10px!important;border:1px solid #b8c6ee!important;border-radius:10px!important;background:#f1f4ff!important;color:#445485!important;line-height:1.5!important}
+    .shift-transfer-result strong{display:block;margin-bottom:2px;color:#35477d}
+    .v026-selected-employee-action small strong{display:block!important;margin-bottom:2px!important;color:#454b62!important}
+    @media(max-width:820px){
+      #dailySuggestionsDialog{width:calc(100% - 8px)!important}
+      #dailySuggestionsDialog .modal-card{max-height:96vh!important;padding-inline:10px!important}
+      #dailySuggestionsList.daily-coverage-results{max-height:calc(96vh - 155px)!important}
+      .daily-coverage-option{grid-template-columns:1fr!important;grid-template-areas:"decision" "main" "source" "reasons" "cautions" "action"!important}
+      .daily-option-decision{display:grid!important;gap:3px!important}
+      .daily-backup-warning{display:grid!important;gap:4px!important}
+      .daily-backup-warning strong{white-space:normal!important}
+      .daily-cover-action{width:100%!important;max-width:none!important;min-width:0!important}
+    }
     #v036PrintRoot{display:none}
     @media print{
       @page{size:A4 landscape;margin:0}
