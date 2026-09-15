@@ -2447,7 +2447,7 @@ function dailySuggestionCandidateCard(item){
   const typeLabel=transfer?'העברה בטוחה מכיתה אחרת':recommended?'פנוי/ה לכיסוי':'זמין/ה טכנית בלבד';
   const decisionTitle=recommended?'מומלץ לשיבוץ':'לא מומלץ אוטומטית';
   const decisionText=recommended?'עבר/ה את סף ההמלצה של המערכת.':'הציון נמוך מסף ההמלצה. ניתן להשתמש רק כאפשרות גיבוי ובהחלטה מודעת.';
-  const sourceHtml=transfer?`<div class="daily-option-source"><span>משובץ/ת כרגע</span><strong>${escapeHtml(source)}</strong><small>אם תבחר/י באפשרות זו, ההעברה תהיה תפעולית רק לטווח <bdi dir="ltr">${escapeHtml(rangeStart)}–${escapeHtml(rangeEnd)}</bdi>. השיבוץ השבועי נשאר ללא שינוי.</small></div>`:'';
+  const sourceHtml=transfer?`<div class="daily-option-source"><span>משובץ/ת כרגע</span><strong>${escapeHtml(source)}</strong><small>אם תבחר/י באפשרות זו, ההעברה תהיה תפעולית רק לטווח <bdi dir="ltr">${escapeHtml(rangeStart)}–${escapeHtml(rangeEnd)}</bdi>. השיבוץ השבועי לא משתנה.</small></div>`:'';
   const reasonsHtml=topReasons.length?`<div class="daily-reason-chips">${topReasons.map((reason)=>`<span>${escapeHtml(reason)}</span>`).join('')}</div>`:'';
   const cautionHtml=cautions.length?`<div class="daily-option-cautions"><strong>${recommended?'לתשומת לב':'למה זו רק אפשרות גיבוי?'}</strong>${cautions.map((text)=>`<span>⚠ ${escapeHtml(text)}</span>`).join('')}</div>`:'';
   const actionLabel=transfer?(recommended?`העברה זמנית מ־${item.from_class_name||'הכיתה הנוכחית'}`:'בחירה כגיבוי והעברה'):(recommended?'בחירה לכיסוי':'בחירה כגיבוי');
