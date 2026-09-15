@@ -74,7 +74,7 @@ test('0.36 coverage UI is a single decision surface, not a two-column cards-list
   assert.doesNotMatch(index,/id="dailySuggestionsList" class="cards-list"/);
   assert.match(app,/function dailyCoverageSummary|daily-coverage-summary/);
   assert.match(app,/למה שאר הצוות לא הוצע/);
-  assert.match(app,/השיבוץ השבועי לא משתנה/);
+  assert.match(app,/מסך השיבוצים השבועי נשאר ללא שינוי/);
   assert.match(patch,/#dailySuggestionsList\.daily-coverage-results\{display:grid!important;grid-template-columns:minmax\(0,1fr\)!important/);
   assert.match(patch,/\.daily-modern-grid\{display:grid!important;grid-template-columns:minmax\(0,1fr\)!important/);
 });
