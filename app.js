@@ -1190,7 +1190,7 @@ function shiftAssignmentHtml(employeeId, candidate=null) {
   if(!rows.length)rows=shiftCurrentAssignments(employeeId).map((row)=>({...row,source:false}));
   if(!rows.length)return '';
   return rows.map((row)=>`<div class="shift-current-assignment ${row.source?'is-source':''}">
-    <span>${row.source?'כבר משובצת — השיבוץ הזה יועבר':'כבר משובצת בכיתה אחרת'}</span>
+    <span>${row.source?'קיים שיבוץ — השיבוץ הזה יועבר':'כבר קיים שיבוץ בכיתה אחרת'}</span>
     <strong>${escapeHtml(row.class_name)} · <bdi dir="ltr">${escapeHtml(row.start_time||'')}–${escapeHtml(row.end_time||'')}</bdi></strong>
   </div>`).join('');
 }
@@ -2446,7 +2446,7 @@ function dailySuggestionCandidateCard(item){
   const source=dailyCandidateSourceText(item);
   const topReasons=(item.reasons||[]).slice(0,4);
   const cautions=(item.cautions||[]).slice(0,3);
-  const typeLabel=transfer?'משובצת כרגע בכיתה אחרת':recommended?'פנויה לכיסוי':'אפשרות חריגה בלבד';
+  const typeLabel=transfer?'כבר קיים שיבוץ בכיתה אחרת':recommended?'פנויה לכיסוי':'אפשרות חריגה בלבד';
   const decisionTitle=recommended?'מתאימה לכיסוי':'לא מומלצת אוטומטית';
   const decisionText=recommended
     ?'עברה את בדיקות הזמינות והתקינה וניתן לבחור בה לכיסוי.'
