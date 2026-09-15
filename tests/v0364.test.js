@@ -91,11 +91,11 @@ test('0.36 shift editor makes existing class assignment and replacement behavior
   assert.match(app,/כבר משובץ\/ת בטווח הזה — לא ניתן ליצור שיבוץ כפול/);
   assert.match(v026,/בחירת עובד\/ת אחר\/ת/);
   assert.match(v026,/רק פותח את רשימת המועמדים/);
-  assert.match(v026,/לא מוחלף\/ת עד לחיצה על “שמירת השיבוץ”/);
+  assert.match(v026,/העובד\/ת הנוכחי\/ת נשאר\/ת בשיבוץ עד שתבחר\/י מחליף\/ה/);
   assert.match(index,/אם עובד\/ת כבר משובץ\/ת בכיתה אחרת/);
 });
 
-test('0.36 hf11 cache chain delivers matching, UI and v026 button changes', () => {
+test('0.36 hf12 cache chain delivers matching, UI and v026 button changes', () => {
   const index=read('index.html');
   const entry=read('patch-v025.js');
   assert.match(index,/app\.js\?v=0360hf12/);
