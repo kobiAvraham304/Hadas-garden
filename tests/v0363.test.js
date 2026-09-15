@@ -22,7 +22,7 @@ test('0.36 daily coverage renders the modern shift-editor matching language', ()
   assert.match(app, /function dailySuggestionCandidateCard/);
   assert.match(app, /daily-option-badges/);
   assert.match(app, /daily-coverage-option/);
-  assert.match(app, /נדרש כיסוי/);
+  assert.match(app, /צריך כיסוי עכשיו/);
   assert.match(app, /function dailyRejectedReasonHtml/);
   assert.match(app, /למה שאר הצוות לא הוצע/);
   assert.match(app, /daily-option-cautions/);
