@@ -263,7 +263,7 @@
         <label>שעת סיום<input name="end_time" type="time" value="15:30" required /></label>
         <input type="hidden" name="shift_role" value="staff" />
         <section class="full-field shift-employee-picker unified-shift-picker" aria-labelledby="shiftEmployeePickerTitle">
-          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד / מחליף</strong><small>אם עובד/ת כבר משובץ/ת בכיתה אחרת, יוצגו כאן שם הכיתה והשעות. העברה תוצע רק כשהיא בטוחה ותקינה.</small></div><div class="picker-status-group"><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div></div>
+          <div class="employee-picker-title"><div><strong id="shiftEmployeePickerTitle">בחירת עובד/ת לשיבוץ</strong><small>אם עובד/ת כבר משובץ/ת בכיתה אחרת, תופיע התראה ברורה עם שם הכיתה והשעות. העברה תוצע רק כשאפשר להעביר בלי לפגוע בתקינת המקור.</small></div><div class="picker-status-group"><span id="shiftRecommendationStatus" class="status-chip">מחשב התאמות</span><span id="shiftEmployeeSelectedScore" class="selected-score-pill hidden"></span></div></div>
           <div id="shiftRecommendations" class="hidden" aria-hidden="true"></div>
           <input name="employee_id" type="hidden" required />
           <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש לפי שם או תפקיד" autocomplete="off" /></label>
@@ -484,7 +484,7 @@
     <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת דיווח</button></div>
   </form></dialog>
 
-  <dialog id="dailySuggestionsDialog" class="modal daily-coverage-modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">כיסוי מיידי</p><h3>מציאת כיסוי</h3><p class="muted">קודם מוצגות אפשרויות בטוחות. העברה מכיתה אחרת תוצע רק אם כיתת המקור נשארת בתקינה.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="dailySuggestionsList" class="daily-coverage-results"></div></div></dialog>
+  <dialog id="dailySuggestionsDialog" class="modal daily-coverage-modal"><div class="modal-card large-modal"><div class="modal-heading"><div><p class="eyebrow">כיסוי מיידי</p><h3>מציאת כיסוי</h3><p class="muted">מוצגות רק המלצות שעוברות את סף הבטיחות. אפשרויות חלשות נשמרות בנפרד כחריגה ולא מוצגות כאילו הן תקינות.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="dailySuggestionsList" class="daily-coverage-results"></div></div></dialog>
 
   <dialog id="dailyAttendanceDialog" class="modal">
     <form id="dailyAttendanceForm" method="dialog" class="modal-card">
