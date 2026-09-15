@@ -66,7 +66,8 @@ test('0.26 shift editing starts compact and exposes an explicit change-employee 
   const patch = read('patch-v026.js');
   const css = read('patch-v026.css');
   assert.match(patch, /v026SelectedEmployeeBar/);
-  assert.match(patch, /בחירת עובד\/ת אחר\/ת/);
+  assert.match(patch, /פתיחת רשימת עובדים/);
+  assert.match(patch, /רק פותח את רשימת המועמדים/);
   assert.match(patch, /v026-picker-collapsed/);
   assert.match(patch, /עריכת שיבוץ/);
   assert.match(patch, /תיקון שיבוץ מוצע/);
