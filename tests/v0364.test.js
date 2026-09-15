@@ -74,7 +74,7 @@ test('0.36 coverage UI is a single decision surface, not a two-column cards-list
   assert.doesNotMatch(index,/id="dailySuggestionsList" class="cards-list"/);
   assert.match(app,/function dailyCoverageSummary|daily-coverage-summary/);
   assert.match(app,/למה שאר הצוות לא הוצע/);
-  assert.match(app,/השיבוץ השבועי לא משתנה/);
+  assert.match(app,/מסך השיבוצים השבועי נשאר ללא שינוי/);
   assert.match(patch,/#dailySuggestionsList\.daily-coverage-results\{display:grid!important;grid-template-columns:minmax\(0,1fr\)!important/);
   assert.match(patch,/\.daily-modern-grid\{display:grid!important;grid-template-columns:minmax\(0,1fr\)!important/);
 });
@@ -87,21 +87,21 @@ test('0.36 shift editor makes existing class assignment and replacement behavior
   assert.match(app,/משובץ\/ת כרגע/);
   assert.match(app,/מה יקרה בשמירה\?/);
   assert.match(app,/לא ייווצר שיבוץ כפול/);
-  assert.match(app,/משובץ\/ת כרגע — זה השיבוץ שיועבר/);
+  assert.match(app,/קיים שיבוץ — השיבוץ הזה יועבר/);
   assert.match(app,/כבר משובץ\/ת בטווח הזה — לא ניתן ליצור שיבוץ כפול/);
-  assert.match(v026,/פתיחת רשימת עובדים/);
+  assert.match(v026,/בחירת עובד\/ת אחר\/ת/);
   assert.match(v026,/רק פותח את רשימת המועמדים/);
-  assert.match(v026,/לא מוחלף\/ת עד לחיצה על “שמירת השיבוץ”/);
+  assert.match(v026,/העובד\/ת הנוכחי\/ת נשאר\/ת בשיבוץ עד שתבחר\/י מחליף\/ה/);
   assert.match(index,/אם עובד\/ת כבר משובץ\/ת בכיתה אחרת/);
 });
 
-test('0.36 hf11 cache chain delivers matching, UI and v026 button changes', () => {
+test('0.36 hf12 cache chain delivers matching, UI and v026 button changes', () => {
   const index=read('index.html');
   const entry=read('patch-v025.js');
-  assert.match(index,/app\.js\?v=0360hf11/);
-  assert.match(index,/patch-v025\.js\?v=0360hf11/);
-  assert.match(entry,/patch-v026\.js\?v=0321hf11/);
-  assert.match(entry,/patch-v0342\.js\?v=0360hf11/);
+  assert.match(index,/app\.js\?v=0360hf12/);
+  assert.match(index,/patch-v025\.js\?v=0360hf12/);
+  assert.match(entry,/patch-v026\.js\?v=0321hf12/);
+  assert.match(entry,/patch-v0342\.js\?v=0360hf12/);
 });
 
 
@@ -109,10 +109,10 @@ test('0.36 low-score coverage is explicitly backup-only and requires confirmatio
   const app=read('app.js');
   const patch=read('patch-v0342.js');
   assert.match(app,/return 'גיבוי בלבד'/);
-  assert.match(app,/אין התאמה מומלצת/);
-  assert.match(app,/לא מומלץ אוטומטית/);
+  assert.match(app,/אין כרגע כיסוי מומלץ/);
+  assert.match(app,/לא מומלצת אוטומטית/);
   assert.match(app,/data-recommended=/);
-  assert.match(app,/בחירה כגיבוי/);
+  assert.match(app,/בחירה חריגה/);
   assert.match(app,/אינה אפשרות מומלצת \(ציון/);
   assert.doesNotMatch(app,/אפשרויות בטוחות/);
   assert.match(patch,/\.daily-coverage-option\.is-backup/);

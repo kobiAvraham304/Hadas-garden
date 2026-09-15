@@ -403,7 +403,7 @@
     bar = document.createElement('div');
     bar.id = 'v026SelectedEmployeeBar';
     bar.className = 'v026-selected-employee hidden';
-    bar.innerHTML = '<div class="v026-selected-employee-copy"><small class="v026-selected-employee-label">השיבוץ שנערך כרגע</small><strong id="v026SelectedEmployeeName">—</strong><span id="v026SelectedEmployeeMeta"></span></div><div class="v026-selected-employee-action"><button id="v026ChangeEmployeeBtn" type="button" class="secondary-btn">פתיחת רשימת עובדים</button><small><strong>מה הכפתור עושה?</strong> רק פותח את רשימת המועמדים. העובד/ת לא מוחלף/ת עד לחיצה על “שמירת השיבוץ”.</small></div>';
+    bar.innerHTML = '<div class="v026-selected-employee-copy"><small class="v026-selected-employee-label">עובד/ת בשיבוץ הנוכחי</small><strong id="v026SelectedEmployeeName">—</strong><span id="v026SelectedEmployeeMeta"></span></div><div class="v026-selected-employee-action"><button id="v026ChangeEmployeeBtn" type="button" class="secondary-btn">בחירת עובד/ת אחר/ת</button><small><strong>חשוב:</strong> הכפתור רק פותח את רשימת המועמדים. העובד/ת הנוכחי/ת נשאר/ת בשיבוץ עד שתבחר/י מחליף/ה ותלחץ/י “שמירת השיבוץ”.</small></div>';
     const search = picker.querySelector('.employee-picker-search');
     picker.insertBefore(bar, search || picker.firstChild);
     bar.querySelector('#v026ChangeEmployeeBtn').addEventListener('click', () => {

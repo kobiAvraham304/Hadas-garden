@@ -1189,9 +1189,11 @@ function shiftAssignmentHtml(employeeId, candidate=null) {
   }
   if(!rows.length)rows=shiftCurrentAssignments(employeeId).map((row)=>({...row,source:false}));
   if(!rows.length)return '';
-  return rows.map((row)=>`<div class="shift-current-assignment ${row.source?'is-source':''}"><span>${row.source?'משובץ/ת כרגע — זה השיבוץ שיועבר':'משובץ/ת היום'}</span><strong>${escapeHtml(row.class_name)} · <bdi dir="ltr">${escapeHtml(row.start_time||'')}–${escapeHtml(row.end_time||'')}</bdi></strong></div>`).join('');
+  return rows.map((row)=>`<div class="shift-current-assignment ${row.source?'is-source':''}">
+    <span>${row.source?'קיים שיבוץ — השיבוץ הזה יועבר':'כבר קיים שיבוץ בכיתה אחרת'}</span>
+    <strong>${escapeHtml(row.class_name)} · <bdi dir="ltr">${escapeHtml(row.start_time||'')}–${escapeHtml(row.end_time||'')}</bdi></strong>
+  </div>`).join('');
 }
-
 function shiftWorkerAvailabilityDetails(employeeId, backendReason = '') {
   const form = $('#shiftForm');
   const date = String(form?.elements.shift_date?.value || '');
@@ -1264,7 +1266,7 @@ function renderShiftEmployeePicker() {
     selectedFallback = `<div class="employee-picker-current"><div><small>עובד/ת בשיבוץ הזה</small><strong>${escapeHtml(selectedEmployee.full_name)}</strong></div>${shiftAssignmentHtml(selectedId)}<div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(selectedId,rejected?.reason||'',{includeBusy:false})}</div></div>`;
   }
   const blocked=state.shiftPickerRejected.filter((item)=>{const employee=employeeById(item.employee_id);const details=shiftWorkerAvailabilityDetails(item.employee_id,item.reason).map((x)=>x.text).join(' ');const hay=`${item.full_name||''} ${employee?.job_title||''} ${fixedClassLabel(item.employee_id)} ${details}`.toLowerCase();return !query||hay.includes(query);});
-  const blockedHtml=blocked.length?`<details class="employee-option-group blocked-employees" open><summary>לא זמינים כרגע <b>${blocked.length}</b></summary><div class="blocked-employee-list">${blocked.map((item)=>{const employee=employeeById(item.employee_id);const assignment=shiftAssignmentHtml(item.employee_id);const overrideAllowed=isManager()&&shiftManualOverrideAllowed(item);return `<div class="rejected-worker-row"><div class="rejected-worker-copy"><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,fixedClassLabel(item.employee_id)?`כיתה קבועה: ${fixedClassLabel(item.employee_id)}`:''].filter(Boolean).join(' · '))}</small>${assignment}<div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(item.employee_id,item.reason,{includeBusy:false})}</div></div>${overrideAllowed?`<button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">בחירה ידנית חריגה</button>`:assignment?`<span class="shift-blocked-action">כבר משובץ/ת בטווח הזה — לא ניתן ליצור שיבוץ כפול</span>`:''}</div>`;}).join('')}</div></details>`:'';
+  const blockedHtml=blocked.length?`<details class="employee-option-group blocked-employees" open><summary>לא זמינים כרגע <b>${blocked.length}</b></summary><div class="blocked-employee-list">${blocked.map((item)=>{const employee=employeeById(item.employee_id);const assignment=shiftAssignmentHtml(item.employee_id);const overrideAllowed=isManager()&&shiftManualOverrideAllowed(item);return `<div class="rejected-worker-row"><div class="rejected-worker-copy"><strong>${escapeHtml(item.full_name||employee?.full_name||'עובד')}</strong><small>${escapeHtml([employee?.job_title,fixedClassLabel(item.employee_id)?`כיתה קבועה: ${fixedClassLabel(item.employee_id)}`:''].filter(Boolean).join(' · '))}</small>${assignment}<div class="shift-worker-reasons">${shiftWorkerAvailabilityHtml(item.employee_id,item.reason,{includeBusy:false})}</div></div>${overrideAllowed?`<button type="button" data-manual-override="${item.employee_id}" data-override-reason="${escapeHtml(item.reason||'חריגה ידנית')}">בחירה למרות החסימה</button>`:assignment?`<span class="shift-blocked-action">כבר משובץ/ת בטווח הזה — לא ניתן ליצור שיבוץ כפול</span>`:''}</div>`;}).join('')}</div></details>`:'';
   target.innerHTML = `${selectedFallback}${recommended.length ? `<div class="employee-option-group"><span>מומלצים (${recommended.length})</span>${recommended.map(card).join('')}</div>` : ''}${possible.length ? `<div class="employee-option-group"><span>אפשרויות נוספות שעברו בדיקות (${possible.length})</span>${possible.map(card).join('')}</div>` : ''}${!rows.length&&!blocked.length ? '<div class="empty-state compact">לא נמצאו עובדים מתאימים.</div>' : ''}${blockedHtml}`;
   const selected = selectedShiftCandidate();
   const pill = $('#shiftEmployeeSelectedScore');
@@ -1296,7 +1298,7 @@ function updateShiftEmployeeHint() {
   const rejected=state.shiftPickerRejected.find((item)=>item.employee_id===employeeId);
   const blockedDetails=employee?shiftWorkerAvailabilityDetails(employeeId,rejected?.reason||'').map((item)=>item.text):[];
   if(manual){
-    hint.textContent=`בחירה ידנית חריגה: ${form.elements.override_reason.value}. שום דבר לא משתנה עד לחיצה על “שמירת השיבוץ”.`;
+    hint.textContent=`בחירה למרות החסימה: ${form.elements.override_reason.value}. זו חריגה ידנית בלבד; שום שינוי לא מתבצע עד לחיצה על “שמירת השיבוץ”.`;
   }else if(candidate?.candidate_type==='transfer'){
     const source=candidate.from_class_name||classById(candidate.from_class_id)?.name||'כיתה אחרת';
     const target=classById(form.elements.class_id.value)?.name||'הכיתה שנבחרה';
@@ -2444,13 +2446,19 @@ function dailySuggestionCandidateCard(item){
   const source=dailyCandidateSourceText(item);
   const topReasons=(item.reasons||[]).slice(0,4);
   const cautions=(item.cautions||[]).slice(0,3);
-  const typeLabel=transfer?'העברה בטוחה מכיתה אחרת':recommended?'פנוי/ה לכיסוי':'זמין/ה טכנית בלבד';
-  const decisionTitle=recommended?'מומלץ לשיבוץ':'לא מומלץ אוטומטית';
-  const decisionText=recommended?'עבר/ה את סף ההמלצה של המערכת.':'הציון נמוך מסף ההמלצה. ניתן להשתמש רק כאפשרות גיבוי ובהחלטה מודעת.';
-  const sourceHtml=transfer?`<div class="daily-option-source"><span>משובץ/ת כרגע</span><strong>${escapeHtml(source)}</strong><small>אם תבחר/י באפשרות זו, ההעברה תהיה תפעולית רק לטווח <bdi dir="ltr">${escapeHtml(rangeStart)}–${escapeHtml(rangeEnd)}</bdi>. השיבוץ השבועי לא משתנה.</small></div>`:'';
+  const typeLabel=transfer?'כבר קיים שיבוץ בכיתה אחרת':recommended?'פנויה לכיסוי':'אפשרות חריגה בלבד';
+  const decisionTitle=recommended?'מתאימה לכיסוי':'לא מומלצת אוטומטית';
+  const decisionText=recommended
+    ?'עברה את בדיקות הזמינות והתקינה וניתן לבחור בה לכיסוי.'
+    :'האפשרות נשמרת רק למקרה חירום. היא מתחת לסף ההמלצה ודורשת בחירה מודעת.';
+  const sourceHtml=transfer
+    ?`<div class="daily-option-source"><span>השיבוץ הנוכחי</span><strong>${escapeHtml(source)}</strong><small>בחירה באפשרות זו מבצעת העברה תפעולית רק לטווח <bdi dir="ltr">${escapeHtml(rangeStart)}–${escapeHtml(rangeEnd)}</bdi>. מסך השיבוצים השבועי נשאר ללא שינוי.</small></div>`
+    :'';
   const reasonsHtml=topReasons.length?`<div class="daily-reason-chips">${topReasons.map((reason)=>`<span>${escapeHtml(reason)}</span>`).join('')}</div>`:'';
-  const cautionHtml=cautions.length?`<div class="daily-option-cautions"><strong>${recommended?'לתשומת לב':'למה זו רק אפשרות גיבוי?'}</strong>${cautions.map((text)=>`<span>⚠ ${escapeHtml(text)}</span>`).join('')}</div>`:'';
-  const actionLabel=transfer?(recommended?`העברה זמנית מ־${item.from_class_name||'הכיתה הנוכחית'}`:'בחירה כגיבוי והעברה'):(recommended?'בחירה לכיסוי':'בחירה כגיבוי');
+  const cautionHtml=cautions.length?`<div class="daily-option-cautions"><strong>${recommended?'לתשומת לב':'למה זו חריגה?'}</strong>${cautions.map((text)=>`<span>⚠ ${escapeHtml(text)}</span>`).join('')}</div>`:'';
+  const actionLabel=transfer
+    ?(recommended?`העברה זמנית מ־${item.from_class_name||'הכיתה הנוכחית'}`:'בחירה חריגה + העברה')
+    :(recommended?'בחירה לכיסוי':'בחירה חריגה');
   return `<article class="daily-coverage-option ${recommended?'is-recommended':'is-backup'} ${transfer?'is-transfer':'is-direct'}">
     <div class="daily-option-decision ${recommended?'ok':'warn'}"><strong>${escapeHtml(decisionTitle)}</strong><span>${escapeHtml(decisionText)}</span></div>
     <div class="daily-option-main">
@@ -2467,7 +2475,6 @@ function dailySuggestionCandidateCard(item){
     <button class="${recommended?'primary-btn':'secondary-btn'} daily-cover-action ${recommended?'':'is-backup-action'}" data-daily-suggestion="assign" data-employee-id="${item.employee_id}" data-replacement-type="${transfer?'transfer':'replacement'}" data-source-shift-id="${escapeHtml(item.source_shift_id||'')}" data-recommended="${recommended?'true':'false'}" data-score="${score}">${escapeHtml(actionLabel)}</button>
   </article>`;
 }
-
 function dailyRejectionCategory(reason=''){
   const text=String(reason);
   if(/תקינת כיתת המקור|משובץ\/ת|שיבוץ בכיתה אחרת|שיבוצים חופפים/.test(text))return 'משובצים / לא ניתן לשחרר';
@@ -2502,20 +2509,34 @@ function renderDailyMatchingResults(data,context){
   const backup=candidates.filter((item)=>!recommended.includes(item));
   const range=data.range||context.range||{};
   const targetClass=classById(context.classId);
-  const countLabel=recommended.length?`${recommended.length} ${recommended.length===1?'מומלץ':'מומלצים'}`:candidates.length?'אין התאמה מומלצת':'אין אפשרות מתאימה';
-  const statusDetail=recommended.length?`${candidates.length} אפשרויות עברו בדיקות בסיסיות`:candidates.length?`${candidates.length} אפשרויות גיבוי בלבד · כולן מתחת לסף 62`:'לא נמצא עובד שעובר את בדיקות הזמינות והתקינה';
-  const intro=`<section class="daily-coverage-summary"><div class="daily-coverage-need"><span>נדרש כיסוי</span><strong>${escapeHtml(targetClass?.name||'כיתה')} · <bdi dir="ltr">${escapeHtml(trimTime(range.start))}–${escapeHtml(trimTime(range.end))}</bdi></strong><small>המערכת בודקת זמינות, חופשות, שיבוצים קיימים, תקינה, תפקיד ושעות. רק ציון 62 ומעלה נחשב המלצה.</small></div><div class="daily-coverage-status ${recommended.length?'ok':candidates.length?'warn':'none'}"><strong>${escapeHtml(countLabel)}</strong><span>${escapeHtml(statusDetail)}</span></div></section>`;
+  const countLabel=recommended.length
+    ?`${recommended.length} ${recommended.length===1?'אפשרות מומלצת':'אפשרויות מומלצות'}`
+    :'אין כרגע כיסוי מומלץ';
+  const statusDetail=recommended.length
+    ?`נמצאו ${candidates.length} אפשרויות לאחר בדיקות זמינות ותקינה`
+    :backup.length
+      ?`${backup.length} אפשרויות חריגה נשמרו למקרה חירום`
+      :'לא נמצא עובד/ת שעובר/ת את בדיקות הזמינות והתקינה';
+  const intro=`<section class="daily-coverage-summary">
+    <div class="daily-coverage-need"><span>צריך כיסוי עכשיו</span><strong>${escapeHtml(targetClass?.name||'כיתה')} · <bdi dir="ltr">${escapeHtml(trimTime(range.start))}–${escapeHtml(trimTime(range.end))}</bdi></strong><small>המערכת בודקת חופשות, שיבוצים חופפים, תקינת כיתת המקור, תפקיד ושעות. רק ציון 62 ומעלה מוצג כהמלצה.</small></div>
+    <div class="daily-coverage-status ${recommended.length?'ok':backup.length?'warn':'none'}"><strong>${escapeHtml(countLabel)}</strong><span>${escapeHtml(statusDetail)}</span></div>
+  </section>`;
   let groups='';
   if(recommended.length){
-    groups=`<div class="daily-matching-groups"><section class="daily-primary-options"><h4>אפשרויות מומלצות</h4><div class="daily-modern-grid">${recommended.map(dailySuggestionCandidateCard).join('')}</div></section>${backup.length?`<details class="daily-other-options"><summary>אפשרויות גיבוי — לא מומלצות אוטומטית <b>${backup.length}</b></summary><div class="daily-modern-grid">${backup.map(dailySuggestionCandidateCard).join('')}</div></details>`:''}</div>`;
+    groups=`<div class="daily-matching-groups">
+      <section class="daily-primary-options"><h4>האפשרויות המומלצות</h4><div class="daily-modern-grid">${recommended.map(dailySuggestionCandidateCard).join('')}</div></section>
+      ${backup.length?`<details class="daily-emergency-options"><summary><div><strong>אפשרויות חריגה בלבד</strong><small>לא מומלצות אוטומטית · פתיחה רק אם אין פתרון אחר</small></div><b>${backup.length}</b></summary><div class="daily-modern-grid">${backup.map(dailySuggestionCandidateCard).join('')}</div></details>`:''}
+    </div>`;
   }else if(backup.length){
-    groups=`<div class="daily-matching-groups"><section class="daily-backup-options"><div class="daily-backup-warning"><strong>אין כרגע התאמה מומלצת</strong><span>האפשרויות הבאות עברו בדיקות בסיסיות אך קיבלו ציון נמוך מסף ההמלצה. בחירה בהן תדרוש אישור נוסף.</span></div><div class="daily-modern-grid">${backup.map(dailySuggestionCandidateCard).join('')}</div></section></div>`;
+    groups=`<div class="daily-matching-groups">
+      <div class="daily-no-safe-option"><strong>לא נמצאה התאמה בטוחה לכיסוי</strong><p>לא נציג אפשרות חלשה כאילו היא פתרון תקין. ניתן לפתוח למטה את אפשרויות החריגה רק אם נדרשת החלטת מנהלת.</p></div>
+      <details class="daily-emergency-options"><summary><div><strong>פתיחת אפשרויות חריגה</strong><small>כל האפשרויות מתחת לסף ההמלצה וידרשו אישור נוסף</small></div><b>${backup.length}</b></summary><div class="daily-modern-grid">${backup.map(dailySuggestionCandidateCard).join('')}</div></details>
+    </div>`;
   }else{
-    groups='<div class="daily-no-safe-option"><strong>לא נמצאה אפשרות כיסוי מתאימה כרגע</strong><p>המערכת לא תמשוך עובד/ת מכיתה אחרת אם הדבר יוריד את כיתת המקור מתחת לתקינה, ולא תציע עובד/ת שחסום/ה בגלל חופשה, שיבוץ חופף או כלל קשיח.</p></div>';
+    groups='<div class="daily-no-safe-option"><strong>לא נמצאה אפשרות כיסוי מתאימה כרגע</strong><p>לא תתבצע העברה מכיתה אחרת אם היא תפגע בתקינת המקור, ולא יוצע עובד/ת שנמצא/ת בחופשה, בשיבוץ חופף או בחסימה קשיחה.</p></div>';
   }
   return intro+groups+dailyRejectedReasonHtml(data.rejected||[],{...context,range});
 }
-
 async function loadDailySuggestions(id){
   const operation=state.dailyOperations.find((row)=>row.id===id);
   const shift=operation?state.dailyShifts.find((row)=>row.id===operation.shift_id):null;
@@ -2579,7 +2600,7 @@ async function handleDailySuggestionClick(event){
     const score=Number(button.dataset.score||0);
     const candidate=(state.dailySuggestionsContext.candidates||[]).find((item)=>item.employee_id===button.dataset.employeeId);
     const name=candidate?.full_name||'העובד/ת';
-    if(!confirm(`${name} אינה אפשרות מומלצת (ציון ${score}/100).\n\nהמערכת מציגה אותה כאפשרות גיבוי בלבד. להמשיך בכל זאת?`))return;
+    if(!confirm(`${name} אינה אפשרות מומלצת (ציון ${score}/100).\n\nזו אפשרות חריגה בלבד, מתחת לסף ההמלצה. להמשיך בכל זאת?`))return;
   }
   setBusy(button,true,'משבץ…');
   try{
