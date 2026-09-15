@@ -95,13 +95,13 @@ test('0.36 shift editor makes existing class assignment and replacement behavior
   assert.match(index,/אם עובד\/ת כבר משובץ\/ת בכיתה אחרת/);
 });
 
-test('0.36 hf12 cache chain delivers matching, UI and v026 button changes', () => {
+test('0.36 hf13 cache chain delivers mobile coverage fix plus existing matching/UI changes', () => {
   const index=read('index.html');
   const entry=read('patch-v025.js');
   assert.match(index,/app\.js\?v=0360hf12/);
-  assert.match(index,/patch-v025\.js\?v=0360hf12/);
+  assert.match(index,/patch-v025\.js\?v=0360hf13/);
   assert.match(entry,/patch-v026\.js\?v=0321hf12/);
-  assert.match(entry,/patch-v0342\.js\?v=0360hf12/);
+  assert.match(entry,/patch-v0342\.js\?v=0360hf13/);
 });
 
 
@@ -126,4 +126,13 @@ test('0.36 coverage card and modal always stretch to usable width', () => {
   assert.match(patch,/\.daily-coverage-option\{width:100%!important/);
   assert.match(patch,/grid-template-areas:"decision decision"/);
   assert.match(patch,/grid-template-areas:"decision" "main" "source" "reasons" "cautions" "action"/);
+});
+
+
+test('0.36 mobile coverage keeps decision area and full-width content', () => {
+  const patch=read('patch-v0342.js');
+  assert.match(patch,/grid-template-areas:"decision" "main" "source" "reasons" "cautions" "action"!important/);
+  assert.match(patch,/\.daily-option-main\{grid-area:main!important;display:grid!important;grid-template-columns:minmax\(0,1fr\) 72px!important/);
+  assert.match(patch,/\.daily-option-badges>span\{[^}]*white-space:nowrap!important/);
+  assert.match(patch,/\.daily-cover-action\{grid-area:action!important;width:100%!important/);
 });

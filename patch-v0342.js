@@ -1070,10 +1070,16 @@
       #dailySuggestionsDialog .modal-card{padding-inline:12px!important}
       .daily-coverage-summary{grid-template-columns:1fr!important;gap:10px!important;padding:12px!important}
       .daily-coverage-status{min-width:0!important;text-align:right!important}
-      .daily-coverage-option{grid-template-columns:1fr!important;grid-template-areas:"main" "source" "reasons" "cautions" "action"!important;padding:12px!important}
-      .daily-cover-action{width:100%!important;min-width:0!important;max-width:none!important;min-height:44px!important}
-      .daily-option-main{gap:8px!important}
-      .daily-score-badge{min-width:68px!important}
+      .daily-coverage-option{width:100%!important;max-width:100%!important;min-width:0!important;grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"decision" "main" "source" "reasons" "cautions" "action"!important;padding:12px!important;gap:9px!important;overflow:hidden!important;box-sizing:border-box!important}
+      .daily-option-decision{grid-area:decision!important;width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box!important}
+      .daily-cover-action{grid-area:action!important;width:100%!important;min-width:0!important;max-width:none!important;min-height:46px!important;box-sizing:border-box!important}
+      .daily-option-main{grid-area:main!important;display:grid!important;grid-template-columns:minmax(0,1fr) 72px!important;align-items:start!important;gap:8px!important;min-width:0!important;width:100%!important;max-width:100%!important}
+      .daily-option-identity{width:100%!important;max-width:100%!important;min-width:0!important}
+      .daily-option-identity h3,.daily-option-identity p{max-width:100%!important;word-break:normal!important;overflow-wrap:normal!important;white-space:normal!important}
+      .daily-option-identity p bdi{white-space:nowrap!important}
+      .daily-option-badges{display:flex!important;flex-wrap:wrap!important;width:100%!important;max-width:100%!important;min-width:0!important;gap:5px!important}
+      .daily-option-badges>span{display:inline-flex!important;width:auto!important;max-width:100%!important;min-width:0!important;white-space:nowrap!important;word-break:normal!important;overflow-wrap:normal!important}
+      .daily-score-badge{width:72px!important;min-width:72px!important;max-width:72px!important;box-sizing:border-box!important;justify-self:end!important}
       .daily-rejected-worker{grid-template-columns:1fr!important}
       .daily-matching-rejected>summary{align-items:flex-start!important}
       .daily-rejected-toggle{white-space:normal!important}
