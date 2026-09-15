@@ -85,18 +85,45 @@ test('0.36 shift editor makes existing class assignment and replacement behavior
   const index=read('index.html');
   assert.match(app,/function shiftCurrentAssignments/);
   assert.match(app,/משובץ\/ת כרגע/);
-  assert.match(app,/בחירה תעביר את השיבוץ/);
-  assert.match(app,/לא ניתן לבחור כל עוד קיים שיבוץ חופף/);
-  assert.match(v026,/בחירת עובד\/ת אחר\/ת/);
-  assert.match(v026,/אין שינוי עד לחיצה על “שמירת השיבוץ”/);
+  assert.match(app,/מה יקרה בשמירה\?/);
+  assert.match(app,/לא ייווצר שיבוץ כפול/);
+  assert.match(app,/משובץ\/ת כרגע — זה השיבוץ שיועבר/);
+  assert.match(app,/כבר משובץ\/ת בטווח הזה — לא ניתן ליצור שיבוץ כפול/);
+  assert.match(v026,/פתיחת רשימת עובדים/);
+  assert.match(v026,/רק פותח את רשימת המועמדים/);
+  assert.match(v026,/לא מוחלף\/ת עד לחיצה על “שמירת השיבוץ”/);
   assert.match(index,/אם עובד\/ת כבר משובץ\/ת בכיתה אחרת/);
 });
 
-test('0.36 hf10 cache chain delivers matching, UI and v026 button changes', () => {
+test('0.36 hf11 cache chain delivers matching, UI and v026 button changes', () => {
   const index=read('index.html');
   const entry=read('patch-v025.js');
-  assert.match(index,/app\.js\?v=0360hf10/);
-  assert.match(index,/patch-v025\.js\?v=0360hf10/);
-  assert.match(entry,/patch-v026\.js\?v=0321hf10/);
-  assert.match(entry,/patch-v0342\.js\?v=0360hf10/);
+  assert.match(index,/app\.js\?v=0360hf11/);
+  assert.match(index,/patch-v025\.js\?v=0360hf11/);
+  assert.match(entry,/patch-v026\.js\?v=0321hf11/);
+  assert.match(entry,/patch-v0342\.js\?v=0360hf11/);
+});
+
+
+test('0.36 low-score coverage is explicitly backup-only and requires confirmation', () => {
+  const app=read('app.js');
+  const patch=read('patch-v0342.js');
+  assert.match(app,/return 'גיבוי בלבד'/);
+  assert.match(app,/אין התאמה מומלצת/);
+  assert.match(app,/לא מומלץ אוטומטית/);
+  assert.match(app,/data-recommended=/);
+  assert.match(app,/בחירה כגיבוי/);
+  assert.match(app,/אינה אפשרות מומלצת \(ציון/);
+  assert.doesNotMatch(app,/אפשרויות בטוחות/);
+  assert.match(patch,/\.daily-coverage-option\.is-backup/);
+  assert.match(patch,/\.daily-option-decision\.warn/);
+  assert.match(patch,/\.daily-cover-action\.is-backup-action/);
+});
+
+test('0.36 coverage card and modal always stretch to usable width', () => {
+  const patch=read('patch-v0342.js');
+  assert.match(patch,/#dailySuggestionsDialog\{width:min\(1180px/);
+  assert.match(patch,/\.daily-coverage-option\{width:100%!important/);
+  assert.match(patch,/grid-template-areas:"decision decision"/);
+  assert.match(patch,/grid-template-areas:"decision" "main" "source" "reasons" "cautions" "action"/);
 });
