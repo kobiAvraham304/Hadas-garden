@@ -98,10 +98,10 @@ test('0.36 shift editor makes existing class assignment and replacement behavior
 test('0.36 hf11 cache chain delivers matching, UI and v026 button changes', () => {
   const index=read('index.html');
   const entry=read('patch-v025.js');
-  assert.match(index,/app\.js\?v=0360hf11/);
-  assert.match(index,/patch-v025\.js\?v=0360hf11/);
-  assert.match(entry,/patch-v026\.js\?v=0321hf11/);
-  assert.match(entry,/patch-v0342\.js\?v=0360hf11/);
+  assert.match(index,/app\.js\?v=0360hf12/);
+  assert.match(index,/patch-v025\.js\?v=0360hf12/);
+  assert.match(entry,/patch-v026\.js\?v=0321hf12/);
+  assert.match(entry,/patch-v0342\.js\?v=0360hf12/);
 });
 
 
