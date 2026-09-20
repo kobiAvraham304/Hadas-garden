@@ -23,9 +23,9 @@ test('API creates early finish request with no existing shifts',async()=>{
  const {res,inserted}=await create({request_type:'early_finish',request_date:'2026-09-27',requested_end:'12:00'});
  assert.equal(res.statusCode,201,JSON.stringify(res.body));assert.equal(inserted[0].shift_id,null);assert.equal(inserted[0].status,'pending');assert.equal(res.body.request.requested_end,'12:00');
 });
-test('API retains shift requirement for late start requests',async()=>{
+test('API creates late start request with no existing shifts',async()=>{
  const {res,inserted}=await create({request_type:'late_start',request_date:'2026-09-27',requested_start:'09:00'});
- assert.equal(res.statusCode,409);assert.equal(inserted.length,0);
+ assert.equal(res.statusCode,201,JSON.stringify(res.body));assert.equal(inserted[0].shift_id,null);assert.equal(inserted[0].requested_start,'09:00');
 });
 test('API stores multiple day-off choices with the selected preference',async()=>{
  const {res,inserted}=await create({request_type:'leave',request_date:'2026-09-27',allow_schedule_on_day_off:true,available_fixed_day_weekdays:[1,3],preferred_fixed_day_weekday:3});
@@ -37,5 +37,10 @@ test('API rejects preference outside the selected days',async()=>{
 });
 test('API rejects invalid early finish times before persisting',async()=>{
  const {res,inserted}=await create({request_type:'early_finish',request_date:'2026-09-27',requested_end:'27:10'});
+ assert.equal(res.statusCode,400);assert.equal(inserted.length,0);
+});
+
+test('API rejects invalid late start time without a shift',async()=>{
+ const {res,inserted}=await create({request_type:'late_start',request_date:'2026-09-27',requested_start:'27:10'});
  assert.equal(res.statusCode,400);assert.equal(inserted.length,0);
 });

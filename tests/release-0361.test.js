@@ -36,3 +36,13 @@ test('foreground navigation sharing a prefetch still applies the returned week',
  assert.equal(c.requests.length,1);c.requests[0]({shifts:[{id:'shared'}]});await Promise.all([a,b]);
  assert.equal(c.state.shifts?.[0]?.id,'shared');
 });
+
+test('approved late start bounds automatic shifts before any shift exists',()=>{
+ assert.equal(employeeAvailability({...input,requests:[{requester_id:'e',request_type:'late_start',request_date:input.date,requested_start:'10:00',status:'approved'}]}).start,'10:00');
+});
+test('pending late start does not change scheduling',()=>{
+ assert.equal(employeeAvailability({...input,requests:[{requester_id:'e',request_type:'late_start',request_date:input.date,requested_start:'10:00',status:'pending'}]}).start,'07:30');
+});
+test('conflicting approved start and end constraints exclude automatic shift',()=>{
+ assert.equal(employeeAvailability({...input,requests:[{requester_id:'e',request_type:'late_start',request_date:input.date,requested_start:'13:00',status:'applied'},{requester_id:'e',request_type:'early_finish',request_date:input.date,requested_end:'12:00',status:'approved'}]}),null);
+});

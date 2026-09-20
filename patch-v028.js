@@ -214,7 +214,7 @@
     if (window.__v028RequestFixesInstalled) return;
     window.__v028RequestFixesInstalled = true;
     try {
-      REQUEST_HELP.late_start = 'התחלה מאוחרת — בוחרים תאריך ושעת הגעה. המערכת מאתרת לבד את השיבוץ של העובד.';
+      REQUEST_HELP.late_start = 'התחלה מאוחרת — אפשר לבקש גם לפני שיש שיבוץ. לאחר אישור, שעת ההגעה תשמש בשיבוץ אוטומטי ותוצג כהערה בשיבוץ ידני.';
       REQUEST_HELP.early_finish = 'סיום מוקדם — בוחרים תאריך ושעת יציאה, גם כשעדיין אין שיבוץ. לאחר אישור, השעה תיכלל בשיבוץ האוטומטי ותוצג כהערה בשיבוץ ידני.';
     } catch {}
 

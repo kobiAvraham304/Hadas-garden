@@ -1,6 +1,6 @@
 /* Hadas Garden — forward-compatible bridge for clients still entering through v0.29 */
 (() => {
-  const LEGACY = '/patch-v029-legacy.js?v=0361';
+  const LEGACY = '/patch-v029-legacy.js?v=0362';
   const CURRENT = '/patch-v030.js?v=0301';
 
   function load(src, marker) {

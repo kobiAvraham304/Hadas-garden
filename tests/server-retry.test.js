@@ -57,3 +57,16 @@ test('server never retries Supabase writes automatically', async () => {
     global.fetch = originalFetch;
   }
 });
+
+test('server stops retrying after a read timeout instead of exceeding function duration', async () => {
+  setupEnv();
+  delete require.cache[require.resolve('../lib/server')];
+  const originalFetch = global.fetch;
+  let calls = 0;
+  global.fetch = async () => { calls++; throw new DOMException('Timed out', 'TimeoutError'); };
+  try {
+    const result = await require('../lib/server').db().from('hadas_test').select('*');
+    assert.equal(calls, 1);
+    assert.match(result.error.message, /לא הגיב בזמן/);
+  } finally { global.fetch = originalFetch; }
+});

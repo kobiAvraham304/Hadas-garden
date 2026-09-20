@@ -14,7 +14,7 @@ test('0.26 upgraded request and suggestion layers remain available under current
   const pkg = JSON.parse(read('package.json'));
   const api = read('api/index.js');
   const version = read('VERSION.md');
-  assert.equal(pkg.version, '0.36.1');
+  assert.equal(pkg.version, '0.36.2');
   assert.match(version, /גרסה 0.35.0/);
   assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
   assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);

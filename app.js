@@ -160,10 +160,10 @@ function canCreateContent() {
 function employeeById(id) { return state.employees.find((item) => item.id === id); }
 function classById(id) { return state.classes.find((item) => item.id === id); }
 function earlyFinishNote(shift) {
-  const requests = state.requests.filter(r => r.requester_id === shift.employee_id && r.request_date === shift.shift_date && r.request_type === 'early_finish' && ['approved','applied'].includes(r.status));
-  if (!requests.length) return '';
-  const end = requests.map(r => trimTime(r.requested_end)).filter(Boolean).sort()[0];
-  return end ? `<span class="early-finish-note">יציאה מוקדמת מאושרת: ${escapeHtml(end)}</span>` : '';
+  const requests = state.requests.filter(r => r.requester_id === shift.employee_id && r.request_date === shift.shift_date && ['early_finish','late_start'].includes(r.request_type) && ['approved','applied'].includes(r.status));
+  const end = requests.filter(r => r.request_type === 'early_finish').map(r => trimTime(r.requested_end)).filter(Boolean).sort()[0];
+  const start = requests.filter(r => r.request_type === 'late_start').map(r => trimTime(r.requested_start)).filter(Boolean).sort().pop();
+  return [start ? `התחלה מאוחרת מאושרת: ${start}` : '', end ? `יציאה מוקדמת מאושרת: ${end}` : ''].filter(Boolean).map(note => `<span class="early-finish-note">${escapeHtml(note)}</span>`).join('');
 }
 function shiftRoleRank(role) { return ({ teacher:0, lead:1, staff:2, replacement:3 })[role] ?? 9; }
 function sortScheduleRows(rows=[]) { return [...rows].sort((a,b)=>shiftRoleRank(a.shift_role)-shiftRoleRank(b.shift_role)||timeToMinutes(a.start_time)-timeToMinutes(b.start_time)||String(employeeById(a.employee_id)?.full_name||'').localeCompare(String(employeeById(b.employee_id)?.full_name||''),'he')); }

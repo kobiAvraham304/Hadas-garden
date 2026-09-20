@@ -137,14 +137,13 @@ module.exports = async function handler(req,res) {
       payload.available_fixed_day_weekday = payload.available_fixed_day_weekdays[0] ?? null;
       let own = null;
       if (['late_start','early_finish'].includes(type)) {
-        if (!payload.shift_id && type !== 'early_finish') throw httpError(400,'יש לבחור את השיבוץ הרלוונטי');
         if (payload.shift_id) {
         own = assertDb(await db().from('hadas_shifts').select('*').eq('id',payload.shift_id).maybeSingle(),'השיבוץ שלך לא נמצא');
         if (!own || own.employee_id !== requesterId) throw httpError(409,'השיבוץ שנבחר אינו שייך לך');
         payload.request_date = own.shift_date;
         }
       }
-      if (type === 'late_start' && (!payload.requested_start || timeToMinutes(payload.requested_start) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_start) >= timeToMinutes(own.end_time))) throw httpError(400,'שעת ההתחלה המבוקשת חייבת להיות בתוך שעות השיבוץ');
+      if (type === 'late_start' && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(payload.requested_start || '') || (own && (timeToMinutes(payload.requested_start) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_start) >= timeToMinutes(own.end_time))))) throw httpError(400,'שעת ההתחלה המבוקשת חייבת להיות בתוך שעות השיבוץ');
       if (type === 'early_finish' && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(payload.requested_end || '') || (own && (timeToMinutes(payload.requested_end) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_end) >= timeToMinutes(own.end_time))))) throw httpError(400,'שעת הסיום המבוקשת חייבת להיות בתוך שעות השיבוץ');
       if (type === 'swap') {
         if (!payload.target_employee_id) throw httpError(400,'יש לבחור עובד שנמצא ביום חופשי');
@@ -238,7 +237,7 @@ module.exports = async function handler(req,res) {
         await emitEvent('shifts');
         await notifyEmployees([request.requester_id],{
           type:'request',title:'הבקשה שלך אושרה',
-          message:managerNote || (request.request_type==='early_finish'&&!request.shift_id ? `בקשתך לתאריך ${requestRangeLabel(request)} אושרה. שעת היציאה תיכלל בשיבוץ האוטומטי ותוצג כהערה בשיבוץ ידני.` : `בקשתך לתאריך ${requestRangeLabel(request)} אושרה ועודכנה בטיוטת השיבוץ.`),
+          message:managerNote || (['early_finish','late_start'].includes(request.request_type)&&!request.shift_id ? `בקשתך לתאריך ${requestRangeLabel(request)} אושרה. השעה המבוקשת תיכלל בשיבוץ האוטומטי ותוצג כהערה בשיבוץ ידני.` : `בקשתך לתאריך ${requestRangeLabel(request)} אושרה ועודכנה בטיוטת השיבוץ.`),
           entityType:'request',entityId:request.id,actionRequired:false,
         });
         if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{
