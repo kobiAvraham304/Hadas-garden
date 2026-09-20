@@ -1,7 +1,7 @@
 /* מערכת ניהול שיבוצים מעון הדס — הרשאות וחוויית משתמש 0.33.1 */
 (() => {
   const VERSION = '0.33.1';
-  const PREVIOUS = '/patch-v032.js?v=0321hf8';
+  const PREVIOUS = '/patch-v032.js?v=0321hf9';
 
   function pinVersion() {
     window.__HADAS_RELEASE_VERSION = VERSION;
@@ -166,7 +166,7 @@
     if (tools) {
       const visible = kind !== 'regular';
       tools.classList.toggle('hidden', !visible);
-      if (visible) tools.open = true;
+      if (visible) tools.open = !matchMedia('(max-width:760px)').matches;
     }
     if (kind === 'regular') {
       state.scheduleMode = 'mine';
