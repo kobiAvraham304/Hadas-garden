@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.32.1 layers remain available under the 0.34 release bootstrap', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.36.5');
+  assert.equal(JSON.parse(read('package.json')).version, '0.36.6');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('handlers/health.js'), /databaseVersion:'0.35.0'/);
@@ -14,8 +14,8 @@ test('0.32.1 layers remain available under the 0.34 release bootstrap', () => {
   assert.match(api, /calendar-v032/);
   assert.match(api, /shifts-v032/);
   const entry = read('patch-v025.js');
-  assert.match(entry, /const VERSION = '0\.36\.5'/);
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf11'/);
+  assert.match(entry, /const VERSION = '0\.36\.6'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf12'/);
   assert.match(entry, /await loadScript\(V033, 'v033'\)/);
   assert.match(entry, /await window\.__hadasV033BootstrapPromise/);
   assert.match(entry, /hadas:bootstrap-ready/);

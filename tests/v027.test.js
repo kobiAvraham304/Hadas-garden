@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.27 release layers remain wired under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.36.5');
+  assert.equal(JSON.parse(read('package.json')).version, '0.36.6');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   const api = read('api/index.js');
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);

@@ -53,7 +53,7 @@ test('0.36 hf11 cache chain exposes the daily coverage update', () => {
   const index = read('index.html');
   const entry = read('patch-v025.js');
   assert.match(index, /app\.js\?v=0362/);
-  assert.match(index, /patch-v025\.js\?v=0365/);
+  assert.match(index, /patch-v025\.js\?v=0366/);
   assert.match(entry, /patch-v0342\.js\?v=0362/);
 });
 
@@ -70,7 +70,7 @@ test('0.36.3 validation offers safe proposed fixes and keeps explicit approval s
   assert.match(core, /remainingCoverageIssue/);
 });
 
-test('0.36.5 mobile schedule controls remain user-controlled and focus uses visible targets', () => {
+test('0.36.6 mobile schedule controls remain user-controlled and focus uses visible targets', () => {
   const v033 = read('patch-v033.js');
   const v032 = read('patch-v032.js');
   const core = read('patch-v032-core.js');
@@ -82,18 +82,18 @@ test('0.36.5 mobile schedule controls remain user-controlled and focus uses visi
   assert.match(core, /scrollIntoView\(\{behavior:'smooth',block:'center',inline:'nearest'\}\)/);
   assert.match(v032, /patch-v032-core\.js\?v=0321hf10/);
   assert.match(v033, /patch-v032\.js\?v=0321hf10/);
-  assert.match(entry, /patch-v033\.js\?v=0333hf11/);
+  assert.match(entry, /patch-v033\.js\?v=0333hf12/);
 });
 
 
-test('0.36.5 validation toggle exposes a rotating open-state chevron', () => {
+test('0.36.6 validation toggle exposes a rotating open-state chevron', () => {
   const core = read('patch-v032-core.js');
   assert.match(core, /v0364-issues-chevron/);
   assert.match(core, /#scheduleIssuesToggle\[aria-expanded="true"\]/);
   assert.match(core, /insertAdjacentHTML\('beforeend','<i class="v0364-issues-chevron"/);
 });
 
-test('0.36.5 mobile compact week can open the existing full horizontal schedule and return', () => {
+test('0.36.6 mobile compact week can open the existing full horizontal schedule and return', () => {
   const v033 = read('patch-v033.js');
   assert.match(v033, /installV0364MobileWeekInteraction/);
   assert.match(v033, /mobile-week-intro/);
@@ -105,10 +105,32 @@ test('0.36.5 mobile compact week can open the existing full horizontal schedule 
 });
 
 
-test('0.36.5 full horizontal mobile week overrides the legacy hidden-table rule', () => {
+test('0.36.6 full horizontal mobile week overrides the legacy hidden-table rule', () => {
   const v033 = read('patch-v033.js');
   assert.match(v033, /#scheduleExport \.schedule-table\{display:table!important/);
   assert.match(v033, /\.schedule-table-scroll\{display:block!important;overflow:visible!important/);
   assert.match(v033, /-webkit-tap-highlight-color:transparent/);
   assert.doesNotMatch(v033, /mobile-week-intro\[role="button"\]:active\{transform:scale/);
+});
+
+
+test('0.36.6 primes the wide mobile week before swapping views to avoid Safari blank paint', () => {
+  const v033 = read('patch-v033.js');
+  assert.match(v033, /data-hadas-mobile-wide-week="preparing"/);
+  assert.match(v033, /settleV0366WideWeek/);
+  assert.match(v033, /void table\.offsetWidth/);
+  assert.match(v033, /void table\.offsetHeight/);
+  assert.match(v033, /-webkit-overflow-scrolling:auto!important/);
+  assert.match(v033, /root\.scrollLeft=0/);
+  assert.match(v033, /state\.v0366WideSettled=true/);
+});
+
+test('0.36.6 adds lightweight motion and respects reduced-motion preferences', () => {
+  const v033 = read('patch-v033.js');
+  assert.match(v033, /v0366-motion-style/);
+  assert.match(v033, /@keyframes v0366PanelIn/);
+  assert.match(v033, /@keyframes v0366Reveal/);
+  assert.match(v033, /dialog\[open\] \.modal-card/);
+  assert.match(v033, /@media\(prefers-reduced-motion:reduce\)/);
+  assert.doesNotMatch(v033, /animation:v0366PanelIn [1-9][0-9]*s/);
 });
