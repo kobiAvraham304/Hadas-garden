@@ -125,5 +125,5 @@ test('0.36 release bootstrap owns the final version guard after legacy layers', 
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0363/);
+  assert.match(index, /patch-v025\.js\?v=0364/);
 });

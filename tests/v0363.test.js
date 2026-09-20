@@ -53,7 +53,7 @@ test('0.36 hf11 cache chain exposes the daily coverage update', () => {
   const index = read('index.html');
   const entry = read('patch-v025.js');
   assert.match(index, /app\.js\?v=0362/);
-  assert.match(index, /patch-v025\.js\?v=0363/);
+  assert.match(index, /patch-v025\.js\?v=0364/);
   assert.match(entry, /patch-v0342\.js\?v=0362/);
 });
 
@@ -70,16 +70,36 @@ test('0.36.3 validation offers safe proposed fixes and keeps explicit approval s
   assert.match(core, /remainingCoverageIssue/);
 });
 
-test('0.36.3 mobile schedule tools close normally and focus uses visible mobile targets', () => {
+test('0.36.4 mobile schedule controls remain user-controlled and focus uses visible targets', () => {
   const v033 = read('patch-v033.js');
   const v032 = read('patch-v032.js');
   const core = read('patch-v032-core.js');
   const entry = read('patch-v025.js');
-  assert.match(v033, /tools\.open = !matchMedia\('\(max-width:760px\)'\)\.matches/);
+  assert.match(v033, /v0364OpenInitialized/);
+  assert.match(v033, /tools\.dataset\.v0364OpenInitialized = 'true'/);
   assert.match(core, /visibleFocusNode/);
   assert.match(core, /mobile-week-day\[data-day-index=/);
   assert.match(core, /scrollIntoView\(\{behavior:'smooth',block:'center',inline:'nearest'\}\)/);
-  assert.match(v032, /patch-v032-core\.js\?v=0321hf9/);
-  assert.match(v033, /patch-v032\.js\?v=0321hf9/);
-  assert.match(entry, /patch-v033\.js\?v=0333hf9/);
+  assert.match(v032, /patch-v032-core\.js\?v=0321hf10/);
+  assert.match(v033, /patch-v032\.js\?v=0321hf10/);
+  assert.match(entry, /patch-v033\.js\?v=0333hf10/);
+});
+
+
+test('0.36.4 validation toggle exposes a rotating open-state chevron', () => {
+  const core = read('patch-v032-core.js');
+  assert.match(core, /v0364-issues-chevron/);
+  assert.match(core, /#scheduleIssuesToggle\[aria-expanded="true"\]/);
+  assert.match(core, /insertAdjacentHTML\('beforeend','<i class="v0364-issues-chevron"/);
+});
+
+test('0.36.4 mobile compact week can open the existing full horizontal schedule and return', () => {
+  const v033 = read('patch-v033.js');
+  assert.match(v033, /installV0364MobileWeekInteraction/);
+  assert.match(v033, /mobile-week-intro/);
+  assert.match(v033, /data-hadas-mobile-wide-week/);
+  assert.match(v033, /schedule-desktop-week/);
+  assert.match(v033, /overflow-x:auto!important/);
+  assert.match(v033, /data-v0364-compact-week/);
+  assert.match(v033, /state\.v0364MobileWideWeek = false/);
 });
