@@ -107,7 +107,7 @@ test('0.36.5 mobile compact week can open the existing full horizontal schedule 
 
 test('0.36.5 full horizontal mobile week overrides the legacy hidden-table rule', () => {
   const v033 = read('patch-v033.js');
-  assert.match(v033, /#scheduleExport\.mode-week \.schedule-table\{display:table!important/);
+  assert.match(v033, /#scheduleExport \.schedule-table\{display:table!important/);
   assert.match(v033, /\.schedule-table-scroll\{display:block!important;overflow:visible!important/);
   assert.match(v033, /-webkit-tap-highlight-color:transparent/);
   assert.doesNotMatch(v033, /mobile-week-intro\[role="button"\]:active\{transform:scale/);
