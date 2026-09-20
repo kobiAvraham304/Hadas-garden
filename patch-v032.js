@@ -3,7 +3,7 @@
   const VERSION = '0.32.1';
   const PREVIOUS = '/patch-v031.js?v=0321hf8';
   const CURRENT_FILES = [
-    '/patch-v032-core.js?v=0321hf7',
+    '/patch-v032-core.js?v=0321hf9',
     '/patch-v032-exports.js?v=0321',
     '/patch-v032-ux.js?v=0321',
     '/patch-v032-stability.js?v=0362',

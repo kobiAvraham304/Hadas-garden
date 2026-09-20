@@ -53,6 +53,33 @@ test('0.36 hf11 cache chain exposes the daily coverage update', () => {
   const index = read('index.html');
   const entry = read('patch-v025.js');
   assert.match(index, /app\.js\?v=0362/);
-  assert.match(index, /patch-v025\.js\?v=0362/);
+  assert.match(index, /patch-v025\.js\?v=0363/);
   assert.match(entry, /patch-v0342\.js\?v=0362/);
+});
+
+
+test('0.36.3 validation offers safe proposed fixes and keeps explicit approval separate', () => {
+  const core = read('patch-v032-core.js');
+  assert.match(core, /הצעת פתרון/);
+  assert.match(core, /אישור ותיקון/);
+  assert.match(core, /לא נמצא כרגע עובד מומלץ/);
+  assert.match(core, /bestRecommended/);
+  assert.match(core, /apply_suggestion/);
+  assert.match(core, /אישור למרות החריגה/);
+  assert.match(core, /data-v032-focus/);
+  assert.match(core, /remainingCoverageIssue/);
+});
+
+test('0.36.3 mobile schedule tools close normally and focus uses visible mobile targets', () => {
+  const v033 = read('patch-v033.js');
+  const v032 = read('patch-v032.js');
+  const core = read('patch-v032-core.js');
+  const entry = read('patch-v025.js');
+  assert.match(v033, /tools\.open = !matchMedia\('\(max-width:760px\)'\)\.matches/);
+  assert.match(core, /visibleFocusNode/);
+  assert.match(core, /mobile-week-day\[data-day-index=/);
+  assert.match(core, /scrollIntoView\(\{behavior:'smooth',block:'center',inline:'nearest'\}\)/);
+  assert.match(v032, /patch-v032-core\.js\?v=0321hf9/);
+  assert.match(v033, /patch-v032\.js\?v=0321hf9/);
+  assert.match(entry, /patch-v033\.js\?v=0333hf9/);
 });
