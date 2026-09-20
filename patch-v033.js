@@ -136,6 +136,107 @@
     panel.append(section);
   }
 
+  function installV0364MobileWeekStyles() {
+    if (document.querySelector('#v0364-mobile-week-style')) return;
+    const style = document.createElement('style');
+    style.id = 'v0364-mobile-week-style';
+    style.textContent = `
+      @media(max-width:760px){
+        #scheduleExport .mobile-week-intro[role="button"]{position:relative;cursor:pointer;padding-inline-end:48px;transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease}
+        #scheduleExport .mobile-week-intro[role="button"]::after{content:"↔";position:absolute;inset-inline-end:14px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:28px;height:28px;border-radius:10px;background:#fff;color:var(--primary-dark);font-size:16px;font-weight:950;box-shadow:0 3px 10px rgba(64,70,120,.08)}
+        #scheduleExport .mobile-week-intro[role="button"]:active{transform:scale(.99)}
+        #scheduleExport .mobile-week-intro[role="button"]:focus-visible{outline:3px solid rgba(111,114,217,.35);outline-offset:2px}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport.mode-week{overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-inline:contain;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important;box-shadow:var(--shadow-small)!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-mobile-week{display:none!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-desktop-week{display:block!important;min-width:1060px!important;width:max-content}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table-scroll{overflow:visible!important;min-width:1060px}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table{min-width:1060px!important;width:1060px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table thead th{min-width:145px!important;padding:7px 6px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table .class-name{min-width:105px!important;width:105px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table td{padding:7px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-item{padding:8px!important;margin-bottom:6px!important;border-radius:11px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-main strong{font-size:.76rem!important;line-height:1.22}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-main small,html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-time{font-size:.67rem!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-actions{gap:4px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-actions button{min-height:32px!important;padding:4px 5px!important;font-size:.61rem!important}
+        .v0364-wide-week-toolbar{position:sticky;right:8px;z-index:12;width:calc(100vw - 36px);max-width:520px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px;padding:8px 10px;border:1px solid #e2e3ee;border-radius:13px;background:rgba(255,255,255,.96);box-shadow:0 5px 16px rgba(62,65,110,.09);backdrop-filter:blur(8px)}
+        .v0364-wide-week-toolbar span{display:grid;gap:1px;min-width:0}.v0364-wide-week-toolbar strong{font-size:.75rem}.v0364-wide-week-toolbar small{font-size:.63rem;color:var(--muted)}
+        .v0364-wide-week-toolbar button{flex:0 0 auto;min-height:34px;padding:5px 8px;font-size:.65rem}
+      }
+    `;
+    document.head.append(style);
+  }
+
+  function syncV0364MobileWeekView() {
+    const mobile = matchMedia('(max-width:760px)').matches;
+    const wide = Boolean(mobile && state?.scheduleMode === 'week' && state?.v0364MobileWideWeek);
+    document.documentElement.dataset.hadasMobileWideWeek = wide ? 'true' : 'false';
+
+    const intro = document.querySelector('#scheduleExport .mobile-week-intro');
+    if (intro) {
+      intro.setAttribute('role', 'button');
+      intro.setAttribute('tabindex', '0');
+      intro.setAttribute('aria-label', 'פתיחת השבוע המלא בפריסה לרוחב עם גלילה לצדדים');
+      intro.setAttribute('title', 'לחץ להצגת טבלת השבוע המלאה לרוחב');
+    }
+
+    const desktop = document.querySelector('#scheduleExport .schedule-desktop-week');
+    if (wide && desktop && !desktop.querySelector('.v0364-wide-week-toolbar')) {
+      desktop.insertAdjacentHTML('afterbegin', '<div class="v0364-wide-week-toolbar"><span><strong>שבוע מלא לרוחב</strong><small>החליקו ימינה ושמאלה לצפייה בכל הימים.</small></span><button type="button" class="ghost-btn" data-v0364-compact-week>חזרה לתצוגה הרגילה</button></div>');
+    }
+  }
+
+  function installV0364MobileWeekInteraction() {
+    if (window.__hadasV0364MobileWeekInstalled) return;
+    window.__hadasV0364MobileWeekInstalled = true;
+    state.v0364MobileWideWeek = false;
+    installV0364MobileWeekStyles();
+
+    const panel = document.querySelector('#schedulePanel');
+    if (!panel) return;
+
+    const openWideWeek = () => {
+      if (!matchMedia('(max-width:760px)').matches || state.scheduleMode !== 'week') return;
+      state.v0364MobileWideWeek = true;
+      renderSchedule();
+    };
+    const closeWideWeek = () => {
+      state.v0364MobileWideWeek = false;
+      renderSchedule();
+    };
+
+    panel.addEventListener('click', (event) => {
+      const compact = event.target.closest('[data-v0364-compact-week]');
+      if (compact) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        closeWideWeek();
+        return;
+      }
+      const intro = event.target.closest('#scheduleExport .mobile-week-intro');
+      if (intro) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openWideWeek();
+        return;
+      }
+      const mode = event.target.closest('#scheduleMode [data-mode]');
+      if (mode) state.v0364MobileWideWeek = false;
+    }, true);
+
+    panel.addEventListener('keydown', (event) => {
+      const intro = event.target.closest?.('#scheduleExport .mobile-week-intro');
+      if (!intro || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault();
+      openWideWeek();
+    }, true);
+
+    matchMedia('(max-width:760px)').addEventListener?.('change', () => {
+      if (!matchMedia('(max-width:760px)').matches) state.v0364MobileWideWeek = false;
+      syncV0364MobileWeekView();
+    });
+  }
+
   function applyRoleUi() {
     if (!state?.profile) return;
     const kind = roleKind();
@@ -166,7 +267,12 @@
     if (tools) {
       const visible = kind !== 'regular';
       tools.classList.toggle('hidden', !visible);
-      if (visible) tools.open = !matchMedia('(max-width:760px)').matches;
+      // Initialize once only. Re-applying role UI must not overwrite the user's
+      // native <details> open/closed choice on mobile.
+      if (visible && !tools.dataset.v0364OpenInitialized) {
+        tools.open = !matchMedia('(max-width:760px)').matches;
+        tools.dataset.v0364OpenInitialized = 'true';
+      }
     }
     if (kind === 'regular') {
       state.scheduleMode = 'mine';
@@ -965,6 +1071,7 @@
     renderSchedule = function v033RenderSchedule() {
       const result = baseRenderSchedule.apply(this, arguments);
       if (roleKind() === 'regular') renderRegularHorizontalSchedule();
+      syncV0364MobileWeekView();
       requestAnimationFrame(applyRoleUi);
       return result;
     };
@@ -1015,6 +1122,8 @@
     installRoleGuard();
     installPasswordReveal();
     installVersionGuard();
+    installV0364MobileWeekInteraction();
+    syncV0364MobileWeekView();
     document.addEventListener('click', handleV033UtilityClick);
     window.addEventListener('resize', debounce(refreshTourSpotlight, 80), { passive:true });
     window.addEventListener('scroll', debounce(refreshTourSpotlight, 40), { passive:true, capture:true });

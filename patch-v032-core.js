@@ -231,7 +231,9 @@
       .v0363-solution-box.is-unavailable{border-color:#e2e4eb;background:#fafafa}.v0363-solution-copy{min-width:0}.v0363-solution-copy>span{display:block;color:#6764c7;font-size:10px;font-weight:950;margin-bottom:2px}
       .v0363-solution-copy strong,.v0363-solution-box>div>strong{display:block;font-size:14px}.v0363-solution-copy small,.v0363-solution-box>div>small{display:block;margin-top:3px;color:#6f7487;line-height:1.45}
       .v0363-solution-actions{display:flex;gap:6px;align-items:center}.v0363-solution-actions button,.v0363-solution-box>button{min-height:36px;padding:6px 10px}
-      @media(max-width:760px){.v0363-solution-box{grid-template-columns:1fr;padding:9px}.v0363-solution-actions{display:grid;grid-template-columns:1fr 1fr}.v0363-solution-actions button,.v0363-solution-box>button{width:100%}}
+      #scheduleIssuesToggle .v0364-issues-chevron{flex:0 0 auto;display:inline-grid;place-items:center;width:22px;height:22px;margin-inline-start:3px;border-radius:8px;color:currentColor;font-style:normal;font-size:14px;transition:transform .18s ease,background .18s ease}
+      #scheduleIssuesToggle[aria-expanded="true"] .v0364-issues-chevron{transform:rotate(180deg);background:rgba(111,114,217,.08)}
+      @media(max-width:760px){.v0363-solution-box{grid-template-columns:1fr;padding:9px}.v0363-solution-actions{display:grid;grid-template-columns:1fr 1fr}.v0363-solution-actions button,.v0363-solution-box>button{width:100%}#scheduleIssuesToggle .v0364-issues-chevron{width:20px;height:20px;font-size:13px}}
     `;document.head.append(style);
   }
   function card(g,kind){const approved=kind==='approved',warning=kind==='warning',ctx=[dateOf(g)?dayLabel(dateOf(g)):'',classOf(g)?`כיתה ${className(classOf(g))}`:'',employeeOf(g)?employeeName(employeeOf(g)):'' ].filter(Boolean).join(' · ');return`<article class="v032-validation-card ${kind}"><div class="v032-validation-icon">${approved?'✓':warning?'i':'!'}</div><div class="v032-validation-copy"><span>${approved?'חריגה מאושרת':warning?'הערה':'דורש טיפול'}</span><strong>${escapeHtml(g.title||'בדיקת תקינות')}</strong>${ctx?`<small>${escapeHtml(ctx)}</small>`:''}<p>${escapeHtml(g.text||detail(g))}</p></div><div class="v032-validation-actions">${!approved&&!warning?`<button type="button" class="primary-btn" data-v032-solution="${escapeHtml(g.id)}">הצעת פתרון</button>`:''}${dateOf(g)||classOf(g)||employeeOf(g)?`<button type="button" class="ghost-btn" data-v032-focus="${escapeHtml(g.id)}">הצג בשיבוץ</button>`:''}${approved?`<button type="button" class="secondary-btn" data-v032-validation="revoke" data-v032-group="${escapeHtml(g.id)}">ביטול אישור</button>`:!warning?`<button type="button" class="secondary-btn" data-v032-validation="approve" data-v032-group="${escapeHtml(g.id)}">אישור למרות החריגה</button>`:''}</div></article>`;}
@@ -259,6 +261,7 @@
     state.v032SolutionProposals ||= new Map();
     installSolutionStyles();
     const current=document.querySelector('#scheduleIssuesToggle');
+    if(current&&!current.querySelector('.v0364-issues-chevron')) current.insertAdjacentHTML('beforeend','<i class="v0364-issues-chevron" aria-hidden="true">⌄</i>');
     if(current&&!current.dataset.v032Installed){
       const clone=current.cloneNode(true);clone.dataset.v032Installed='true';current.replaceWith(clone);
       clone.addEventListener('click',async(e)=>{
