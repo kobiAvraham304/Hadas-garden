@@ -146,11 +146,16 @@
         #scheduleExport .mobile-week-intro[role="button"]::after{content:"↔";position:absolute;inset-inline-end:14px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:28px;height:28px;border-radius:10px;background:#fff;color:var(--primary-dark);font-size:16px;font-weight:950;box-shadow:0 3px 10px rgba(64,70,120,.08)}
         #scheduleExport .mobile-week-intro[role="button"]:active{background:linear-gradient(135deg,var(--primary-soft),#fff)!important;box-shadow:inset 0 0 0 1px rgba(111,114,217,.12)}
         #scheduleExport .mobile-week-intro[role="button"]:focus-visible{outline:3px solid rgba(111,114,217,.35);outline-offset:2px}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport.mode-week{overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-inline:contain;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important;box-shadow:var(--shadow-small)!important}
+
+        /* Keep the compact mobile view visible for two paint frames while Safari lays out the wide table. */
+        html[data-hadas-mobile-wide-week="preparing"] #scheduleExport .schedule-mobile-week{display:grid!important}
+        html[data-hadas-mobile-wide-week="preparing"] #scheduleExport .schedule-desktop-week{display:block!important;position:absolute!important;visibility:hidden!important;pointer-events:none!important;inset-inline-start:-1200px!important;top:0!important;width:1060px!important;min-width:1060px!important}
+
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport.mode-week{overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:auto!important;overscroll-behavior-inline:contain;direction:rtl!important;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important;box-shadow:var(--shadow-small)!important;isolation:isolate}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-mobile-week{display:none!important}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-desktop-week{display:block!important;min-width:1060px!important;width:max-content}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table-scroll{display:block!important;overflow:visible!important;min-width:1060px}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table{display:table!important;min-width:1060px!important;width:1060px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-desktop-week{display:block!important;position:relative!important;visibility:visible!important;min-width:1060px!important;width:1060px!important;direction:rtl!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table-scroll{display:block!important;overflow:visible!important;min-width:1060px!important;width:1060px!important;direction:rtl!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table{display:table!important;min-width:1060px!important;width:1060px!important;table-layout:fixed!important;direction:rtl!important;content-visibility:visible!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table thead th{min-width:145px!important;padding:7px 6px!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table .class-name{min-width:105px!important;width:105px!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table td{padding:7px!important}
@@ -167,10 +172,61 @@
     document.head.append(style);
   }
 
+  function installV0366MotionStyles() {
+    if (document.querySelector('#v0366-motion-style')) return;
+    const style=document.createElement('style');
+    style.id='v0366-motion-style';
+    style.textContent=`
+      @keyframes v0366PanelIn{from{opacity:.72;transform:translateY(5px)}to{opacity:1;transform:none}}
+      @keyframes v0366Reveal{from{opacity:.45;transform:translateY(-4px)}to{opacity:1;transform:none}}
+      @keyframes v0366DialogIn{from{opacity:.65;transform:translateY(10px) scale(.992)}to{opacity:1;transform:none}}
+      @keyframes v0366ToastIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+      .panel.active{animation:v0366PanelIn .18s cubic-bezier(.2,.75,.25,1)}
+      .primary-btn,.secondary-btn,.ghost-btn,.nav-btn,.icon-round-btn,.publish-btn,.auto-schedule-btn,.mini-btn,.issues-toggle-btn,.schedule-tools-menu>summary{
+        transition:transform .12s ease,box-shadow .16s ease,background-color .16s ease,border-color .16s ease,opacity .16s ease!important;
+        -webkit-tap-highlight-color:transparent;
+      }
+      .primary-btn:active,.secondary-btn:active,.ghost-btn:active,.nav-btn:active,.icon-round-btn:active,.publish-btn:active,.auto-schedule-btn:active,.mini-btn:active,.issues-toggle-btn:active,.schedule-tools-menu>summary:active{transform:scale(.985)}
+      .schedule-tools-menu[open] .schedule-secondary-actions,.mobile-week-day[open] .mobile-week-day-body,.v032-validation-panel{animation:v0366Reveal .16s ease-out}
+      dialog[open] .modal-card{animation:v0366DialogIn .18s cubic-bezier(.2,.75,.25,1)}
+      .toast{animation:v0366ToastIn .18s ease-out}
+      @media(hover:hover) and (pointer:fine){
+        .primary-btn:hover,.secondary-btn:hover,.ghost-btn:hover,.publish-btn:hover,.auto-schedule-btn:hover,.icon-round-btn:hover{transform:translateY(-1px)}
+        .summary-card,.class-card,.employee-card,.request-card,.announcement-card,.task-card,.day-class-card{transition:transform .16s ease,box-shadow .18s ease,border-color .18s ease}
+        .summary-card:hover,.class-card:hover,.employee-card:hover,.request-card:hover,.announcement-card:hover,.task-card:hover,.day-class-card:hover{transform:translateY(-2px)}
+      }
+      @media(prefers-reduced-motion:reduce){
+        .panel.active,.schedule-tools-menu[open] .schedule-secondary-actions,.mobile-week-day[open] .mobile-week-day-body,.v032-validation-panel,dialog[open] .modal-card,.toast{animation:none!important}
+        .primary-btn,.secondary-btn,.ghost-btn,.nav-btn,.icon-round-btn,.publish-btn,.auto-schedule-btn,.mini-btn,.issues-toggle-btn,.schedule-tools-menu>summary,.summary-card,.class-card,.employee-card,.request-card,.announcement-card,.task-card,.day-class-card{transition:none!important;transform:none!important}
+      }
+    `;
+    document.head.append(style);
+  }
+
+  function settleV0366WideWeek() {
+    if (!matchMedia('(max-width:760px)').matches || !state?.v0364MobileWideWeek || state?.v0366WideSettled) return;
+    const root=document.querySelector('#scheduleExport');
+    const table=root?.querySelector('.schedule-desktop-week .schedule-table');
+    if(!root||!table)return;
+    document.documentElement.dataset.hadasMobileWideWeek='preparing';
+    requestAnimationFrame(()=>{
+      // Force WebKit to finish the wide table's layout before swapping views.
+      void table.offsetWidth;
+      void table.offsetHeight;
+      requestAnimationFrame(()=>{
+        state.v0366WideSettled=true;
+        document.documentElement.dataset.hadasMobileWideWeek='true';
+        root.scrollLeft=0;
+        // A second assignment forces the first composited frame to paint at the RTL origin.
+        requestAnimationFrame(()=>{root.scrollLeft=0;});
+      });
+    });
+  }
+
   function syncV0364MobileWeekView() {
     const mobile = matchMedia('(max-width:760px)').matches;
     const wide = Boolean(mobile && state?.scheduleMode === 'week' && state?.v0364MobileWideWeek);
-    document.documentElement.dataset.hadasMobileWideWeek = wide ? 'true' : 'false';
+    document.documentElement.dataset.hadasMobileWideWeek = wide ? (state.v0366WideSettled ? 'true' : 'preparing') : 'false';
 
     const intro = document.querySelector('#scheduleExport .mobile-week-intro');
     if (intro) {
@@ -184,13 +240,16 @@
     if (wide && desktop && !desktop.querySelector('.v0364-wide-week-toolbar')) {
       desktop.insertAdjacentHTML('afterbegin', '<div class="v0364-wide-week-toolbar"><span><strong>שבוע מלא לרוחב</strong><small>החליקו ימינה ושמאלה לצפייה בכל הימים.</small></span><button type="button" class="ghost-btn" data-v0364-compact-week>חזרה לתצוגה הרגילה</button></div>');
     }
+    if(wide) settleV0366WideWeek();
   }
 
   function installV0364MobileWeekInteraction() {
     if (window.__hadasV0364MobileWeekInstalled) return;
     window.__hadasV0364MobileWeekInstalled = true;
     state.v0364MobileWideWeek = false;
+    state.v0366WideSettled = false;
     installV0364MobileWeekStyles();
+    installV0366MotionStyles();
 
     const panel = document.querySelector('#schedulePanel');
     if (!panel) return;
@@ -198,10 +257,13 @@
     const openWideWeek = () => {
       if (!matchMedia('(max-width:760px)').matches || state.scheduleMode !== 'week') return;
       state.v0364MobileWideWeek = true;
+      state.v0366WideSettled = false;
       renderSchedule();
     };
     const closeWideWeek = () => {
       state.v0364MobileWideWeek = false;
+      state.v0366WideSettled = false;
+      document.documentElement.dataset.hadasMobileWideWeek='false';
       renderSchedule();
     };
 
@@ -221,7 +283,10 @@
         return;
       }
       const mode = event.target.closest('#scheduleMode [data-mode]');
-      if (mode) state.v0364MobileWideWeek = false;
+      if (mode) {
+        state.v0364MobileWideWeek = false;
+        state.v0366WideSettled = false;
+      }
     }, true);
 
     panel.addEventListener('keydown', (event) => {
@@ -232,7 +297,10 @@
     }, true);
 
     matchMedia('(max-width:760px)').addEventListener?.('change', () => {
-      if (!matchMedia('(max-width:760px)').matches) state.v0364MobileWideWeek = false;
+      if (!matchMedia('(max-width:760px)').matches) {
+        state.v0364MobileWideWeek = false;
+        state.v0366WideSettled = false;
+      }
       syncV0364MobileWeekView();
     });
   }
