@@ -105,13 +105,14 @@
   if (typeof refreshScheduleWeek === 'function' && typeof fetchScheduleWeek === 'function' && typeof applySchedulePayload === 'function') {
     refreshScheduleWeek = async function v0345RefreshScheduleWeek({ force = true } = {}) {
       const weekAtStart = dateISO(state.weekStart);
+      const requestId = ++state.weekRequestId;
       const beforeKey = validationKey();
       const hadCurrentValidation = validationIsCurrent();
       state.scheduleLoading = true;
       document.body.classList.add('schedule-is-loading');
       try {
         const payload = await fetchScheduleWeek(state.weekStart, { force, apply: false });
-        if (weekAtStart !== dateISO(state.weekStart)) return payload;
+        if (!payload || requestId !== state.weekRequestId || weekAtStart !== dateISO(state.weekStart)) return null;
         applySchedulePayload(payload);
 
         const today = dateISO(new Date());
@@ -130,8 +131,10 @@
         showToast(error.message || 'טעינת השיבוץ נכשלה', 'error');
         throw error;
       } finally {
-        state.scheduleLoading = false;
-        document.body.classList.remove('schedule-is-loading');
+        if (requestId === state.weekRequestId) {
+          state.scheduleLoading = false;
+          document.body.classList.remove('schedule-is-loading');
+        }
       }
     };
   }

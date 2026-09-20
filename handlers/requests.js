@@ -126,15 +126,26 @@ module.exports = async function handler(req,res) {
       };
       if (payload.available_fixed_day_weekday !== null && (!Number.isInteger(payload.available_fixed_day_weekday) || payload.available_fixed_day_weekday < 0 || payload.available_fixed_day_weekday > 5)) throw httpError(400,'יום החופשי הקבוע אינו תקין');
       if (!payload.allow_schedule_on_day_off) payload.available_fixed_day_weekday = null;
+      const rawDays = body.available_fixed_day_weekdays;
+      if (rawDays !== undefined && !Array.isArray(rawDays)) throw httpError(400,'רשימת הימים אינה תקינה');
+      const selectedDays = [...new Set((rawDays || (payload.available_fixed_day_weekday === null ? [] : [payload.available_fixed_day_weekday])).map(Number))];
+      if (selectedDays.some(day => !Number.isInteger(day) || day < 0 || day > 5)) throw httpError(400,'יום חופשי אינו תקין');
+      const preferred = body.preferred_fixed_day_weekday == null || body.preferred_fixed_day_weekday === '' ? null : Number(body.preferred_fixed_day_weekday);
+      if (preferred !== null && !selectedDays.includes(preferred)) throw httpError(400,'היום המועדף חייב להיות מתוך הימים שנבחרו');
+      payload.available_fixed_day_weekdays = payload.allow_schedule_on_day_off ? selectedDays : [];
+      payload.preferred_fixed_day_weekday = payload.allow_schedule_on_day_off ? preferred : null;
+      payload.available_fixed_day_weekday = payload.available_fixed_day_weekdays[0] ?? null;
       let own = null;
       if (['late_start','early_finish'].includes(type)) {
-        if (!payload.shift_id) throw httpError(400,'יש לבחור את השיבוץ הרלוונטי');
+        if (!payload.shift_id && type !== 'early_finish') throw httpError(400,'יש לבחור את השיבוץ הרלוונטי');
+        if (payload.shift_id) {
         own = assertDb(await db().from('hadas_shifts').select('*').eq('id',payload.shift_id).maybeSingle(),'השיבוץ שלך לא נמצא');
         if (!own || own.employee_id !== requesterId) throw httpError(409,'השיבוץ שנבחר אינו שייך לך');
         payload.request_date = own.shift_date;
+        }
       }
       if (type === 'late_start' && (!payload.requested_start || timeToMinutes(payload.requested_start) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_start) >= timeToMinutes(own.end_time))) throw httpError(400,'שעת ההתחלה המבוקשת חייבת להיות בתוך שעות השיבוץ');
-      if (type === 'early_finish' && (!payload.requested_end || timeToMinutes(payload.requested_end) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_end) >= timeToMinutes(own.end_time))) throw httpError(400,'שעת הסיום המבוקשת חייבת להיות בתוך שעות השיבוץ');
+      if (type === 'early_finish' && (!/^([01]\d|2[0-3]):[0-5]\d$/.test(payload.requested_end || '') || (own && (timeToMinutes(payload.requested_end) <= timeToMinutes(own.start_time) || timeToMinutes(payload.requested_end) >= timeToMinutes(own.end_time))))) throw httpError(400,'שעת הסיום המבוקשת חייבת להיות בתוך שעות השיבוץ');
       if (type === 'swap') {
         if (!payload.target_employee_id) throw httpError(400,'יש לבחור עובד שנמצא ביום חופשי');
         if (payload.target_employee_id === requesterId) throw httpError(400,'לא ניתן לבחור את עצמך');
@@ -212,10 +223,11 @@ module.exports = async function handler(req,res) {
       await notifyEmployees([request.requester_id],{ type:'swap',title:'בקשת ההחלפה נדחתה',message:`${caller.employee.full_name} לא אישר את בקשת ההחלפה לתאריך ${request.request_date}.`,entityType:'request',entityId:request.id });
     } else if (action === 'decide') {
       if (!isManager(caller)) throw httpError(403,'אין הרשאה לטפל בבקשה');
+      if (request.status !== 'pending') throw httpError(409,'הבקשה כבר טופלה');
       if (!['approved','rejected'].includes(body.status)) throw httpError(400,'החלטה לא תקינה');
       if (request.request_type === 'swap' && body.status === 'approved' && !request.target_approved) throw httpError(409,'העובד שנבחר עדיין לא אישר את ההחלפה');
       const managerNote = String(body.manager_note || '').trim() || null;
-      assertDb(await db().from('hadas_requests').update({ status:body.status,manager_note:managerNote,decided_by:caller.employee.id,decided_at:new Date().toISOString() }).eq('id',request.id),'לא ניתן לעדכן את הבקשה');
+      assertDb(await db().from('hadas_requests').update({ status:body.status,manager_note:managerNote,decided_by:caller.employee.id,decided_at:new Date().toISOString() }).eq('id',request.id).eq('status','pending').select('id').single(),'הבקשה כבר טופלה או נמחקה');
       if (body.status === 'approved') {
         const applied = await db().rpc('hadas_apply_approved_request',{ p_request_id:request.id,p_actor_id:caller.employee.id });
         if (applied.error) {
@@ -225,8 +237,8 @@ module.exports = async function handler(req,res) {
         await clearRequestActionNotifications(request.id);
         await emitEvent('shifts');
         await notifyEmployees([request.requester_id],{
-          type:'request',title:'הבקשה שלך אושרה והוזרמה לשיבוץ',
-          message:managerNote || `בקשתך לתאריך ${requestRangeLabel(request)} אושרה ועודכנה בטיוטת השיבוץ.`,
+          type:'request',title:'הבקשה שלך אושרה',
+          message:managerNote || (request.request_type==='early_finish'&&!request.shift_id ? `בקשתך לתאריך ${requestRangeLabel(request)} אושרה. שעת היציאה תיכלל בשיבוץ האוטומטי ותוצג כהערה בשיבוץ ידני.` : `בקשתך לתאריך ${requestRangeLabel(request)} אושרה ועודכנה בטיוטת השיבוץ.`),
           entityType:'request',entityId:request.id,actionRequired:false,
         });
         if (request.target_employee_id) await notifyEmployees([request.target_employee_id],{

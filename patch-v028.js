@@ -215,7 +215,7 @@
     window.__v028RequestFixesInstalled = true;
     try {
       REQUEST_HELP.late_start = 'התחלה מאוחרת — בוחרים תאריך ושעת הגעה. המערכת מאתרת לבד את השיבוץ של העובד.';
-      REQUEST_HELP.early_finish = 'סיום מוקדם — בוחרים תאריך ושעת יציאה. המערכת מאתרת לבד את השיבוץ של העובד.';
+      REQUEST_HELP.early_finish = 'סיום מוקדם — בוחרים תאריך ושעת יציאה, גם כשעדיין אין שיבוץ. לאחר אישור, השעה תיכלל בשיבוץ האוטומטי ותוצג כהערה בשיבוץ ידני.';
     } catch {}
 
     const previousUpdateFields = updateRequestFields;

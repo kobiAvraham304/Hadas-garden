@@ -95,7 +95,7 @@
     const baseRefreshAll = refreshAll;
     let activeRefresh = null;
     refreshAll = async function hadasStableRefreshAll(...args) {
-      if (activeRefresh) return activeRefresh;
+      if (activeRefresh) { state.refreshQueued = true; return activeRefresh; }
       const onboarding = currentProfile()?.onboarding_completed;
       activeRefresh = (async () => {
         try {

@@ -494,6 +494,7 @@
   async function monthSchedulePages(monthKey) {
     const weeks = monthWeekStarts(monthKey);
     const payloads = await Promise.all(weeks.map((week) => fetchScheduleWeek(week, { force:false, apply:false })));
+    if (payloads.some(payload => !payload)) throw new Error('השיבוץ השתנה בזמן הכנת הדוח. יש לפתוח את הדוח מחדש.');
     return weeks.map((weekStart, index) => ({
       weekStart,
       payload:payloads[index] || {},
@@ -1088,7 +1089,7 @@
       .v026-selected-employee-action{max-width:none!important;width:100%!important;justify-items:stretch!important}
       .v026-selected-employee-action small{text-align:center!important;max-width:none!important}
 
-      #appVersionBadge{display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;top:calc(env(safe-area-inset-top) + 66px)!important;left:7px!important;bottom:auto!important;z-index:140!important;background:rgba(255,255,255,.96)!important;font-size:.66rem!important;padding:4px 8px!important}
+      #appVersionBadge{display:block!important;visibility:visible!important;opacity:1!important;position:fixed!important;top:auto!important;right:auto!important;left:7px!important;bottom:calc(var(--mobile-nav-height, 70px) + env(safe-area-inset-bottom) + 6px)!important;z-index:140!important;background:rgba(255,255,255,.96)!important;font-size:.66rem!important;padding:4px 8px!important}
       .schedule-secondary-actions #v036PdfBtn{grid-column:1/-1!important;min-height:44px!important;font-size:.76rem!important;width:100%!important;justify-content:center!important}
       .schedule-tools-menu:not([open])>.schedule-secondary-actions{display:none!important}
       .mobile-week-day>.v036-mobile-day-toggle{appearance:none!important;-webkit-appearance:none!important;width:100%!important;border:0!important;margin:0!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"name chevron" "stats status"!important;align-items:center!important;gap:6px 9px!important;min-height:76px!important;padding:11px 13px!important;background:linear-gradient(135deg,#fff,#fafaff)!important;color:inherit!important;text-align:right!important;font:inherit!important;cursor:pointer!important;touch-action:manipulation!important}

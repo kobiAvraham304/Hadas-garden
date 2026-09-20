@@ -1,7 +1,7 @@
 /* מערכת ניהול שיבוצים מעון הדס — שכבת ממשק 0.29.0 */
 (() => {
   const VERSION = '0.29.0';
-  const PREVIOUS_PATCH = '/patch-v028.js?v=0290';
+  const PREVIOUS_PATCH = '/patch-v028.js?v=0361';
 
   function forceVersion() {
     const badge = document.querySelector('#appVersionBadge');

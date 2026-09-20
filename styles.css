@@ -1284,3 +1284,16 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
   .daily-operations-table .daily-card-actions{grid-template-columns:1fr 1fr}
   .daily-operations-table .daily-card-actions button{min-height:40px;font-size:.68rem}
 }
+
+/* Request controls: touch targets, readable Hebrew and safe mobile width. */
+.early-finish-note{display:block;color:#9a5310;font-weight:700;margin-top:3px;white-space:normal}
+.day-off-preference{margin-top:10px;font-size:.85rem}.day-off-preference summary{cursor:pointer;color:#575ac6;padding:8px 0}.day-off-preference label{display:grid;gap:6px;margin-top:8px}
+.weekday-choice[aria-pressed="true"]{border-color:#6f72d9;background:#efefff;box-shadow:inset 0 0 0 1px #6f72d9}
+@media(max-width:760px){
+ #requestDialog .modal-card{max-width:100%;box-sizing:border-box}
+ #requestForm input,#requestForm select,#requestForm textarea{font-size:16px;min-width:0;max-width:100%;box-sizing:border-box}
+ .request-action-zone{display:flex;flex-wrap:wrap;gap:8px}.request-action-zone button{min-height:44px;white-space:normal;flex:1 1 140px}
+ .request-action-zone .notice{flex-basis:100%;margin:0}.request-key-details strong{overflow-wrap:anywhere}
+ .weekday-choice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.weekday-choice{min-height:48px}
+ .request-reply-row{min-width:0}.request-reply-row input{min-width:0}
+}

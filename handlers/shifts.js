@@ -117,7 +117,7 @@ async function loadAutomaticScheduleData(weekStart) {
     db().from('hadas_app_settings').select('*').eq('id', 1).single(),
     db().from('hadas_employee_class_constraints').select('*'),
     db().from('hadas_employee_weekly_patterns').select('*'),
-    db().from('hadas_requests').select('*').in('request_type', ['leave', 'day_off', 'sick']).in('status', ['approved', 'applied']).lte('request_date', weekEnd),
+    db().from('hadas_requests').select('*').in('request_type', ['leave', 'day_off', 'sick', 'early_finish']).in('status', ['approved', 'applied']).lte('request_date', weekEnd),
     db().from('hadas_shifts').select('*').gte('shift_date', weekStart).lte('shift_date', weekEnd),
     db().from('hadas_shifts').select('*').gte('shift_date', previousStart).lte('shift_date', addDays(previousStart, 5)),
     db().from('hadas_calendar_events').select('id,title,description,event_date,event_type,is_general_day_off').eq('is_general_day_off', true).gte('event_date', weekStart).lte('event_date', weekEnd).order('event_date'),

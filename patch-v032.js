@@ -6,7 +6,7 @@
     '/patch-v032-core.js?v=0321hf7',
     '/patch-v032-exports.js?v=0321',
     '/patch-v032-ux.js?v=0321',
-    '/patch-v032-stability.js?v=0321',
+    '/patch-v032-stability.js?v=0361',
   ];
 
   function pin() {

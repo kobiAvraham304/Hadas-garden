@@ -9,7 +9,7 @@ const announcements = require('../handlers/announcements');
 const legacyPatch = () => read('patch-v029-legacy.js');
 
 test('0.29 migration remains aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.36.0');
+  assert.equal(JSON.parse(read('package.json')).version, '0.36.1');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('health.js'), /update-v0.35.0\.sql/);
@@ -83,7 +83,7 @@ test('0.29 stale client entrypoints resolve through legacy behavior into the cur
   for (const route of ['/patch-v025.js','/patch-v029.js','/patch-v030.js','/patch-v031.js','/patch-v031.css']) assert.ok(headers.has(route), route);
   assert.match(read('patch-v029.js'), /patch-v029-legacy\.js/);
   assert.match(legacyPatch(), /const VERSION = '0\.29\.0'/);
-  assert.match(legacyPatch(), /PREVIOUS_PATCH = '\/patch-v028\.js\?v=0290'/);
+  assert.match(legacyPatch(), /PREVIOUS_PATCH = '\/patch-v028\.js\?v=0361'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v031.js'), /PREVIOUS_PATCH = '\/patch-v030\.js\?v=0310hf8'/);
 });
