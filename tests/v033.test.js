@@ -6,11 +6,11 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.33 release remains in the 0.34 compatibility chain', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.36.4');
+  assert.equal(JSON.parse(read('package.json')).version, '0.36.5');
   const entry = read('patch-v025.js');
   const patch = read('patch-v033.js');
   const vercel = JSON.parse(read('vercel.json'));
-  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf10'/);
+  assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf11'/);
   assert.match(entry, /__hadasV033BootstrapPromise/);
   assert.match(patch, /PREVIOUS = '\/patch-v032\.js\?v=0321hf10'/);
   assert.match(patch, /releaseBootstrap/);

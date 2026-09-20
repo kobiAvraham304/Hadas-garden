@@ -142,15 +142,15 @@
     style.id = 'v0364-mobile-week-style';
     style.textContent = `
       @media(max-width:760px){
-        #scheduleExport .mobile-week-intro[role="button"]{position:relative;cursor:pointer;padding-inline-end:48px;transition:transform .14s ease,border-color .14s ease,box-shadow .14s ease}
+        #scheduleExport .mobile-week-intro[role="button"]{position:relative;cursor:pointer;padding-inline-end:48px;transition:border-color .14s ease,box-shadow .14s ease;-webkit-tap-highlight-color:transparent;user-select:none}
         #scheduleExport .mobile-week-intro[role="button"]::after{content:"↔";position:absolute;inset-inline-end:14px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:28px;height:28px;border-radius:10px;background:#fff;color:var(--primary-dark);font-size:16px;font-weight:950;box-shadow:0 3px 10px rgba(64,70,120,.08)}
-        #scheduleExport .mobile-week-intro[role="button"]:active{transform:scale(.99)}
+        #scheduleExport .mobile-week-intro[role="button"]:active{background:linear-gradient(135deg,var(--primary-soft),#fff)!important;box-shadow:inset 0 0 0 1px rgba(111,114,217,.12)}
         #scheduleExport .mobile-week-intro[role="button"]:focus-visible{outline:3px solid rgba(111,114,217,.35);outline-offset:2px}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport.mode-week{overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:touch!important;overscroll-behavior-inline:contain;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important;box-shadow:var(--shadow-small)!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-mobile-week{display:none!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-desktop-week{display:block!important;min-width:1060px!important;width:max-content}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table-scroll{overflow:visible!important;min-width:1060px}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table{min-width:1060px!important;width:1060px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table-scroll{display:block!important;overflow:visible!important;min-width:1060px}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table{display:table!important;min-width:1060px!important;width:1060px!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table thead th{min-width:145px!important;padding:7px 6px!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table .class-name{min-width:105px!important;width:105px!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table td{padding:7px!important}
