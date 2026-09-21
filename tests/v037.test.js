@@ -105,3 +105,31 @@ test('0.37 release cache chain exposes all changed client layers', () => {
   assert.match(entry,/patch-v033\.js\?v=0333hf13/);
   assert.match(entry,/patch-v0342\.js\?v=0370/);
 });
+
+
+test('0.37 forced refreshes reuse in-flight week and calendar requests', () => {
+  const app=read('app.js');
+  assert.match(app,/request = state\.weekInflight\.get\(key\) \|\| null/);
+  assert.match(app,/request = state\.calendarInflight\.get\(key\) \|\| null/);
+  assert.match(app,/force bypasses stale cache, but never duplicates an identical request already in flight/);
+});
+
+test('0.37 assistant and lead schedule permissions remain constrained on mobile rerenders', () => {
+  const patch=read('patch-v033.js');
+  const data=read('handlers/data.js');
+  assert.match(patch,/setHidden\('#publishScheduleBtn', kind !== 'manager'\)/);
+  assert.match(patch,/setHidden\('#scheduleIssuesToggle', kind !== 'manager'\)/);
+  assert.match(patch,/setHidden\('#v028ScheduleEmployeeSearch', kind === 'regular'\)/);
+  assert.match(patch,/if \(kind === 'regular'\) \{[\s\S]*state\.scheduleMode = 'mine'/);
+  assert.match(patch,/state\.profile\.schedule_scope === 'class'/);
+  assert.match(data,/publication: manager \? publication : null/);
+  assert.match(data,/const visibleScheduleAbsences = fullScheduleViewer/);
+});
+
+test('0.37 motion stays lightweight and honors reduced motion', () => {
+  const patch=read('patch-v033.js');
+  assert.match(patch,/@media\(prefers-reduced-motion:reduce\)/);
+  assert.match(patch,/animation:v0366PanelIn \.18s/);
+  assert.match(patch,/transition:transform \.12s ease/);
+  assert.doesNotMatch(patch,/animation-duration:\s*[2-9]s/);
+});
