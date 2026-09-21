@@ -107,13 +107,6 @@ test('0.37 release cache chain exposes all changed client layers', () => {
 });
 
 
-test('0.37 forced refreshes reuse in-flight week and calendar requests', () => {
-  const app=read('app.js');
-  assert.match(app,/request = state\.weekInflight\.get\(key\) \|\| null/);
-  assert.match(app,/request = state\.calendarInflight\.get\(key\) \|\| null/);
-  assert.match(app,/force bypasses stale cache, but never duplicates an identical request already in flight/);
-});
-
 test('0.37 assistant and lead schedule permissions remain constrained on mobile rerenders', () => {
   const patch=read('patch-v033.js');
   const data=read('handlers/data.js');

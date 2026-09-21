@@ -550,8 +550,7 @@ async function fetchScheduleWeek(weekStart, { force = false, apply = true } = {}
   if (apply) { state.scheduleLoading = true; document.body.classList.add('schedule-is-loading'); }
   let request = null;
   try {
-    // force bypasses stale cache, but never duplicates an identical request already in flight.
-    request = state.weekInflight.get(key) || null;
+    request = !force ? state.weekInflight.get(key) : null;
     if (!request) {
       request = apiFetch(`/api/shifts?week_start=${key}`, { timeout: 9000 });
       state.weekInflight.set(key, request);
@@ -2740,8 +2739,7 @@ async function setCalendarMonth(date, { force = false } = {}) {
   if (cached) { state.calendarEvents = cached.events; renderCalendar(); }
   $('#calendarMonthLabel').textContent = `${formatDate(target, { month: 'long', year: 'numeric' })}${cached ? '' : ' · טוען…'}`;
   try {
-    // Reuse a same-month in-flight request even during forced refreshes.
-    request = state.calendarInflight.get(key) || null;
+    request = !force ? state.calendarInflight.get(key) : null;
     if (!request) { request = apiFetch(`/api/calendar?month=${key}`, { timeout: 8000 }); state.calendarInflight.set(key, request); }
     const result = await request;
     state.calendarCache.set(key, { events: result.events || [], fetchedAt: Date.now() });
