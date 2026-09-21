@@ -655,6 +655,22 @@
     dialog.querySelector('.v036-month-field').classList.add('hidden');
     if(!dialog.open)dialog.showModal();dialog.__hadasRefresh();
   }
+  function copiedAbsenceLabel(row){
+    const raw=String(row?.absence_type||row?.type||row?.label||'').trim();
+    const labels={
+      leave:'חופשה מאושרת',
+      day_off:'יום חופשי מאושר',
+      sick:'מחלה מאושרת',
+      fixed_day_off:'יום חופשי קבוע',
+      day_off_worked:'עבודה ביום חופשי קבוע',
+      approved_leave:'חופשה מאושרת',
+    };
+    if(labels[raw])return labels[raw];
+    const label=String(row?.label||'').trim();
+    if(labels[label])return labels[label];
+    if(label&&!/^[a-z0-9_ -]+$/i.test(label))return label;
+    return 'חופש / היעדרות';
+  }
   function dayCopyText(iso){
     const date=parseDateValue(iso),off=generalDayOffFor(iso);
     const lines=[`שיבוץ מעון הדס — יום ${DAY_NAMES[date.getDay()]} ${formatDate(date,{day:'2-digit',month:'2-digit',year:'numeric'})}`];
@@ -667,7 +683,7 @@
       rows.forEach((shift)=>lines.push(`• ${employeeById(shift.employee_id)?.full_name||'עובד'} — ${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`));
     }
     const abs=(state.scheduleAbsences||[]).filter((row)=>row.absence_date===iso);
-    if(abs.length){lines.push('','חופש / היעדרות:');abs.forEach((row)=>lines.push(`• ${employeeById(row.employee_id)?.full_name||row.employee_name||'עובד'} — ${row.label||row.absence_type||'חופש'}`));}
+    if(abs.length){lines.push('','חופש / היעדרות:');abs.forEach((row)=>lines.push(`• ${employeeById(row.employee_id)?.full_name||row.employee_name||'עובד'} — ${copiedAbsenceLabel(row)}`));}
     return lines.join('\n');
   }
   async function copyDay(iso){

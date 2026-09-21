@@ -151,13 +151,13 @@
         html[data-hadas-mobile-wide-week="preparing"] #scheduleExport .schedule-mobile-week{display:grid!important}
         html[data-hadas-mobile-wide-week="preparing"] #scheduleExport .schedule-desktop-week{display:block!important;position:absolute!important;visibility:hidden!important;pointer-events:none!important;inset-inline-start:-1200px!important;top:0!important;width:1060px!important;min-width:1060px!important}
 
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport.mode-week{overflow-x:auto!important;overflow-y:visible!important;-webkit-overflow-scrolling:auto!important;overscroll-behavior-inline:contain;direction:rtl!important;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important;box-shadow:var(--shadow-small)!important;isolation:isolate}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport.mode-week{overflow-x:scroll!important;overflow-y:visible!important;-webkit-overflow-scrolling:auto!important;overscroll-behavior-inline:contain;direction:ltr!important;border:1px solid var(--border)!important;border-radius:18px!important;background:#fff!important;box-shadow:var(--shadow-small)!important;isolation:isolate}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-mobile-week{display:none!important}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-desktop-week{display:block!important;position:relative!important;visibility:visible!important;min-width:1060px!important;width:1060px!important;direction:rtl!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-desktop-week{display:block!important;position:relative!important;visibility:visible!important;min-width:1060px!important;width:1060px!important;direction:rtl!important;background:#fff!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table-scroll{display:block!important;overflow:visible!important;min-width:1060px!important;width:1060px!important;direction:rtl!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table{display:table!important;min-width:1060px!important;width:1060px!important;table-layout:fixed!important;direction:rtl!important;content-visibility:visible!important}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table thead th{min-width:145px!important;padding:7px 6px!important}
-        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table .class-name{min-width:105px!important;width:105px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table thead th{position:static!important;min-width:145px!important;padding:7px 6px!important}
+        html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table .class-name{position:static!important;min-width:105px!important;width:105px!important;box-shadow:none!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .schedule-table td{padding:7px!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-item{padding:8px!important;margin-bottom:6px!important;border-radius:11px!important}
         html[data-hadas-mobile-wide-week="true"] #scheduleExport .shift-main strong{font-size:.76rem!important;line-height:1.22}
@@ -190,6 +190,9 @@
       .schedule-tools-menu[open] .schedule-secondary-actions,.mobile-week-day[open] .mobile-week-day-body,.v032-validation-panel{animation:v0366Reveal .16s ease-out}
       dialog[open] .modal-card{animation:v0366DialogIn .18s cubic-bezier(.2,.75,.25,1)}
       .toast{animation:v0366ToastIn .18s ease-out}
+      .auto-review-suggestion{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;margin:8px 0;padding:10px 11px;border:1px solid #d9d7f4;border-radius:14px;background:linear-gradient(135deg,#faf9ff,#fff);box-shadow:0 4px 12px rgba(70,72,120,.05)}
+      .auto-review-suggestion-copy{display:grid;gap:3px;min-width:0}.auto-review-suggestion-copy>span{color:#6764c7;font-size:.66rem;font-weight:950}.auto-review-suggestion-copy>strong{font-size:.8rem}.auto-review-suggestion-copy>small{color:var(--muted);font-size:.66rem}.auto-review-suggestion-copy>p{margin:2px 0 0;font-size:.7rem;line-height:1.4}.auto-review-suggestion-copy>em{font-size:.63rem;color:#776f58;font-style:normal;line-height:1.4}.auto-review-add{min-height:36px;white-space:nowrap}
+      @media(max-width:760px){.auto-review-suggestion{grid-template-columns:1fr}.auto-review-add{width:100%}}
       @media(hover:hover) and (pointer:fine){
         .primary-btn:hover,.secondary-btn:hover,.ghost-btn:hover,.publish-btn:hover,.auto-schedule-btn:hover,.icon-round-btn:hover{transform:translateY(-1px)}
         .summary-card,.class-card,.employee-card,.request-card,.announcement-card,.task-card,.day-class-card{transition:transform .16s ease,box-shadow .18s ease,border-color .18s ease}
@@ -210,15 +213,18 @@
     if(!root||!table)return;
     document.documentElement.dataset.hadasMobileWideWeek='preparing';
     requestAnimationFrame(()=>{
-      // Force WebKit to finish the wide table's layout before swapping views.
       void table.offsetWidth;
       void table.offsetHeight;
+      // Use an LTR scroll container with an RTL table. Safari handles this origin
+      // consistently, unlike negative/zero scrollLeft semantics on RTL scrollers.
+      document.documentElement.dataset.hadasMobileWideWeek='true';
+      const maxScroll=Math.max(0,root.scrollWidth-root.clientWidth);
+      root.scrollLeft=maxScroll;
+      void root.offsetWidth;
+      state.v0366WideSettled=true;
       requestAnimationFrame(()=>{
-        state.v0366WideSettled=true;
-        document.documentElement.dataset.hadasMobileWideWeek='true';
-        root.scrollLeft=0;
-        // A second assignment forces the first composited frame to paint at the RTL origin.
-        requestAnimationFrame(()=>{root.scrollLeft=0;});
+        const latestMax=Math.max(0,root.scrollWidth-root.clientWidth);
+        root.scrollLeft=latestMax;
       });
     });
   }
