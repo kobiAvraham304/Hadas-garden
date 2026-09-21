@@ -99,7 +99,7 @@ test('0.37.0 mobile compact week can open the existing full horizontal schedule 
   assert.match(v033, /mobile-week-intro/);
   assert.match(v033, /data-hadas-mobile-wide-week/);
   assert.match(v033, /schedule-desktop-week/);
-  assert.match(v033, /overflow-x:auto!important/);
+  assert.match(v033, /overflow-x:scroll!important/);
   assert.match(v033, /data-v0364-compact-week/);
   assert.match(v033, /state\.v0364MobileWideWeek = false/);
 });
@@ -121,7 +121,7 @@ test('0.37.0 primes the wide mobile week before swapping views to avoid Safari b
   assert.match(v033, /void table\.offsetWidth/);
   assert.match(v033, /void table\.offsetHeight/);
   assert.match(v033, /-webkit-overflow-scrolling:auto!important/);
-  assert.match(v033, /root\.scrollLeft=0/);
+  assert.match(v033, /root\.scrollLeft=maxScroll/);
   assert.match(v033, /state\.v0366WideSettled=true/);
 });
 
