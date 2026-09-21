@@ -149,6 +149,7 @@ function publicAutomaticPreview(plan) {
     assignmentNotes: plan.assignmentNotes || [],
     excluded: plan.excluded || [],
     coverageGaps: plan.coverageGaps || [],
+    reviewSuggestions: plan.reviewSuggestions || [],
     metrics: plan.metrics,
     signature: plan.signature,
   };
@@ -172,7 +173,17 @@ function buildManualAutomaticPlan(base,data,{weekStart,mode,selectedDates,manual
   for(const date of selectedDates){for(const employee of data.employees.filter((e)=>e.active&&e.is_schedulable!==false&&e.assignment_mode!=='no_schedule')){const pattern=autoPattern(data.patterns,employee.id,date);if(pattern?.day_type!=='work'||autoAbsent(data.requests,employee.id,date))continue;if(!finalRows.some((row)=>row.employee_id===employee.id&&row.shift_date===date))validation.errors.push({code:'work_day_unscheduled',date,employee_id:employee.id,message:`${employee.full_name}: יום עבודה קבוע לא שובץ — יש לתקן לפני החלה`});}}
   const dedupe=(items)=>{const seen=new Set();return items.filter((item)=>{const key=[item.code,item.date||'',item.class_id||'',item.employee_id||'',item.start_time||item.time||'',item.message||''].join('|');if(seen.has(key))return false;seen.add(key);return true;});};validation.errors=dedupe(validation.errors);validation.warnings=dedupe(validation.warnings);
   const coverageGaps=(base.coverageGaps||[]).filter((gap)=>validation.errors.some((item)=>item.code===gap.code&&item.date===gap.date&&item.class_id===gap.class_id&&(!item.time||shortTime(item.time)===shortTime(gap.start_time))));
-  return {...base,generated,finalRows,keptCount:kept.length,validation,coverageGaps,metrics:{...(base.metrics||{}),generatedCount:generated.length,unresolvedErrors:validation.errors.length,warnings:validation.warnings.length}};
+  const reviewSuggestions=(base.reviewSuggestions||[]).filter((suggestion)=>{
+    const alreadyAdded=generated.some((row)=>row.shift_date===suggestion.shift_date&&row.class_id===suggestion.class_id&&row.employee_id===suggestion.employee_id&&shortTime(row.start_time)===shortTime(suggestion.start_time)&&shortTime(row.end_time)===shortTime(suggestion.end_time));
+    if(alreadyAdded)return false;
+    const suggestionStart=timeToMinutes(suggestion.start_time),suggestionEnd=timeToMinutes(suggestion.end_time);
+    return validation.errors.some((item)=>{
+      if(!['understaffed','missing_leader'].includes(item.code)||item.date!==suggestion.shift_date||item.class_id!==suggestion.class_id)return false;
+      const itemStart=timeToMinutes(item.start_time||item.time),itemEnd=timeToMinutes(item.end_time||item.time);
+      return itemStart<suggestionEnd&&itemEnd>suggestionStart;
+    });
+  });
+  return {...base,generated,finalRows,keptCount:kept.length,validation,coverageGaps,reviewSuggestions,metrics:{...(base.metrics||{}),generatedCount:generated.length,unresolvedErrors:validation.errors.length,warnings:validation.warnings.length,reviewSuggestionCount:reviewSuggestions.length}};
 }
 
 function automaticComparableRows(rows) {

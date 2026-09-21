@@ -26,7 +26,7 @@ test('0.24 availability includes recurring days off and distinguishes an excepti
   ]);
 });
 
-test('0.24 automatic scheduler expands a tiny as-needed fragment only within availability and weekly limit',()=>{
+test('0.37 automatic scheduler offers a tiny as-needed fragment for review instead of silently adding it',()=>{
   const input={
     weekStart:'2026-08-30',selectedDates:['2026-08-30'],mode:'rebuild',
     employees:[
@@ -42,12 +42,12 @@ test('0.24 automatic scheduler expands a tiny as-needed fragment only within ava
     settings:{opening_time:'07:30',morning_end_time:'07:30',closing_time:'15:30',friday_closing_time:'12:00',morning_required_staff:1,required_staff:1,closing_required_staff:1,closing_window_minutes:30,validation_slot_minutes:15,require_leader:false},
   };
   const plan=generateAutomaticSchedule(input);
-  const row=plan.generated.find((item)=>item.employee_id==='sub');
-  assert.ok(row);
-  assert.ok(row.start_time<='07:30'&&row.end_time>='07:45');
-  assert.equal(timeToMinutes(row.end_time)-timeToMinutes(row.start_time),120);
-  assert.equal(plan.validation.errors.some((item)=>item.code==='max_weekly_hours'||item.code==='short_nonfixed_shift'),false);
-  assert.equal(plan.metrics.coveragePercent,100);
+  assert.equal(plan.generated.some((item)=>item.employee_id==='sub'),false);
+  const suggestion=plan.reviewSuggestions.find((item)=>item.employee_id==='sub');
+  assert.ok(suggestion);
+  assert.ok(suggestion.start_time<='07:30'&&suggestion.end_time>='07:45');
+  assert.ok(timeToMinutes(suggestion.end_time)-timeToMinutes(suggestion.start_time)<=120);
+  assert.ok(plan.validation.errors.some((item)=>item.code==='understaffed'));
 });
 
 test('0.24 preview signature changes when inputs change even if the resulting rows are identical',()=>{

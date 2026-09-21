@@ -21,7 +21,7 @@ test('0.21 quality: every explicit fixed work day is rostered even above minimum
   assert.equal(plan.metrics.mandatoryWorkMissed,0);
 });
 
-test('0.21 quality: scarcity-aware allocation protects morning bottleneck and uses late worker late',()=>{
+test('0.37 quality: partial as-needed coverage is review-only instead of silently rostered',()=>{
   const classes=[{id:'c1',name:'סיני',active:true,sort_order:1}];
   const employees=[
     employee('teacher',{job_title:'גננת',default_start:'08:00',default_end:'13:30'}),
@@ -31,10 +31,16 @@ test('0.21 quality: scarcity-aware allocation protects morning bottleneck and us
   ];
   const patterns=[work('teacher',0,'08:00','13:30'),work('lead',0,'08:15','15:30'),work('a',0),work('b',0),need('full',0),need('late',0)]; fillOtherDays(employees,patterns);
   const plan=generateAutomaticSchedule({weekStart:'2026-08-30',employees,classes,patterns,constraints:[],requests:[],settings:settings(),existingShifts:[],previousShifts:[]});
-  const full=plan.finalRows.find(r=>r.employee_id==='full'&&r.shift_date==='2026-08-30');
-  const late=plan.finalRows.find(r=>r.employee_id==='late'&&r.shift_date==='2026-08-30');
-  assert.ok(full.start_time<='07:30'&&full.end_time>='08:00');
-  assert.ok(late.start_time<='13:30'&&late.end_time>='15:00');
+  const fullRow=plan.finalRows.find(r=>r.employee_id==='full'&&r.shift_date==='2026-08-30');
+  assert.equal(Boolean(fullRow),false);
+  const lateRow=plan.finalRows.find(r=>r.employee_id==='late'&&r.shift_date==='2026-08-30');
+  if(lateRow){
+    assert.equal(lateRow.start_time,'13:30');
+    assert.equal(lateRow.end_time,'15:30');
+  }
+  const suggestions=plan.reviewSuggestions.filter(r=>r.shift_date==='2026-08-30'&&r.class_id==='c1');
+  assert.ok(suggestions.length>=1);
+  assert.ok(suggestions.some(r=>r.employee_id==='full'&&r.start_time<='08:00'));
 });
 
 test('0.21 quality: as-needed staff are not added when fixed work already covers the class',()=>{
@@ -46,7 +52,7 @@ test('0.21 quality: as-needed staff are not added when fixed work already covers
   assert.equal(plan.metrics.asNeededCount,0);
 });
 
-test('0.21 quality: an as-needed worker may cover two non-overlapping critical windows in one day',()=>{
+test('0.37 quality: separate partial as-needed windows remain explicit review suggestions',()=>{
   const classes=[{id:'c1',name:'א',active:true,sort_order:1},{id:'c2',name:'ב',active:true,sort_order:2}];
   const employees=[
     employee('t1',{job_title:'גננת',primary_class_id:'c1'}), employee('a1',{primary_class_id:'c1'}),employee('a2',{primary_class_id:'c1'}),employee('a3',{primary_class_id:'c1'}),
@@ -55,11 +61,8 @@ test('0.21 quality: an as-needed worker may cover two non-overlapping critical w
   ];
   const patterns=[work('t1',0),work('a1',0),work('a2',0),work('a3',0),work('t2',0,'08:00','14:30'),work('b1',0),work('b2',0),work('b3',0,'07:45','15:30'),need('sub',0)]; fillOtherDays(employees,patterns);
   const plan=generateAutomaticSchedule({weekStart:'2026-08-30',employees,classes,patterns,constraints:[],requests:[],settings:settings(),existingShifts:[],previousShifts:[]});
-  const subRows=plan.finalRows.filter(r=>r.employee_id==='sub'&&r.shift_date==='2026-08-30');
-  assert.equal(subRows.length,2);
-  assert.ok(subRows.some(r=>r.start_time<='07:30'&&r.end_time>='07:45'));
-  assert.ok(subRows.some(r=>r.start_time<='14:30'&&r.end_time>='15:00'));
-  assert.ok(subRows[0].end_time<=subRows[1].start_time||subRows[1].end_time<=subRows[0].start_time);
+  assert.equal(plan.finalRows.some(r=>r.employee_id==='sub'&&r.shift_date==='2026-08-30'),false);
+  assert.ok(plan.reviewSuggestions.some(r=>r.employee_id==='sub'&&r.shift_date==='2026-08-30'));
 });
 
 test('0.21 quality: borrowing fixed staff is a last resort and source class remains compliant',()=>{
