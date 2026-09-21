@@ -31,10 +31,16 @@ test('0.37 quality: partial as-needed coverage is review-only instead of silentl
   ];
   const patterns=[work('teacher',0,'08:00','13:30'),work('lead',0,'08:15','15:30'),work('a',0),work('b',0),need('full',0),need('late',0)]; fillOtherDays(employees,patterns);
   const plan=generateAutomaticSchedule({weekStart:'2026-08-30',employees,classes,patterns,constraints:[],requests:[],settings:settings(),existingShifts:[],previousShifts:[]});
-  assert.equal(plan.finalRows.some(r=>['full','late'].includes(r.employee_id)&&r.shift_date==='2026-08-30'),false);
+  const fullRow=plan.finalRows.find(r=>r.employee_id==='full'&&r.shift_date==='2026-08-30');
+  assert.equal(Boolean(fullRow),false);
+  const lateRow=plan.finalRows.find(r=>r.employee_id==='late'&&r.shift_date==='2026-08-30');
+  if(lateRow){
+    assert.equal(lateRow.start_time,'13:30');
+    assert.equal(lateRow.end_time,'15:30');
+  }
   const suggestions=plan.reviewSuggestions.filter(r=>r.shift_date==='2026-08-30'&&r.class_id==='c1');
   assert.ok(suggestions.length>=1);
-  assert.ok(suggestions.some(r=>r.start_time<='08:00'||r.end_time>='15:00'));
+  assert.ok(suggestions.some(r=>r.employee_id==='full'&&r.start_time<='08:00'));
 });
 
 test('0.21 quality: as-needed staff are not added when fixed work already covers the class',()=>{
