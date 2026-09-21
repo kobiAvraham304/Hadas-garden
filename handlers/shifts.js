@@ -174,13 +174,22 @@ function buildManualAutomaticPlan(base,data,{weekStart,mode,selectedDates,manual
   const dedupe=(items)=>{const seen=new Set();return items.filter((item)=>{const key=[item.code,item.date||'',item.class_id||'',item.employee_id||'',item.start_time||item.time||'',item.message||''].join('|');if(seen.has(key))return false;seen.add(key);return true;});};validation.errors=dedupe(validation.errors);validation.warnings=dedupe(validation.warnings);
   const coverageGaps=(base.coverageGaps||[]).filter((gap)=>validation.errors.some((item)=>item.code===gap.code&&item.date===gap.date&&item.class_id===gap.class_id&&(!item.time||shortTime(item.time)===shortTime(gap.start_time))));
   const reviewSuggestions=(base.reviewSuggestions||[]).filter((suggestion)=>{
-    const alreadyAdded=generated.some((row)=>row.shift_date===suggestion.shift_date&&row.class_id===suggestion.class_id&&row.employee_id===suggestion.employee_id&&shortTime(row.start_time)===shortTime(suggestion.start_time)&&shortTime(row.end_time)===shortTime(suggestion.end_time));
-    if(alreadyAdded)return false;
-    const suggestionStart=timeToMinutes(suggestion.start_time),suggestionEnd=timeToMinutes(suggestion.end_time);
-    return validation.errors.some((item)=>{
-      if(!['understaffed','missing_leader'].includes(item.code)||item.date!==suggestion.shift_date||item.class_id!==suggestion.class_id)return false;
-      const itemStart=timeToMinutes(item.start_time||item.time),itemEnd=timeToMinutes(item.end_time||item.time);
-      return itemStart<suggestionEnd&&itemEnd>suggestionStart;
+    const segments=(Array.isArray(suggestion.segments)&&suggestion.segments.length?suggestion.segments:[suggestion]).map((segment)=>({
+      shift_date:segment.shift_date||suggestion.shift_date,
+      class_id:segment.class_id||suggestion.class_id,
+      employee_id:segment.employee_id||suggestion.employee_id,
+      start_time:shortTime(segment.start_time||suggestion.start_time),
+      end_time:shortTime(segment.end_time||suggestion.end_time),
+    }));
+    const allAdded=segments.every((segment)=>generated.some((row)=>row.shift_date===segment.shift_date&&row.class_id===segment.class_id&&row.employee_id===segment.employee_id&&shortTime(row.start_time)===segment.start_time&&shortTime(row.end_time)===segment.end_time));
+    if(allAdded)return false;
+    return segments.some((segment)=>{
+      const suggestionStart=timeToMinutes(segment.start_time),suggestionEnd=timeToMinutes(segment.end_time);
+      return validation.errors.some((item)=>{
+        if(!['understaffed','missing_leader'].includes(item.code)||item.date!==segment.shift_date||item.class_id!==segment.class_id)return false;
+        const itemStart=timeToMinutes(item.start_time||item.time),itemEnd=timeToMinutes(item.end_time||item.time);
+        return itemStart<suggestionEnd&&itemEnd>suggestionStart;
+      });
     });
   });
   return {...base,generated,finalRows,keptCount:kept.length,validation,coverageGaps,reviewSuggestions,metrics:{...(base.metrics||{}),generatedCount:generated.length,unresolvedErrors:validation.errors.length,warnings:validation.warnings.length,reviewSuggestionCount:reviewSuggestions.length}};
