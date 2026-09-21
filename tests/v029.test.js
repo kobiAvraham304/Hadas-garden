@@ -9,7 +9,7 @@ const announcements = require('../handlers/announcements');
 const legacyPatch = () => read('patch-v029-legacy.js');
 
 test('0.29 migration remains aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.36.6');
+  assert.equal(JSON.parse(read('package.json')).version, '0.37.0');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('health.js'), /update-v0.35.0\.sql/);
