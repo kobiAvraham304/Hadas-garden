@@ -49,8 +49,14 @@ module.exports = async function pushHandler(req, res) {
       return send(res, 200, { ok:true, subscribed:false });
     }
     if (action === 'test') {
-      await sendPushNotifications([caller.employee.id], { title:'התראות מעון הדס פעילות ✓', message:'מעכשיו עדכונים חשובים יכולים להגיע ישירות לטלפון.', url:'/?push=notifications', tag:'hadas-push-test' });
-      return send(res, 200, { ok:true });
+      const results = await sendPushNotifications([caller.employee.id], { title:'התראות מעון הדס פעילות ✓', message:'מעכשיו עדכונים חשובים יכולים להגיע ישירות לטלפון.', url:'/?push=notifications', tag:'hadas-push-test' });
+      const settled = (results || []).map((item) => item?.value).filter(Boolean);
+      const sent = settled.filter((item) => item.ok).length;
+      const failed = settled.filter((item) => !item.ok).length;
+      console.log(JSON.stringify({ level:'info', msg:'push_test', employeeId:caller.employee.id, subscriptions:settled.length, sent, failed }));
+      if (!settled.length) throw httpError(409, 'לא נמצא מכשיר פעיל להתראות');
+      if (!sent) throw httpError(502, 'ההתראה לא נמסרה לשירות ההתראות');
+      return send(res, 200, { ok:true, sent, failed });
     }
     throw httpError(400, 'פעולת התראה לא מוכרת');
   } catch (error) { return handleError(res, error); }

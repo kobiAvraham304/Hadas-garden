@@ -1,0 +1,3 @@
+const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const read=p=>fs.readFileSync(p,'utf8');
+test('0.37.3 keeps announcement publisher when explicitly targeted',()=>{const c=read('handlers/announcements.js');assert.doesNotMatch(c,/audienceEmployeeIds\([^\n]+\)\)\.filter\(\(id\) => id !== caller\.employee\.id\)/);assert.match(c,/const ids = await audienceEmployeeIds/);});
+test('0.37.3 push test reports real delivery outcome',()=>{const c=read('handlers/push.js');assert.match(c,/const sent = settled\.filter/);assert.match(c,/לא נמצא מכשיר פעיל להתראות/);assert.match(c,/ההתראה לא נמסרה לשירות ההתראות/);});

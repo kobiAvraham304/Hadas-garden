@@ -111,7 +111,10 @@ module.exports = async function handler(req, res) {
         await db().from('hadas_announcements').delete().eq('id', item.id);
         throw error;
       }
-      const ids = (await audienceEmployeeIds(a.audienceType, a.classId, body.employee_ids)).filter((id) => id !== caller.employee.id);
+      // Keep the publisher in the recipient set when they are explicitly part of the audience.
+      // This matters for Push: managers/schedulers often publish a test to themselves, and
+      // filtering the caller here made the announcement succeed while no notification was ever created/sent.
+      const ids = await audienceEmployeeIds(a.audienceType, a.classId, body.employee_ids);
       await notifyEmployees(ids, { type: 'announcement', title: `הודעה חדשה: ${title}`, message: content.slice(0, 220), entityType: 'announcement', entityId: item.id, push: pushRequested, pushUrl: `/?push=announcement&id=${encodeURIComponent(item.id)}`, pushTag: `announcement-${item.id}` });
       await audit(caller.employee.id, 'create', 'announcement', item.id);
       await emitEvent('announcements');
