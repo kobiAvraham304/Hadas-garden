@@ -41,6 +41,7 @@
     {"source":"/patch-v0331-hotfix.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {"source":"/patch-v034.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
     {"source":"/patch-v034.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
+    {"source":"/push-sw.js","headers":[{"key":"Cache-Control","value":"no-cache, max-age=0, must-revalidate"}]},
     {
       "source": "/(.*)",
       "headers": [
@@ -75,6 +76,7 @@
     {"source":"/api/shifts","destination":"/api/index?route=shifts"},
     {"source":"/api/suggestions","destination":"/api/index?route=suggestions"},
     {"source":"/api/tasks","destination":"/api/index?route=tasks"},
-    {"source":"/api/notifications","destination":"/api/index?route=notifications"}
+    {"source":"/api/notifications","destination":"/api/index?route=notifications"},
+    {"source":"/api/push","destination":"/api/index?route=push"}
   ]
 }
