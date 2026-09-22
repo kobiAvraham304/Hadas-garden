@@ -1,0 +1,7 @@
+.push-settings-card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:14px;margin:0 0 14px;border:1px solid #dedcf6;border-radius:16px;background:linear-gradient(135deg,#f7f6ff,#fff)}
+.push-settings-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#eceaff;font-size:1.15rem}
+.push-settings-copy{display:grid;gap:3px;min-width:0}.push-settings-copy strong{font-size:.92rem}.push-settings-copy small{color:var(--muted);line-height:1.45}
+.push-settings-card[data-state="active"]{border-color:#b8dfc7;background:linear-gradient(135deg,#f2fbf5,#fff)}.push-settings-card[data-state="active"] .push-settings-icon{background:#e1f5e8}
+.push-settings-card[data-state="warning"]{border-color:#ead7aa;background:#fffaf0}.push-settings-card[data-state="warning"] .push-settings-icon{background:#fff0c9}
+.push-compose-option{border-color:#d8d5f4!important;background:#faf9ff!important}
+@media(max-width:640px){.push-settings-card{grid-template-columns:auto 1fr}.push-settings-card .secondary-btn{grid-column:1/-1;width:100%}}
