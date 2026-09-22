@@ -31,9 +31,11 @@
   <link rel="manifest" href="/site.webmanifest" />
   <link rel="stylesheet" href="/styles.css?v=0362" />
   <link rel="stylesheet" href="/patch-v025.css?v=0350" />
+  <link rel="stylesheet" href="/push-v0372.css?v=0372" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0371" defer></script>
-  <script src="/patch-v025.js?v=0371" defer></script>
+  <script src="/app.js?v=0372" defer></script>
+  <script src="/patch-v025.js?v=0372" defer></script>
+  <script src="/push-v0372.js?v=0372" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -395,7 +397,7 @@
       <div class="modal-heading"><div><p class="eyebrow">עדכון לצוות</p><h3>הודעה חדשה</h3><p class="muted">בחרו סגנון, קהל ותוקף. הודעה נעוצה תופיע ראשונה.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
       <fieldset class="compose-style-picker"><legend>סוג ההודעה</legend><div class="compose-style-grid"><label class="info"><input type="radio" name="announcement_type" value="info" checked /><span>◉</span><strong>מידע</strong><small>עדכון שוטף</small></label><label class="important"><input type="radio" name="announcement_type" value="important" /><span>!</span><strong>חשוב</strong><small>דורש תשומת לב</small></label><label class="urgent"><input type="radio" name="announcement_type" value="urgent" /><span>⚠</span><strong>דחוף</strong><small>עדכון מיידי</small></label></div></fieldset>
       <div class="form-grid"><label class="full-field">כותרת<input name="title" required placeholder="כותרת קצרה וברורה" /></label><label>פרסום<input name="published_at" type="datetime-local" /></label><label>תוקף עד<input name="expires_at" type="datetime-local" /></label><label class="full-field">תוכן<textarea name="body" rows="5" required placeholder="כתבו את ההודעה לצוות"></textarea></label></div>
-      <div class="compose-options"><label class="toggle-field"><input name="is_pinned" type="checkbox" /><span><strong>נעיצה בראש ההודעות</strong><small>מתאים להודעה חשובה שצריכה להישאר בולטת.</small></span></label><label class="toggle-field"><input name="requires_acknowledgement" type="checkbox" checked /><span><strong>דרוש אישור קריאה</strong><small>העובדים יתבקשו ללחוץ „קראתי”.</small></span></label></div>
+      <div class="compose-options"><label class="toggle-field"><input name="is_pinned" type="checkbox" /><span><strong>נעיצה בראש ההודעות</strong><small>מתאים להודעה חשובה שצריכה להישאר בולטת.</small></span></label><label class="toggle-field"><input name="requires_acknowledgement" type="checkbox" checked /><span><strong>דרוש אישור קריאה</strong><small>העובדים יתבקשו ללחוץ „קראתי”.</small></span></label><label class="toggle-field"><input name="popup_on_login" type="checkbox" /><span><strong>הודעה קופצת בתוך המערכת</strong><small>תוצג לעובדים כחלון בולט בכניסה; נשלחת גם התראת Push לטלפון.</small></span></label><label class="toggle-field push-compose-option"><input name="send_push" type="checkbox" /><span><strong>🔔 שליחת התראה לטלפון</strong><small>תישלח למכשירים שהפעילו התראות, גם כשהמערכת סגורה.</small></span></label></div>
       <fieldset class="audience-box"><legend>למי לשלוח?</legend><div class="audience-tabs" data-audience-group="announcement"><label><input type="radio" name="audience_type" value="all" checked />כל המעון</label><label><input type="radio" name="audience_type" value="class" />כיתה</label><label><input type="radio" name="audience_type" value="employees" />עובדים נבחרים</label></div><label id="announcementClassField" class="hidden">בחירת כיתה<select name="class_id"></select></label><div id="announcementEmployeesField" class="employee-picker hidden"></div></fieldset>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">פרסום ההודעה</button></div>
     </form>
@@ -426,6 +428,7 @@
   <dialog id="notificationsDialog" class="modal notifications-modal">
     <div class="modal-card large-modal">
       <div class="modal-heading"><div><p class="eyebrow">עדכונים אישיים</p><h3>התראות ועדכונים</h3><p class="muted">בקשות, שיבוצים ופעולות שקשורות אליך.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <section id="pushSettingsCard" class="push-settings-card" aria-live="polite"><div class="push-settings-icon" aria-hidden="true">🔔</div><div class="push-settings-copy"><strong>התראות בטלפון</strong><small id="pushStatusText">קבלו שיבוצים, תוצאות בקשות והודעות חשובות גם כשהמערכת סגורה.</small></div><button id="pushToggleBtn" type="button" class="secondary-btn">הפעלת התראות</button></section>
       <div id="notificationsSummary" class="notifications-summary"></div>
       <div class="notifications-toolbar"><div id="notificationFilterChips" class="notification-filter-chips" role="group" aria-label="סינון התראות"><button type="button" data-notification-filter="action">דורש טיפול</button><button type="button" data-notification-filter="unread">לא נקרא</button><button type="button" data-notification-filter="all">הכול</button></div><button id="markAllNotificationsBtn" type="button" class="ghost-btn">סימון הכול כנקרא</button></div>
       <div id="notificationsList" class="notifications-list"></div>

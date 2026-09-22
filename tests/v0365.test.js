@@ -39,8 +39,8 @@ test('0.36 hf12 styles emphasize unsafe coverage and cross-class assignment stat
 test('0.36 hf13 cache chain delivers the mobile layout fix plus clarity update', () => {
   const index = read('index.html');
   const entry = read('patch-v025.js');
-  assert.match(index, /app\.js\?v=0371/);
-  assert.match(index, /patch-v025\.js\?v=0371/);
+  assert.match(index, /app\.js\?v=0372/);
+  assert.match(index, /patch-v025\.js\?v=0372/);
   assert.match(entry, /patch-v026\.js\?v=0321hf12/);
   assert.match(entry, /patch-v0342\.js\?v=0370/);
 });
