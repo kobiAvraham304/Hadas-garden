@@ -8,8 +8,5 @@
     "test": "node --test tests/*.test.js",
     "check": "node scripts/check.js",
     "qa": "npm test && npm run check"
-  },
-  "dependencies": {
-    "web-push": "3.6.7"
   }
 }
