@@ -99,9 +99,9 @@ test('0.37 release cache chain exposes all changed client layers', () => {
   const index=read('index.html');
   const entry=read('patch-v025.js');
   const pkg=JSON.parse(read('package.json'));
-  assert.equal(pkg.version,'0.37.3');
-  assert.match(index,/app\.js\?v=0373/);
-  assert.match(index,/patch-v025\.js\?v=0373/);
+  assert.equal(pkg.version,'0.37.4');
+  assert.match(index,/app\.js\?v=0374/);
+  assert.match(index,/patch-v025\.js\?v=0374/);
   assert.match(entry,/patch-v033\.js\?v=0333hf14/);
   assert.match(entry,/patch-v0342\.js\?v=0370/);
 });

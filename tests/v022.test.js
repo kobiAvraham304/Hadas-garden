@@ -5,7 +5,7 @@ const {generateAutomaticSchedule}=require('../lib/auto-schedule');
 const {validateWeek}=require('../lib/schedule');
 
 test('0.22 metadata and migration align',()=>{
-  assert.equal(JSON.parse(read('package.json')).version,'0.37.3');
+  assert.equal(JSON.parse(read('package.json')).version,'0.37.4');
   assert.match(read('handlers/health.js'),/schema_version === '0.35.0'/);
   const sql=read('supabase/update-v0.22.0.sql');
   assert.match(sql,/max_work_days_per_week/);assert.match(sql,/priority_rank/);assert.doesNotMatch(sql,/drop table/i);
