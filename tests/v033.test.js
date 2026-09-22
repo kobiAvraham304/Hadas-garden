@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.33 release remains in the 0.34 compatibility chain', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.37.2');
+  assert.equal(JSON.parse(read('package.json')).version, '0.37.3');
   const entry = read('patch-v025.js');
   const patch = read('patch-v033.js');
   const vercel = JSON.parse(read('vercel.json'));
