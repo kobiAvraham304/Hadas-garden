@@ -8,7 +8,7 @@ const { canManageDailyOperations } = require('../lib/server');
 const { operationPayload } = require('../handlers/attendance');
 
 test('0.35 release bootstrap and schema markers are current', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.37.1');
+  assert.equal(JSON.parse(read('package.json')).version, '0.37.2');
   assert.match(read('VERSION.md'), /גרסה 0\.35\.0/);
   assert.match(read('patch-v025.js'), /V034 = '\/patch-v034\.js\?v=0350'/);
   assert.match(read('patch-v025.js'), /await loadScript\(V034, 'v034'\)/);
