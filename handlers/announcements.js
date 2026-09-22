@@ -87,6 +87,7 @@ module.exports = async function handler(req, res) {
       const content = String(body.body || '').trim();
       if (!title || !content) throw httpError(400, 'יש להזין כותרת ותוכן');
       const a = audience(caller, body.audience_type, body.class_id);
+      const pushRequested = truthy(body.send_push) || truthy(body.popup_on_login);
       const row = {
         title,
         body: content,
@@ -99,6 +100,7 @@ module.exports = async function handler(req, res) {
         is_pinned: Boolean(body.is_pinned),
         requires_acknowledgement: body.requires_acknowledgement !== false && String(body.requires_acknowledgement) !== 'false',
         popup_on_login: truthy(body.popup_on_login),
+        push_enabled: pushRequested,
         created_by: caller.employee.id,
         ...attachment(body),
       };
@@ -110,7 +112,7 @@ module.exports = async function handler(req, res) {
         throw error;
       }
       const ids = (await audienceEmployeeIds(a.audienceType, a.classId, body.employee_ids)).filter((id) => id !== caller.employee.id);
-      await notifyEmployees(ids, { type: 'announcement', title: `הודעה חדשה: ${title}`, message: content.slice(0, 220), entityType: 'announcement', entityId: item.id });
+      await notifyEmployees(ids, { type: 'announcement', title: `הודעה חדשה: ${title}`, message: content.slice(0, 220), entityType: 'announcement', entityId: item.id, push: pushRequested, pushUrl: `/?push=announcement&id=${encodeURIComponent(item.id)}`, pushTag: `announcement-${item.id}` });
       await audit(caller.employee.id, 'create', 'announcement', item.id);
       await emitEvent('announcements');
       return send(res, 201, { ok: true, item });
@@ -129,6 +131,7 @@ module.exports = async function handler(req, res) {
       }
       Object.assign(row, attachment(body));
       if (body.popup_on_login !== undefined) row.popup_on_login = truthy(body.popup_on_login);
+      if (body.push_enabled !== undefined) row.push_enabled = truthy(body.push_enabled);
       if (body.audience_type !== undefined) {
         const a = audience(caller, body.audience_type, body.class_id);
         row.audience_type = a.audienceType;
