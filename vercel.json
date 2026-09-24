@@ -1,6 +1,8 @@
 {
   "cleanUrls": true,
-  "regions": ["sin1"],
+  "regions": [
+    "sin1"
+  ],
   "trailingSlash": false,
   "git": {
     "deploymentEnabled": {
@@ -13,70 +15,493 @@
     }
   },
   "headers": [
-    {"source":"/","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/index.html","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/api/config","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"CDN-Cache-Control","value":"no-store"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/app.js","headers":[{"key":"Cache-Control","value":"no-cache, max-age=0, must-revalidate"}]},
-    {"source":"/styles.css","headers":[{"key":"Cache-Control","value":"no-cache, max-age=0, must-revalidate"}]},
-    {"source":"/patch-v025.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v025.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v027.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]},
-    {"source":"/patch-v027.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"}]},
-    {"source":"/patch-v028.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v028.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v029.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v029.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v030.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v030.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v031.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v031.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v032.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v032-core.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v032-exports.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v032-ux.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v032-stability.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v032.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v033.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v033.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v0331-hotfix.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v034.js","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/patch-v034.css","headers":[{"key":"Cache-Control","value":"no-store, max-age=0"},{"key":"Vercel-CDN-Cache-Control","value":"no-store"}]},
-    {"source":"/push-sw.js","headers":[{"key":"Cache-Control","value":"no-cache, max-age=0, must-revalidate"}]},
+    {
+      "source": "/",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/api/config",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "CDN-Cache-Control",
+          "value": "no-store"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/app.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/styles.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v025.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v025.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v027.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v027.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v028.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v028.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v029.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v029.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v030.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v030.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v031.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v031.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v032.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v032-core.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v032-exports.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v032-ux.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v032-stability.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v032.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v033.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v033.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v0331-hotfix.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v034.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/patch-v034.css",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "Vercel-CDN-Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/push-sw.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, max-age=0, must-revalidate"
+        }
+      ]
+    },
     {
       "source": "/(.*)",
       "headers": [
-        {"key":"X-Content-Type-Options","value":"nosniff"},
-        {"key":"X-Frame-Options","value":"DENY"},
-        {"key":"Referrer-Policy","value":"strict-origin-when-cross-origin"},
-        {"key":"Permissions-Policy","value":"camera=(), microphone=(), geolocation=()"},
-        {"key":"Cross-Origin-Opener-Policy","value":"same-origin"},
-        {"key":"Cross-Origin-Resource-Policy","value":"same-origin"},
-        {"key":"Content-Security-Policy","value":"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"}
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Cross-Origin-Resource-Policy",
+          "value": "same-origin"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+        }
       ]
     }
   ],
   "rewrites": [
-    {"source":"/","destination":"/index.html"},
-    {"source":"/health","destination":"/health.html"},
-    {"source":"/api/announcements","destination":"/api/index?route=announcements"},
-    {"source":"/api/attendance","destination":"/api/index?route=attendance"},
-    {"source":"/api/auth-change-password","destination":"/api/index?route=auth-change-password"},
-    {"source":"/api/auth-login","destination":"/api/index?route=auth-login"},
-    {"source":"/api/auth-logout","destination":"/api/index?route=auth-logout"},
-    {"source":"/api/auth-me","destination":"/api/index?route=auth-me"},
-    {"source":"/api/calendar","destination":"/api/index?route=calendar"},
-    {"source":"/api/config","destination":"/api/index?route=config"},
-    {"source":"/api/data","destination":"/api/index?route=data"},
-    {"source":"/api/daily-operations","destination":"/api/index?route=daily-operations"},
-    {"source":"/api/employees","destination":"/api/index?route=employees"},
-    {"source":"/api/health","destination":"/api/index?route=health"},
-    {"source":"/api/feedback","destination":"/api/index?route=feedback"},
-    {"source":"/api/requests","destination":"/api/index?route=requests"},
-    {"source":"/api/settings","destination":"/api/index?route=settings"},
-    {"source":"/api/shifts","destination":"/api/index?route=shifts"},
-    {"source":"/api/suggestions","destination":"/api/index?route=suggestions"},
-    {"source":"/api/tasks","destination":"/api/index?route=tasks"},
-    {"source":"/api/notifications","destination":"/api/index?route=notifications"},
-    {"source":"/api/push","destination":"/api/index?route=push"}
+    {
+      "source": "/",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/health",
+      "destination": "/health.html"
+    },
+    {
+      "source": "/api/announcements",
+      "destination": "/api/index?route=announcements"
+    },
+    {
+      "source": "/api/attendance",
+      "destination": "/api/index?route=attendance"
+    },
+    {
+      "source": "/api/auth-change-password",
+      "destination": "/api/index?route=auth-change-password"
+    },
+    {
+      "source": "/api/auth-login",
+      "destination": "/api/index?route=auth-login"
+    },
+    {
+      "source": "/api/auth-logout",
+      "destination": "/api/index?route=auth-logout"
+    },
+    {
+      "source": "/api/auth-me",
+      "destination": "/api/index?route=auth-me"
+    },
+    {
+      "source": "/api/calendar",
+      "destination": "/api/index?route=calendar"
+    },
+    {
+      "source": "/api/config",
+      "destination": "/api/index?route=config"
+    },
+    {
+      "source": "/api/data",
+      "destination": "/api/index?route=data"
+    },
+    {
+      "source": "/api/daily-operations",
+      "destination": "/api/index?route=daily-operations"
+    },
+    {
+      "source": "/api/employees",
+      "destination": "/api/index?route=employees"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/index?route=health"
+    },
+    {
+      "source": "/api/feedback",
+      "destination": "/api/index?route=feedback"
+    },
+    {
+      "source": "/api/requests",
+      "destination": "/api/index?route=requests"
+    },
+    {
+      "source": "/api/settings",
+      "destination": "/api/index?route=settings"
+    },
+    {
+      "source": "/api/shifts",
+      "destination": "/api/index?route=shifts"
+    },
+    {
+      "source": "/api/suggestions",
+      "destination": "/api/index?route=suggestions"
+    },
+    {
+      "source": "/api/tasks",
+      "destination": "/api/index?route=tasks"
+    },
+    {
+      "source": "/api/notifications",
+      "destination": "/api/index?route=notifications"
+    },
+    {
+      "source": "/api/push",
+      "destination": "/api/index?route=push"
+    },
+    {
+      "source": "/api/push-worker",
+      "destination": "/api/index?route=push-worker"
+    }
   ]
 }
