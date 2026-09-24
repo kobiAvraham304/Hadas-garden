@@ -1,6 +1,6 @@
-/* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.37.4 */
+/* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.38.0 */
 (() => {
-  const VERSION = '0.37.4';
+  const VERSION = '0.38.0';
   const V026 = '/patch-v026.js?v=0321hf12';
   const V033 = '/patch-v033.js?v=0333hf14';
   const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
