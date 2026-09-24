@@ -23,6 +23,7 @@ const routes = Object.freeze({
   'health': require('../handlers/health'),
   'notifications': require('../handlers/notifications'),
   'push': require('../handlers/push'),
+  'push-worker': require('../handlers/push-worker'),
   'requests': require('../lib/requests-v030'),
   'settings': require('../handlers/settings'),
   'shifts': require('../lib/shifts-v032'),

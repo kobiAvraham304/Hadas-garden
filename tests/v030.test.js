@@ -9,7 +9,7 @@ const { truthy } = require('../lib/requests-v030');
 const { syntheticLeaveRequestId } = require('../lib/calendar-v030');
 
 test('0.30 release layers remain available under the current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.37.4');
+  assert.equal(JSON.parse(read('package.json')).version, '0.38.0');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('health.js'), /update-v0.35.0\.sql/);
@@ -102,7 +102,7 @@ test('0.30 runtime stays intact while physical entrypoints advance to v0.34', ()
   assert.match(read('patch-v030.js'), /const VERSION = '0\.30\.0'/);
   assert.match(read('patch-v030.js'), /PREVIOUS_PATCH = '\/patch-v029\.js\?v=0300'/);
   assert.match(read('patch-v030.css'), /patch-v029\.css\?v=0300/);
-  assert.match(entry, /const VERSION = '0\.37\.4'/);
+  assert.match(entry, /const VERSION = '0\.38\.0'/);
   assert.match(entry, /V026 = '\/patch-v026\.js\?v=0321hf12'/);
   assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf14'/);
   assert.match(entry, /await loadScript\(V026, 'v026'\)/);
