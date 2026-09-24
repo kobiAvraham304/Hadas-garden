@@ -427,9 +427,19 @@
   <dialog id="calendarEventDialog" class="modal"><div class="modal-card"><div class="modal-heading"><div><p class="eyebrow">פרטי אירוע</p><h3 id="calendarEventTitle"></h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div><div id="calendarEventDetails" class="event-details"></div><div id="calendarEventActions" class="modal-actions"></div></div></dialog>
 
   <dialog id="notificationsDialog" class="modal notifications-modal">
-    <div class="modal-card large-modal">
-      <div class="modal-heading"><div><p class="eyebrow">עדכונים אישיים</p><h3>התראות ועדכונים</h3><p class="muted">בקשות, שיבוצים ופעולות שקשורות אליך.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <section id="pushSettingsCard" class="push-settings-card" aria-live="polite"><div class="push-settings-icon" aria-hidden="true">🔔</div><div class="push-settings-copy"><strong>התראות בטלפון</strong><small id="pushStatusText">קבלו שיבוצים, תוצאות בקשות והודעות חשובות גם כשהמערכת סגורה.</small></div><button id="pushToggleBtn" type="button" class="secondary-btn">הפעלת התראות</button></section>
+    <div class="modal-card notifications-shell">
+      <div class="modal-heading notifications-heading"><div><p class="eyebrow">עדכונים אישיים</p><h3>התראות ועדכונים</h3><p class="muted">בקשות, שיבוצים ופעולות שקשורות אליך.</p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <section id="pushSettingsCard" class="push-control-panel" aria-live="polite">
+        <div class="push-control-title"><span class="push-control-icon" aria-hidden="true">🔔</span><div><strong>התראות לטלפון</strong><small>שליטה בעדכונים שמגיעים גם כשהמערכת סגורה.</small></div><span id="pushStateBadge" class="push-state-badge">כבוי</span></div>
+        <div class="push-control-row">
+          <div><strong>קבלת התראות</strong><small id="pushStatusText">שיבוצים, בקשות והודעות חשובות.</small></div>
+          <button id="pushToggleBtn" type="button" class="push-switch" role="switch" aria-checked="false" aria-label="קבלת התראות לטלפון"><span></span></button>
+        </div>
+        <div class="push-control-row smart-shift-row">
+          <div><strong>תזכורות משמרת חכמות</strong><small id="pushSmartStatusText">תזכורת שעה לפני המשמרת ובתחילתה.</small></div>
+          <button id="pushSmartToggleBtn" type="button" class="push-switch" role="switch" aria-checked="false" aria-label="תזכורות משמרת חכמות"><span></span></button>
+        </div>
+      </section>
       <div id="notificationsSummary" class="notifications-summary"></div>
       <div class="notifications-toolbar"><div id="notificationFilterChips" class="notification-filter-chips" role="group" aria-label="סינון התראות"><button type="button" data-notification-filter="action">דורש טיפול</button><button type="button" data-notification-filter="unread">לא נקרא</button><button type="button" data-notification-filter="all">הכול</button></div><button id="markAllNotificationsBtn" type="button" class="ghost-btn">סימון הכול כנקרא</button></div>
       <div id="notificationsList" class="notifications-list"></div>
