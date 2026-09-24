@@ -127,7 +127,7 @@ module.exports = async function pushWorkerHandler(req,res) {
       db().from('hadas_classes').select('id,name').in('id',classIds),
       db().from('hadas_shift_reminder_deliveries').select('employee_id,schedule_fingerprint,status').eq('shift_date',date).eq('reminder_type','one_hour'),
     ]);
-    const employees = assertDb(employeesR,'לא ניתן לטעון עובדות') || [];
+    const employees = assertDb(employeesR,'לא ניתן לטעון עובדים') || [];
     const classes = assertDb(classesR,'לא ניתן לטעון כיתות') || [];
     const oneHourRows = assertDb(oneHourR,'לא ניתן לבדוק תזכורות קודמות') || [];
     const employeeMap = new Map(employees.map((row) => [row.id,row]));
