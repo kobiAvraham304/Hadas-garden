@@ -1,0 +1,48 @@
+/* מעון הדס — תצוגת בקשות 0.39.0 */
+.v039-request-period{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin:12px 0;
+  padding:12px 14px;
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:var(--surface);
+}
+.v039-request-period>div:first-child{display:grid;gap:3px}
+.v039-request-period strong{font-size:.86rem}
+.v039-period-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.v039-period-actions input[type="month"]{
+  min-height:42px;
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:0 10px;
+  background:var(--surface);
+  font:inherit;
+}
+.v039-submitted{margin:3px 0 0;font-size:.76rem;opacity:.7}
+.v039-manual-checkbox{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:10px;
+  font-weight:700;
+  cursor:pointer;
+}
+.v039-manual-checkbox input{width:18px;height:18px}
+.v039-manual-leave{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.v039-manual-leave>div{display:grid;gap:3px}
+.v039-manual-leave small{opacity:.72}
+.request-key-details .time-value{direction:ltr;unicode-bidi:isolate}
+@media(max-width:760px){
+  .v039-request-period{align-items:stretch;flex-direction:column}
+  .v039-period-actions{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto}
+  .v039-period-actions input[type="month"]{width:100%}
+  .v039-manual-leave{align-items:stretch;flex-direction:column}
+}

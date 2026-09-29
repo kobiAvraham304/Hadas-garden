@@ -5,7 +5,7 @@
  */
 // Must load before route modules: it wraps shared scheduling exports before
 // handlers destructure them and also provides per-request approval context.
-const schedulingHotfix = require('../lib/hotfix-v0342');
+const schedulingHotfix = require('../lib/hotfix-v039');
 
 const routes = Object.freeze({
   'announcements': require('../handlers/announcements'),
@@ -24,9 +24,9 @@ const routes = Object.freeze({
   'notifications': require('../handlers/notifications'),
   'push': require('../handlers/push'),
   'push-worker': require('../handlers/push-worker'),
-  'requests': require('../lib/requests-v030'),
+  'requests': require('../lib/requests-v039'),
   'settings': require('../handlers/settings'),
-  'shifts': require('../lib/shifts-v032'),
+  'shifts': require('../lib/shifts-v039'),
   'suggestions': require('../lib/suggestions-v026'),
   'tasks': require('../handlers/tasks'),
 });

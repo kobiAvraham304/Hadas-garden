@@ -1,6 +1,6 @@
-/* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.38.0 */
+/* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.39.0 */
 (() => {
-  const VERSION = '0.38.0';
+  const VERSION = '0.39.0';
   const V026 = '/patch-v026.js?v=0321hf12';
   const V033 = '/patch-v033.js?v=0333hf14';
   const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
@@ -8,6 +8,8 @@
   const V0342 = '/patch-v0342.js?v=0370';
   const V0343 = '/patch-v0343.js?v=0350';
   const V0345 = '/patch-v0345.js?v=0362';
+  const V039 = '/patch-v039.js?v=0390';
+  const V039_CSS = '/patch-v039.css?v=0390';
 
   let releaseApiGate;
   let gateReleased = false;
@@ -111,6 +113,15 @@
     }
   }
 
+  function loadStyle(href, marker) {
+    if (document.querySelector(`link[data-hadas-bootstrap="${marker}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    link.dataset.hadasBootstrap = marker;
+    document.head.append(link);
+  }
+
   function loadScript(src, marker) {
     return new Promise((resolve, reject) => {
       const existing = document.querySelector(`script[data-hadas-bootstrap="${marker}"]`);
@@ -138,6 +149,7 @@
     window.__hadasCurrentBootstrapStarted = true;
     forceVersion();
     installTourSafety();
+    loadStyle(V039_CSS, 'v039-css');
 
     try {
       await loadScript(V026, 'v026');
@@ -159,9 +171,11 @@
       }
       await loadScript(V0343, 'v0343');
       await loadScript(V0345, 'v0345');
+      await loadScript(V039, 'v039');
+      if (!window.__hadasV039Ready) throw new Error('עדכון הבקשות לא סיים להיטען');
       installReleaseVersionGuard();
     } catch (error) {
-      console.error('Hadas v0.36.0 bootstrap failed', error);
+      console.error('Hadas v0.39.0 bootstrap failed', error);
       const toast = document.querySelector('#toast');
       if (toast) {
         toast.textContent = 'טעינת עדכון המערכת נכשלה. המערכת תמשיך במצב בסיסי; מומלץ לרענן.';
