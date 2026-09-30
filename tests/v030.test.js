@@ -14,9 +14,9 @@ test('0.30 release layers remain available under the current release', () => {
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('health.js'), /update-v0.35.0\.sql/);
   const api = read('api/index.js');
-  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
+  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v039'\)/);
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v032'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v039'\)/);
   assert.match(read('lib/calendar-v032.js'), /require\('\.\/calendar-v030'\)/);
   assert.match(read('lib/shifts-v032.js'), /require\('\.\/shifts-v030'\)/);
   assert.match(read('supabase/update-v0.30.0.sql'), /schema_version='0\.30\.0'/);

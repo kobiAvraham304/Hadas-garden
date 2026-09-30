@@ -12,7 +12,7 @@ test('0.32.1 layers remain available under the 0.34 release bootstrap', () => {
   assert.match(read('handlers/health.js'), /databaseVersion:'0.35.0'/);
   const api = read('api/index.js');
   assert.match(api, /calendar-v032/);
-  assert.match(api, /shifts-v032/);
+  assert.match(api, /shifts-v039/);
   const entry = read('patch-v025.js');
   assert.match(entry, /const VERSION = '0\.39\.0'/);
   assert.match(entry, /V033 = '\/patch-v033\.js\?v=0333hf14'/);

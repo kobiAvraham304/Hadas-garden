@@ -16,11 +16,11 @@ test('0.26 upgraded request and suggestion layers remain available under current
   const version = read('VERSION.md');
   assert.equal(pkg.version, '0.39.0');
   assert.match(version, /גרסה 0.35.0/);
-  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v030'\)/);
+  assert.match(api, /'requests': require\('\.\.\/lib\/requests-v039'\)/);
   assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);
   assert.match(read('lib/requests-v028.js'), /require\('\.\/requests-v026'\)/);
   assert.match(api, /'suggestions': require\('\.\.\/lib\/suggestions-v026'\)/);
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v032'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v039'\)/);
 });
 
 test('0.26 preview shifts are normalized as the effective future schedule', () => {

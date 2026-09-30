@@ -10,7 +10,7 @@ test('0.27 release layers remain wired under current release', () => {
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   const api = read('api/index.js');
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
-  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v032'\)/);
+  assert.match(api, /'shifts': require\('\.\.\/lib\/shifts-v039'\)/);
   assert.match(read('lib/calendar-v030.js'), /require\('\.\/calendar-v027'\)/);
   assert.match(read('lib/shifts-v030.js'), /require\('\.\/shifts-v027'\)/);
   assert.match(read('lib/shifts-v027.js'), /require\('\.\/shifts-v025'\)/);

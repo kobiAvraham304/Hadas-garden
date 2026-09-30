@@ -11,7 +11,7 @@ test('0.28 metadata, health and request wrapper remain aligned under current rel
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
   assert.match(read('health.js'), /update-v0.35.0\.sql/);
-  assert.match(read('api/index.js'), /'requests': require\('\.\.\/lib\/requests-v030'\)/);
+  assert.match(read('api/index.js'), /'requests': require\('\.\.\/lib\/requests-v039'\)/);
   assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);
 });
 
