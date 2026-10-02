@@ -37,3 +37,10 @@ test('0.39.1 version markers are synchronized',()=>{
   assert.match(read('patch-v025.js'),/patch-v0391\.js\?v=0391/);
   assert.match(read('VERSION.md'),/^# 0\.39\.1/);
 });
+
+test('0.39.1 adds an index for manual leave completion foreign-key lookups',()=>{
+  const sql=read('supabase/update-v0.39.1.sql');
+  assert.match(sql,/hadas_requests_manual_leave_form_completed_by_idx/);
+  assert.match(sql,/manual_leave_form_completed_by/);
+  assert.doesNotMatch(sql,/drop table|truncate table|delete from/i);
+});
