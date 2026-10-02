@@ -1,0 +1,47 @@
+/* מעון הדס — 0.39.1 */
+#autoScheduleDialog .v032-auto-week-selected{display:none!important}
+
+.v0391-personal-general-day{
+  background:linear-gradient(180deg,#fffaf0,#fffdf8)!important;
+  border-color:#ead7a8!important;
+}
+.v0391-personal-general-off{
+  display:flex;
+  align-items:flex-start;
+  gap:9px;
+  margin:9px;
+  padding:10px 11px;
+  border:1px solid #ead49e;
+  border-radius:13px;
+  background:#fff3d6;
+  color:#76551b;
+  box-shadow:0 4px 12px rgba(118,85,27,.06);
+}
+.v0391-personal-general-off>div{display:grid;gap:2px;min-width:0}
+.v0391-personal-general-off strong{font-size:.72rem;line-height:1.15}
+.v0391-personal-general-off b{font-size:.82rem;line-height:1.2;overflow-wrap:anywhere}
+.v0391-personal-general-off small{font-size:.67rem;line-height:1.25;color:#8b6b31;overflow-wrap:anywhere}
+.v0391-general-off-icon{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;border-radius:9px;background:#ffe7a8;font-size:.9rem}
+
+.feedback-modal{position:relative}
+.v0391-feedback-credit{
+  position:absolute;
+  inset-inline-start:18px;
+  top:67px;
+  z-index:2;
+  font-size:.66rem;
+  font-weight:700;
+  color:var(--muted);
+  opacity:.72;
+  pointer-events:none;
+  white-space:nowrap;
+}
+
+@media(max-width:760px){
+  .v0391-personal-general-off{margin:7px;padding:9px;gap:8px}
+  .v0391-general-off-icon{flex-basis:26px;width:26px;height:26px}
+  .v0391-feedback-credit{inset-inline-start:14px;top:62px;font-size:.62rem}
+}
+@media(max-width:420px){
+  .v0391-feedback-credit{position:static;display:block;margin:-4px 14px 8px;text-align:left}
+}
