@@ -86,5 +86,5 @@ test('0.39 migration canonicalizes historic request hours and adds the missing F
 });
 
 test('0.39 package version is synchronized',()=>{
-  assert.equal(JSON.parse(read('package.json')).version,'0.39.3');
+  assert.equal(JSON.parse(read('package.json')).version,'0.39.4');
 });
