@@ -77,3 +77,24 @@ test('0.39.4 the primary shift validator retains the same precise override and a
   assert.match(backend,/const approvedSick=requests\.find/);
   assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'0.39.4');
 });
+
+test('0.39.4 fast legacy saves delegate explicitly confirmed leave overrides to current shift handler',async()=>{
+  const source=fs.readFileSync('lib/shifts-v025.js','utf8');
+  const calls=[];
+  const legacyHandler=async(req)=>{calls.push({method:req.method,flag:req.body.override_approved_leave});return {ok:true,legacy:true};};
+  const deps={
+    '../handlers/shifts':legacyHandler,
+    './server':{parseBody:req=>req.body},
+    './schedule':{},
+    '../handlers/daily-operations':{}
+  };
+  const mod={exports:{}};
+  const factory=vm.runInNewContext('(function(require,module,exports){'+source+'\\n})',{});
+  factory(name=>{assert.ok(Object.hasOwn(deps,name),'unexpected dependency '+name);return deps[name]},mod,mod.exports);
+  const makeBody={...payload,override_approved_leave:true};
+  const post=await mod.exports({method:'POST',body:makeBody},{});
+  assert.equal(post.legacy,true);
+  const patch=await mod.exports({method:'PATCH',body:{...makeBody,id:'existing-id',complete_payload:true}},{});
+  assert.equal(patch.legacy,true);
+  assert.deepEqual(calls,[{method:'POST',flag:true},{method:'PATCH',flag:true}]);
+});
