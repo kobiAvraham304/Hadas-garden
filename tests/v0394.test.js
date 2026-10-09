@@ -89,7 +89,7 @@ test('0.39.4 fast legacy saves delegate explicitly confirmed leave overrides to 
     '../handlers/daily-operations':{}
   };
   const mod={exports:{}};
-  const factory=vm.runInNewContext('(function(require,module,exports){'+source+'\\n})',{});
+  const factory=vm.runInNewContext('(function(require,module,exports){'+source+'\n})',{});
   factory(name=>{assert.ok(Object.hasOwn(deps,name),'unexpected dependency '+name);return deps[name]},mod,mod.exports);
   const makeBody={...payload,override_approved_leave:true};
   const post=await mod.exports({method:'POST',body:makeBody},{});
