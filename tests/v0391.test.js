@@ -32,10 +32,10 @@ test('0.39.1 uses narrow render hooks without a broad DOM observer',()=>{
 });
 
 test('0.39.1 version markers are synchronized',()=>{
-  assert.equal(JSON.parse(read('package.json')).version,'0.39.3');
-  assert.match(read('patch-v025.js'),/const VERSION = '0\.39\.3'/);
+  assert.equal(JSON.parse(read('package.json')).version,'0.39.4');
+  assert.match(read('patch-v025.js'),/const VERSION = '0\.39\.4'/);
   assert.match(read('patch-v025.js'),/patch-v0391\.js\?v=0391/);
-  assert.match(read('VERSION.md'),/^# 0\.39\.3/);
+  assert.match(read('VERSION.md'),/^# 0\.39\.4/);
 });
 
 test('0.39.1 adds an index for manual leave completion foreign-key lookups',()=>{

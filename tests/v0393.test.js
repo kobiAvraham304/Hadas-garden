@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const read = path => fs.readFileSync(path,'utf8');
 
-test('0.39.3 shows the explicit leave checkbox before the scrollable employee list', () => {
+test('0.39.4 shows the explicit leave checkbox before the scrollable employee list', () => {
   const html = read('index.html');
   const field = html.indexOf('id="approvedLeaveOverrideField"');
   const list = html.indexOf('id="shiftEmployeeOptionsList"');
@@ -14,7 +14,7 @@ test('0.39.3 shows the explicit leave checkbox before the scrollable employee li
   assert.match(read('patch-v0392.css'),/#shiftForm #approvedLeaveOverrideCheck\{appearance:auto!important/);
 });
 
-test('0.39.3 synchronizes native hidden property and checkbox disabled state', () => {
+test('0.39.4 synchronizes native hidden property and checkbox disabled state', () => {
   const client = read('app.js');
   const start = client.indexOf('function syncApprovedLeaveOverride()');
   const end = client.indexOf('function renderShiftEmployeePicker()', start);
@@ -41,11 +41,11 @@ test('0.39.3 synchronizes native hidden property and checkbox disabled state', (
   assert.equal(checkbox.checked,false,'stale leave approval must never remain selected');
 });
 
-test('0.39.3 reflects live employee/date changes and preserves mandatory server leave authorization', () => {
+test('0.39.4 reflects live employee/date changes and preserves mandatory server leave authorization', () => {
   const client = read('app.js'),server=read('handlers/shifts.js');
   assert.match(client,/function updateShiftEmployeeHint\(\) \{\s*syncApprovedLeaveOverride\(\);/);
   assert.match(client,/\[name="shift_date"\]'\)\.addEventListener\('change', \(\) => \{ syncApprovedLeaveOverride\(\);/);
   assert.match(server,/overrideApprovedLeave && \['leave','day_off'\]\.includes\(approvedAbsence\.request_type\)/);
-  assert.equal(JSON.parse(read('package.json')).version, '0.39.3');
+  assert.equal(JSON.parse(read('package.json')).version, '0.39.4');
   assert.match(read('patch-v025.js'),/patch-v0392\.css\?v=0393/);
 });
