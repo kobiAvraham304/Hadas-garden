@@ -437,7 +437,7 @@ function bindEvents() {
   $('#approvedLeaveOverrideCheck').addEventListener('change', updateShiftEmployeeHint);
   $('#deleteShiftFromDialogBtn').addEventListener('click', deleteShiftFromDialog);
   $('#addLeaveFromShiftBtn')?.addEventListener('click', openLeaveFromShift);
-  $('#shiftForm [name="shift_date"]').addEventListener('change', () => { syncShiftHoursFromPattern(); queueShiftRecommendations(); });
+  $('#shiftForm [name="shift_date"]').addEventListener('change', () => { syncApprovedLeaveOverride(); syncShiftHoursFromPattern(); queueShiftRecommendations(); });
   for (const name of ['class_id','start_time','end_time','shift_role']) $('#shiftForm [name="'+name+'"]').addEventListener(name.includes('time') ? 'input' : 'change', (event) => { if (name === 'shift_role') $('#shiftForm').dataset.roleTouched = 'true'; queueShiftRecommendations(event); });
   $('#shiftRecommendations').addEventListener('click', handleShiftRecommendationClick);
   $('#publishChangeNowBtn').addEventListener('click', publishPendingChangeNow);
@@ -1326,6 +1326,8 @@ function syncApprovedLeaveOverride() {
   if (!form || !field || !checkbox) return;
   const available = Boolean(approvedLeaveForShift(form.elements.employee_id.value));
   field.classList.toggle('hidden', !available);
+  field.hidden = !available;
+  field.setAttribute('aria-hidden', String(!available));
   checkbox.disabled = !available;
   if (!available) checkbox.checked = false;
 }
@@ -1380,6 +1382,7 @@ function handleShiftEmployeePickerClick(event) {
   renderShiftEmployeePicker(); if(!preserveExistingHours) syncShiftHoursFromPattern(); syncShiftRoleFromEmployee(true); updateShiftEmployeeHint();
 }
 function updateShiftEmployeeHint() {
+  syncApprovedLeaveOverride();
   const form = $("#shiftForm"); const employeeId = form.elements.employee_id.value;
   const candidate = state.shiftPickerCandidates.find((item) => item.employee_id === employeeId);
   const employee = employeeById(employeeId); const hint = $("#shiftEmployeeHint"); if (!hint) return;

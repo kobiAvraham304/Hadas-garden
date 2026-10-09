@@ -2,7 +2,7 @@
 (() => {
   if (window.__hadasV0391Ready) return;
 
-  const VERSION = '0.39.2';
+  const VERSION = '0.39.3';
 
   function generalDaysOffRows() {
     const rows = [];
