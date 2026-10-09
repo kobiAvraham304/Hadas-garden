@@ -13,3 +13,8 @@ input[data-hadas-24h]{min-width:100px}
 .approved-leave-override strong{font-size:.85rem}
 .approved-leave-override small{font-size:.75rem;font-weight:500;line-height:1.5}
 .auto-validation-handoff{margin-block:12px}
+
+/* 0.39.3: keep leave confirmation unmistakable and above scrollable employee results. */
+#shiftForm #approvedLeaveOverrideField:not(.hidden){display:flex!important;visibility:visible!important;opacity:1!important;position:relative!important;z-index:2;align-items:center!important;min-height:66px!important;width:100%!important;gap:12px!important;padding:13px 15px!important;margin:4px 0 2px!important;box-sizing:border-box!important;border:2px solid #d9a948!important;background:#fff8e9!important}
+#shiftForm #approvedLeaveOverrideCheck{appearance:auto!important;display:block!important;flex:0 0 22px!important;width:22px!important;min-width:22px!important;max-width:22px!important;height:22px!important;min-height:22px!important;max-height:22px!important;margin:0!important;padding:0!important;accent-color:#865f18!important}
+#shiftForm #approvedLeaveOverrideField span{flex:1;min-width:0;line-height:1.35}
