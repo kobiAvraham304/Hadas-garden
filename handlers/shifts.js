@@ -64,7 +64,7 @@ async function assertShiftsSafeToDelete(shifts) {
   if((assertDb(sourceRequestsR,'לא ניתן לבדוק בקשות מקושרות')||[]).length||(assertDb(targetRequestsR,'לא ניתן לבדוק בקשות מקושרות')||[]).length)throw httpError(409,'לא ניתן למחוק שיבוץ שמקושר לבקשה פתוחה. יש לטפל בבקשה תחילה.');
 }
 
-async function validateShift(payload, id, overrideDayOff = false, overrideRules = false) {
+async function validateShift(payload, id, overrideDayOff = false, overrideRules = false, overrideApprovedLeave = false) {
   if (!payload.shift_date || !payload.class_id || !payload.employee_id) throw httpError(400, 'חסרים פרטי שיבוץ');
   if (!payload.start_time || !payload.end_time || timeToMinutes(payload.end_time) <= timeToMinutes(payload.start_time)) throw httpError(400, 'שעות השיבוץ אינן תקינות');
   const [employeeR, classR, settingsR, patternR, requestsR] = await Promise.all([
@@ -99,7 +99,7 @@ async function validateShift(payload, id, overrideDayOff = false, overrideRules 
     const forbidden = constraintRows.find((item) => (!item.valid_from || item.valid_from <= payload.shift_date) && (!item.valid_to || item.valid_to >= payload.shift_date));
     if (forbidden) throw httpError(409, forbidden.reason ? `קיים איסור שיבוץ בכיתה: ${forbidden.reason}` : 'קיים איסור לשבץ את העובד בכיתה זו');
     const approvedAbsence=requests.find((row)=>row.request_date<=payload.shift_date&&payload.shift_date<=String(row.request_end_date||row.request_date));
-    if(approvedAbsence) throw httpError(409, `לעובד יש ${approvedAbsence.request_type==='sick'?'מחלה':'חופשה/יום חופשי'} מאושרים בתאריך זה`);
+    if(approvedAbsence && !(overrideApprovedLeave && ['leave','day_off'].includes(approvedAbsence.request_type))) throw httpError(409, `לעובד יש ${approvedAbsence.request_type==='sick'?'מחלה':'חופשה/יום חופשי'} מאושרים בתאריך זה`);
     const day = new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay(); const pattern = weeklyPatterns.find((row) => Number(row.weekday) === day);
     if (!pattern) throw httpError(409, 'היום אינו מוגדר בכרטיס העובד. יש לעדכן יום עבודה/חופשי/לפי צורך או לבחור שיבוץ ידני חריג');
     const fixedDayOff = pattern.day_type === 'day_off'; if (fixedDayOff && !(overrideDayOff||overrideRules)) throw httpError(409, 'זהו יום חופשי קבוע של העובד. ניתן לשמור רק כשיבוץ ידני חריג');
@@ -339,23 +339,21 @@ module.exports = async function handler(req, res) {
       const basePlan = generateAutomaticSchedule({ ...data, weekStart, mode, selectedDates, createdBy: caller.employee.id });
       if (body.signature && body.signature !== basePlan.signature) throw httpError(409, 'נתוני העובדים או השבוע השתנו מאז התצוגה המקדימה. יש לחשב מחדש את השיבוץ.');
       const plan=buildManualAutomaticPlan(basePlan,data,{weekStart,mode,selectedDates,manualGenerated:body.manual_generated,callerId:caller.employee.id});
-      const incompleteCodes = new Set(['understaffed','missing_leader','short_nonfixed_shift']);
-      const hardErrors = plan.validation.errors.filter((item)=>!incompleteCodes.has(item.code));
-      if (hardErrors.length) throw httpError(409, 'נשארו נקודות שחייבות תיקון לפני החלת השיבוץ. פתחו את הנקודה ובצעו תיקון בתצוגה המקדימה.', { errors:hardErrors, warnings:plan.validation.warnings });
-      if (plan.validation.errors.length && !body.allow_incomplete) throw httpError(409, 'נשארו חוסרים בשיבוץ האוטומטי. ניתן לחזור לתצוגה המקדימה או לאשר יצירת טיוטה חלקית.', plan.validation);
+      // Safety invariants remain blocking; staffing gaps and approvable deviations belong to the separate validation screen.
+      const unsafeCodes = new Set(['overlap','outside_opening_hours','approved_absence','forbidden_class','teacher_fixed_class']);
+      const unsafeErrors = plan.validation.errors.filter((item)=>unsafeCodes.has(item.code));
+      if (unsafeErrors.length) throw httpError(409, 'השיבוץ האוטומטי מכיל התנגשות או שיבוץ לא בטוח. יש לחשב מחדש לפני שמירת הטיוטה.', { errors:unsafeErrors });
       if (!plan.generated.length) throw httpError(409, mode === 'fill' ? 'לא נמצאו חוסרים שניתן למלא אוטומטית' : 'לא ניתן היה ליצור שיבוצים מהנתונים הקיימים');
       if(mode==='rebuild'&&automaticSchedulesMatch(data.existingShifts,plan.generated,selectedDates)){
-        const approvedKeys=await persistAutomaticApprovals({weekStart,plan,approvedIssues:body.approved_issues,caller});
-        return send(res,200,{ok:true,count:0,mode,unchanged:true,metrics:plan.metrics,validation:plan.validation,approved_keys:approvedKeys});
+        return send(res,200,{ok:true,count:0,mode,unchanged:true,metrics:plan.metrics,validation:plan.validation,approved_keys:[]});
       }
       const rows = plan.generated.map((row) => ({ ...row, status: 'draft', created_by: caller.employee.id }));
       const applied = assertDb(await db().rpc('hadas_apply_automatic_schedule',{
         p_week_start:weekStart,p_selected_dates:selectedDates,p_rows:rows,p_actor_id:caller.employee.id,p_mode:mode,
       }),'לא ניתן להחיל את השיבוץ האוטומטי כעסקה אחת') || {};
       const inserted=Array.isArray(applied.inserted)?applied.inserted:[];
-      const approvedKeys=await persistAutomaticApprovals({weekStart,plan,approvedIssues:body.approved_issues,caller});
       await emitEvent('shifts');
-      return send(res, 201, { ok: true, count: inserted.length, mode, metrics: plan.metrics, validation: plan.validation, approved_keys: approvedKeys });
+      return send(res, 201, { ok: true, count: inserted.length, mode, metrics: plan.metrics, validation: plan.validation, approved_keys: [] });
     }
 
 
@@ -545,11 +543,11 @@ module.exports = async function handler(req, res) {
         shift_role: ['teacher', 'lead', 'staff', 'replacement'].includes(body.shift_role) ? body.shift_role : 'staff',
         status: 'draft',
         public_note: String(body.public_note || '').trim() || null,
-        rule_override:Boolean(body.override_rules),
-        rule_override_note:Boolean(body.override_rules) ? (String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית') : null,
+        rule_override:Boolean(body.override_rules || body.override_approved_leave),
+        rule_override_note:Boolean(body.override_approved_leave) ? 'שיבוץ ידני בזמן חופשה מאושרת — אישור מפורש' : (Boolean(body.override_rules) ? (String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית') : null),
         created_by: caller.employee.id,
       };
-      await validateShift(payload, null, Boolean(body.override_day_off), Boolean(body.override_rules));
+      await validateShift(payload, null, Boolean(body.override_day_off), Boolean(body.override_rules), Boolean(body.override_approved_leave));
       const shift = assertDb(await db().from('hadas_shifts').insert(payload).select('*').single(), 'לא ניתן לשמור שיבוץ');
       await recordChange(caller, 'create', null, shift);
       await audit(caller.employee.id, 'create', 'shift', shift.id, payload);
@@ -571,10 +569,10 @@ module.exports = async function handler(req, res) {
         shift_role: body.shift_role || current.shift_role,
         status: 'draft',
         public_note: body.public_note === undefined ? current.public_note : (String(body.public_note || '').trim() || null),
-        rule_override:body.override_rules === undefined ? Boolean(current.rule_override) : Boolean(body.override_rules),
-        rule_override_note:body.override_rules === undefined ? current.rule_override_note : (Boolean(body.override_rules)?(String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית'):null),
+        rule_override:body.override_rules === undefined && body.override_approved_leave === undefined ? Boolean(current.rule_override) : Boolean(body.override_rules || body.override_approved_leave),
+        rule_override_note:Boolean(body.override_approved_leave) ? 'שיבוץ ידני בזמן חופשה מאושרת — אישור מפורש' : (body.override_rules === undefined ? current.rule_override_note : (Boolean(body.override_rules)?(String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית'):null)),
       };
-      await validateShift(payload, id, Boolean(body.override_day_off), Boolean(payload.rule_override));
+      await validateShift(payload, id, Boolean(body.override_day_off), Boolean(body.override_rules), Boolean(body.override_approved_leave));
       const updated = assertDb(await db().from('hadas_shifts').update(payload).eq('id', id).select('*').single(), 'לא ניתן לעדכן שיבוץ');
       await recordChange(caller, 'update', current, updated);
       await audit(caller.employee.id, 'update', 'shift', id, payload);

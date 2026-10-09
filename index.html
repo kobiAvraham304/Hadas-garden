@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet" />
   <meta name="theme-color" content="#6f72d9" />
   <!-- production release 0.37.4: Push onboarding -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -271,6 +274,7 @@
           <input name="employee_id" type="hidden" required />
           <label class="employee-picker-search"><span aria-hidden="true">⌕</span><input id="shiftEmployeeSearch" type="search" placeholder="חיפוש לפי שם או תפקיד" autocomplete="off" /></label>
           <div id="shiftEmployeeOptionsList" class="shift-employee-options" role="listbox" aria-label="עובדים זמינים"></div>
+          <label id="approvedLeaveOverrideField" class="approved-leave-override full-field hidden"><input type="checkbox" name="override_approved_leave" id="approvedLeaveOverrideCheck" value="true" /><span><strong>אני מודע/ת לחופשה המאושרת ובכל זאת רוצה לשבץ</strong><small>סימון ✓ מאפשר שיבוץ ידני חריג. החופשה המאושרת לא תימחק, והפעולה תתועד.</small></span></label>
           <small id="shiftEmployeeHint">בחרו עובד/ת מתוך הרשימה. אין שינוי בשיבוץ עד לחיצה על “שמירת השיבוץ”.</small>
         </section>
         <label class="full-field">הערה גלויה<input name="public_note" placeholder="לדוגמה: עד 12:30 או ישיבה מקצועית" /></label>
