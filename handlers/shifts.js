@@ -98,8 +98,10 @@ async function validateShift(payload, id, overrideDayOff = false, overrideRules 
     const constraintRows = assertDb(await db().from('hadas_employee_class_constraints').select('id,reason,valid_from,valid_to').eq('employee_id', payload.employee_id).eq('class_id', payload.class_id).eq('constraint_type', 'forbidden'), 'בדיקת אילוצים נכשלה') || [];
     const forbidden = constraintRows.find((item) => (!item.valid_from || item.valid_from <= payload.shift_date) && (!item.valid_to || item.valid_to >= payload.shift_date));
     if (forbidden) throw httpError(409, forbidden.reason ? `קיים איסור שיבוץ בכיתה: ${forbidden.reason}` : 'קיים איסור לשבץ את העובד בכיתה זו');
+    const approvedSick=requests.find((row)=>row.request_type==='sick'&&row.request_date<=payload.shift_date&&payload.shift_date<=String(row.request_end_date||row.request_date));
+    if(approvedSick)throw httpError(409,'לעובד יש מחלה מאושרת בתאריך זה');
     const approvedAbsence=requests.find((row)=>row.request_date<=payload.shift_date&&payload.shift_date<=String(row.request_end_date||row.request_date));
-    if(approvedAbsence && !(overrideApprovedLeave && ['leave','day_off'].includes(approvedAbsence.request_type))) throw httpError(409, `לעובד יש ${approvedAbsence.request_type==='sick'?'מחלה':'חופשה/יום חופשי'} מאושרים בתאריך זה`);
+    if(approvedAbsence && !(overrideApprovedLeave && ['leave','day_off'].includes(approvedAbsence.request_type))) throw httpError(409, 'לעובד יש חופשה/יום חופשי מאושרים בתאריך זה');
     const day = new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay(); const pattern = weeklyPatterns.find((row) => Number(row.weekday) === day);
     if (!pattern) throw httpError(409, 'היום אינו מוגדר בכרטיס העובד. יש לעדכן יום עבודה/חופשי/לפי צורך או לבחור שיבוץ ידני חריג');
     const fixedDayOff = pattern.day_type === 'day_off'; if (fixedDayOff && !(overrideDayOff||overrideRules)) throw httpError(409, 'זהו יום חופשי קבוע של העובד. ניתן לשמור רק כשיבוץ ידני חריג');
