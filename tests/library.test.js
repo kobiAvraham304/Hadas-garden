@@ -92,3 +92,8 @@ test('library storage verifies canonical MIME as well as byte size',async()=>{
  global.fetch=async()=>new Response(JSON.stringify({metadata:{size:100,mimetype:'text/html'}}),{status:200});
  try{await assert.rejects(()=>require('../lib/library-storage').verifyUpload({name:'image.png',mime_type:'image/png',size_bytes:100,storage_path:'a.png'}));}finally{global.fetch=old;process.env=env;}
 });
+test('private file URLs include the Supabase Storage API prefix',async()=>{
+ const old=global.fetch,env={...process.env};Object.assign(process.env,{SUPABASE_URL:'https://fixture.invalid',SUPABASE_PUBLISHABLE_KEY:'fixture',SUPABASE_SECRET_KEY:'fixture'});
+ global.fetch=async()=>new Response(JSON.stringify({signedURL:'/object/sign/hadas-library/employee/file.txt?token=fixture'}),{status:200});
+ try{assert.equal(await require('../lib/server').createPrivateFileUrl('hadas-library','employee/file.txt'), 'https://fixture.invalid/storage/v1/object/sign/hadas-library/employee/file.txt?token=fixture');}finally{global.fetch=old;process.env=env;}
+});

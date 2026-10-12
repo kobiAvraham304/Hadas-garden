@@ -158,7 +158,7 @@
   }
   function openComposer(item=null){
     const d=composerDialog();if(d.open)return;
-    L.draft=null;L.selected=[];L.thumbAttempted=false;L.editId=item?.id||null;L.dirty=false;const form=el('libraryComposerForm');form.reset();
+    L.draft=null;L.selected=[];L.thumbAttempted=false;L.thumbNeedsCleanup=false;L.editId=item?.id||null;L.dirty=false;const form=el('libraryComposerForm');form.reset();
     if(item)for(const key of ['title','category','description','age_range','duration_minutes','materials','adaptations','link_url'])if(form.elements[key])form.elements[key].value=item[key]||'';
     form.elements.tags.value=(item?.tags||[]).join(', ');form.elements.category.value=item?.category||'meeting';
     el('libraryDropZone').classList.toggle('hidden',Boolean(item));el('libraryPublishBtn').textContent=item?'שמירת שינויים':'פרסום בספרייה';el('libraryUploadStatus').textContent=item?'עריכת פרטי התוכן':'התוכן משותף עם צוות המעון';renderSelected();d.showModal();
