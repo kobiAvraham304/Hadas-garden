@@ -7,10 +7,10 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const { validateWeek } = require('../lib/schedule');
 
 test('0.28 metadata, health and request wrapper remain aligned under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.39.4');
+  assert.equal(JSON.parse(read('package.json')).version, '0.40.0');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
-  assert.match(read('handlers/health.js'), /schema_version === '0.35.0'/);
-  assert.match(read('health.js'), /update-v0.35.0\.sql/);
+  assert.match(read('handlers/health.js'), /schema_version === '0.40.0'/);
+  assert.match(read('health.js'), /update-v0.40.0\.sql/);
   assert.match(read('api/index.js'), /'requests': require\('\.\.\/lib\/requests-v039'\)/);
   assert.match(read('lib/requests-v030.js'), /require\('\.\/requests-v028'\)/);
 });

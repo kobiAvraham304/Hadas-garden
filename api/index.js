@@ -21,6 +21,7 @@ const routes = Object.freeze({
   'employees': require('../handlers/employees'),
   'feedback': require('../handlers/feedback'),
   'health': require('../handlers/health'),
+  'library': require('../handlers/library'),
   'notifications': require('../handlers/notifications'),
   'push': require('../handlers/push'),
   'push-worker': require('../handlers/push-worker'),

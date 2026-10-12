@@ -278,7 +278,7 @@ async function apiFetch(url, options = {}) {
     try {
       const response = await fetch(url, { method, headers, credentials: 'same-origin', cache: 'no-store', signal: timeoutSignal(options.timeout || 12000), body: options.body === undefined ? undefined : JSON.stringify(options.body) });
       let data = {}; try { data = await response.json(); } catch {}
-      if (response.status === 401) { state.profile = null; setScreen('loginScreen'); throw Object.assign(new Error(data.error || 'ההתחברות פגה'), { status: 401 }); }
+      if (response.status === 401) { window.HadasLibrary?.reset(); state.profile = null; setScreen('loginScreen'); throw Object.assign(new Error(data.error || 'ההתחברות פגה'), { status: 401 }); }
       if (!response.ok) { const error = new Error(data.error || 'הפעולה נכשלה'); error.data = data; error.status = response.status; throw error; }
       if (method !== 'GET' && /\/api\/(shifts|requests|calendar|employees|settings|attendance|daily-operations)(?:\?|$)/.test(url)) {
         state.dataRevision += 1;
@@ -507,11 +507,12 @@ async function handlePasswordChange(event) {
 }
 async function logout() {
   try { await apiFetch('/api/auth-logout', { method: 'POST', body: {} }); } catch {}
+  window.HadasLibrary?.reset();
   state.profile = null; state.csrfToken = '';
   if (state.realtimeChannel && state.realtimeClient) state.realtimeClient.removeChannel(state.realtimeChannel);
   clearInterval(state.pollTimer); setScreen('loginScreen');
 }
-async function enterApp() { setScreen('appShell'); applyPermissions(); $('#attendanceDate').value = state.attendanceDate; $('#dailyDate').value = state.dailyDate; switchTab(state.activeTab); await refreshAll(); subscribeRealtime(); }
+async function enterApp() { setScreen('appShell'); applyPermissions(); $('#attendanceDate').value = state.attendanceDate; $('#dailyDate').value = state.dailyDate; switchTab(new URLSearchParams(location.search).has('library')?'library':state.activeTab); await refreshAll(); subscribeRealtime(); }
 function applyPermissions() {
   $$('.manager-only').forEach((element) => element.classList.toggle('hidden', !isManager()));
   $$('.daily-operations-only').forEach((element) => element.classList.toggle('hidden', !canManageDailyOperations()));
@@ -533,7 +534,7 @@ function applyPermissions() {
 function switchTab(tab) {
   if (tab === 'employees' && !isManager()) tab = 'dashboard';
   if (tab === 'daily' && !canManageDailyOperations()) tab = 'dashboard';
-  const secondaryTabs = new Set(['daily', 'attendance', 'tasks', 'calendar', 'employees']);
+  const secondaryTabs = new Set(['daily', 'attendance', 'tasks', 'calendar', 'employees', 'library']);
   state.activeTab = tab; storageSet('sessionStorage', 'hadas-active-tab', tab);
   $$('.nav-btn[data-tab]').forEach((button) => button.classList.toggle('active', button.dataset.tab === tab));
   $('#mobileMoreBtn').classList.toggle('active', secondaryTabs.has(tab));
@@ -544,7 +545,7 @@ function switchTab(tab) {
     renderAttendance();
     loadSelfAttendance(state.attendanceDate).catch(() => {});
   } else renderPanel(tab);
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 function scheduleCacheKey(date = state.weekStart) { return dateISO(startOfWeek(date)); }
 function schedulePayloadFromState() {
@@ -704,6 +705,7 @@ function subscribeRealtime() {
   if (state.realtimeChannel) state.realtimeClient.removeChannel(state.realtimeChannel);
   state.realtimeChannel = state.realtimeClient.channel('hadas-public-refresh').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'hadas_realtime_events' }, (payload) => {
     const topic = String(payload?.new?.topic || 'refresh');
+    if (window.HadasLibrary?.handleRealtime(topic)) return;
     state.realtimeTopics.add(topic);
     clearTimeout(state.reloadTimer);
     state.reloadTimer = setTimeout(async () => {
@@ -754,6 +756,7 @@ function populateSelects() {
   $('#employeeClassFilter').innerHTML = `<option value="all">כל הכיתות</option><option value="none">ללא כיתה</option>${classOptions}`;
 }
 function renderPanel(tab) {
+  if (tab === 'library') return window.HadasLibrary?.open();
   if (tab === 'dashboard') return renderDashboard();
   if (tab === 'schedule') return renderSchedule();
   if (tab === 'requests') return renderRequests();
@@ -2341,6 +2344,7 @@ async function handleNotificationClick(event) {
   else if(type==='task') switchTab('tasks');
   else if(type==='calendar') switchTab('calendar');
   else if(type==='feedback') openFeedbackDialog();
+  else if(type==='library') { switchTab('library'); window.HadasLibrary?.openItem(card.dataset.entityId); }
   else if(type==='daily_operation') switchTab(isManager()?'daily':'schedule');
 }
 

@@ -37,9 +37,11 @@
   <link rel="stylesheet" href="/patch-v025.css?v=0350" />
   <link rel="stylesheet" href="/push-v0372.css?v=0380" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0380" defer></script>
-  <script src="/patch-v025.js?v=0380" defer></script>
+  <script src="/app.js?v=0400" defer></script>
+  <script src="/patch-v025.js?v=0400" defer></script>
   <script src="/push-v0372.js?v=0380" defer></script>
+  <link rel="stylesheet" href="/library.css?v=0400" />
+  <script src="/library.js?v=0400" defer></script>
 </head>
 <body>
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
@@ -112,12 +114,29 @@
       <button data-tab="attendance" class="nav-btn mobile-secondary"><span class="nav-icon">✓</span><span>נוכחות</span></button>
       <button data-tab="tasks" class="nav-btn mobile-secondary"><span class="nav-icon">☑</span><span>משימות</span><span id="taskBadge" class="nav-badge hidden"></span></button>
       <button data-tab="calendar" class="nav-btn mobile-secondary"><span class="nav-icon">◫</span><span>לוח שנה</span></button>
+      <button data-tab="library" class="nav-btn mobile-secondary"><span class="nav-icon">▤</span><span>הספריה</span></button>
       <button data-tab="employees" class="nav-btn manager-only mobile-secondary"><span class="nav-icon">♙</span><span>עובדים</span></button>
       <button id="mobileMoreBtn" type="button" class="nav-btn mobile-more-btn"><span class="nav-icon">•••</span><span>עוד</span></button>
     </nav>
 
     <div class="page-container">
       <section id="dashboardPanel" class="panel active"></section>
+
+      <section id="libraryPanel" class="panel" aria-labelledby="libraryTitle">
+        <div class="lib-hero">
+          <div><p class="eyebrow">יוצרים ומשתפים במעון הדס</p><h2 id="libraryTitle">הספריה<span class="lib-title-dot">.</span></h2><p>הרעיונות הטובים שלנו, במקום אחד.</p><span class="lib-hero-note">מפגשים · יצירות · מוזיקה · השראה</span></div>
+          <div class="lib-hero-actions"><button id="libraryUploadBtn" type="button" class="primary-btn"><span aria-hidden="true">＋</span> העלאת תוכן</button><button id="libraryRefreshBtn" type="button" class="ghost-btn">רענון הספרייה</button></div>
+        </div>
+        <div class="lib-toolbar">
+          <label class="lib-search"><span aria-hidden="true">⌕</span><input id="librarySearch" type="search" placeholder="מה נעשה היום? חיפוש נושא, פעילות או שיר" aria-label="חיפוש בספרייה" /></label>
+          <label class="lib-sort"><span class="sr-only">מיון</span><select id="librarySort"><option value="new">הכי חדשים</option><option value="popular">הכי אהובים</option><option value="tried">נוסו בצוות</option></select></label>
+        </div>
+        <div id="libraryCategories" class="lib-categories" aria-label="סוג תוכן"></div>
+        <div class="lib-view-row"><div id="libraryViews" class="lib-views" aria-label="התכנים שלי"><button type="button" data-lib-view="all" aria-pressed="true">כל התכנים</button><button type="button" data-lib-view="saved" aria-pressed="false">השמורים שלי</button><button type="button" data-lib-view="mine" aria-pressed="false">התכנים שלי</button></div><label id="libraryCollectionField" class="lib-collection-field hidden"><span class="sr-only">אוסף</span><select id="libraryCollectionFilter"><option value="">כל האוספים</option></select></label></div>
+        <div class="lib-results-heading"><p id="libraryResultCount" role="status" aria-live="polite"></p><span>משתפים ידע, מקבלים השראה</span></div>
+        <div id="libraryGrid" class="lib-grid" aria-busy="false"></div>
+        <button id="libraryLoadMore" type="button" class="secondary-btn lib-load-more hidden">עוד תכנים</button>
+      </section>
 
       <section id="schedulePanel" class="panel">
         <div class="section-heading schedule-heading">
@@ -248,6 +267,7 @@
       <div class="mobile-more-handle"></div>
       <div class="mobile-more-heading"><div><p class="eyebrow">אפשרויות נוספות</p><h3>לאן עוברים?</h3></div><button id="mobileMoreClose" type="button" class="icon-btn" aria-label="סגירה">×</button></div>
       <div class="mobile-more-grid">
+        <button type="button" data-more-tab="library" class="lib-more-link"><span>▤</span><strong>הספריה</strong><small>פעילויות והשראה מהצוות</small></button>
         <button type="button" data-more-tab="daily" class="daily-operations-only"><span>⚡</span><strong>תפעול יומי</strong><small>היעדרויות והחלפות חירום</small></button>
         <button type="button" data-more-tab="attendance"><span>✓</span><strong>נוכחות</strong><small>עדכון שעות בפועל</small></button>
         <button type="button" data-more-tab="tasks"><span>☑</span><strong>משימות</strong><small>מעקב ביצוע</small></button>

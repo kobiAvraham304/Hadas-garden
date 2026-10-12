@@ -9,6 +9,7 @@ module.exports = async function handler(req, res) {
     environment:{ ok:missing.length === 0, missing },
     database:{ ok:false },
     schema:{ ok:false, version:null },
+    library:{ ok:false },
     initialAccounts:{ ok:false, count:0 },
   };
   if (!missing.length) {
@@ -17,8 +18,10 @@ module.exports = async function handler(req, res) {
       checks.database = classes.error ? { ok:false, error:'לא ניתן להתחבר לטבלאות המערכת' } : { ok:true };
       const meta = await db().from('hadas_app_meta').select('*').eq('id',1).maybeSingle();
       checks.schema = meta.error
-        ? { ok:false, version:null, error:'יש להריץ פעם אחת את קובץ העדכון update-v0.35.0.sql' }
-        : { ok:Boolean(meta.data && meta.data.schema_version === '0.35.0'), version:meta.data?.schema_version || null };
+        ? { ok:false, version:null, error:'יש להריץ את קובץ העדכון update-v0.40.0.sql' }
+        : { ok:Boolean(meta.data && meta.data.schema_version === '0.40.0'), version:meta.data?.schema_version || null };
+      const library = await db().from('hadas_library_items').select('id').limit(1);
+      checks.library = { ok:!library.error };
       const accounts = await db().from('hadas_users').select('id').in('phone',['+972542521780','+972544594513']);
       checks.initialAccounts = accounts.error
         ? { ok:false, count:0, error:'לא ניתן לבדוק את החשבונות הראשוניים' }
@@ -27,6 +30,6 @@ module.exports = async function handler(req, res) {
       checks.database = { ok:false, error:'בדיקת בסיס הנתונים נכשלה' };
     }
   }
-  const ready = checks.environment.ok && checks.database.ok && checks.schema.ok && checks.initialAccounts.ok;
-  return send(res, ready ? 200 : 503, { ok:ready, version, databaseVersion:'0.35.0', checks });
+  const ready = checks.environment.ok && checks.database.ok && checks.schema.ok && checks.initialAccounts.ok && checks.library.ok;
+  return send(res, ready ? 200 : 503, { ok:ready, version, databaseVersion:'0.40.0', checks });
 };

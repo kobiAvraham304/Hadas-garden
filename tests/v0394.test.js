@@ -75,7 +75,7 @@ test('0.39.4 the primary shift validator retains the same precise override and a
   assert.match(backend,/validateShift\(payload, null, Boolean\(body\.override_day_off\), Boolean\(body\.override_rules\), Boolean\(body\.override_approved_leave\)\)/);
   assert.match(backend,/שיבוץ ידני בזמן חופשה מאושרת — אישור מפורש/);
   assert.match(backend,/const approvedSick=requests\.find/);
-  assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'0.39.4');
+  assert.equal(JSON.parse(fs.readFileSync('package.json','utf8')).version,'0.40.0');
 });
 
 test('0.39.4 fast legacy saves delegate explicitly confirmed leave overrides to current shift handler',async()=>{
