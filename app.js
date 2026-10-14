@@ -155,7 +155,8 @@ function initializeWindows24HourFields() {
     };
     input.addEventListener('change',normalize);
     input.addEventListener('blur',normalize);
-    input.addEventListener('input',()=>input.setCustomValidity(''));
+    input.addEventListener('focus',normalize);
+    input.addEventListener('input',()=>{ input.setCustomValidity(''); if(valid.test(input.value.trim())) normalize(); });
     normalize();
   };
   document.querySelectorAll('input[type="time"]').forEach(enhance);
@@ -746,7 +747,18 @@ function populateSelects() {
   const employeeOptions = state.employees.filter((item) => item.active && item.is_schedulable !== false).map((item) => `<option value="${item.id}">${escapeHtml(item.full_name)} — ${escapeHtml(item.job_title)}</option>`).join('');
   $('#shiftForm [name="class_id"]').innerHTML = classOptions;
   $('#shiftForm [name="employee_id"]').innerHTML = employeeOptions;
-  $('#employeeForm [name="primary_class_id"]').innerHTML = `<option value="">ללא כיתה קבועה</option>${classOptions}`;
+  // Preserve the in-progress class choice when background data refreshes.
+  const employeeClassSelect = $('#employeeForm [name="primary_class_id"]');
+  const selectedClassId = employeeClassSelect.value;
+  const selectedClassLabel = employeeClassSelect.selectedOptions[0]?.textContent || "";
+  employeeClassSelect.innerHTML = '<option value="">ללא כיתה קבועה</option>' + classOptions;
+  if (selectedClassId) {
+    if (![...employeeClassSelect.options].some(option=>option.value===selectedClassId)) {
+      const priorClass=classById(selectedClassId);
+      employeeClassSelect.add(new Option(priorClass?.name || selectedClassLabel || "כיתה משויכת",selectedClassId));
+    }
+    employeeClassSelect.value=selectedClassId;
+  }
   $('#requestForm [name="target_employee_id"]').innerHTML = '<option value="">בחרו תאריך כדי לראות עובדים זמינים</option>';
   $('#announcementForm [name="class_id"]').innerHTML = `<option value="">בחר כיתה</option>${classOptions}`;
   $('#taskForm [name="target_id"]').innerHTML = `<option value="">בחר כיתה</option>${classOptions}`;
@@ -2189,6 +2201,11 @@ function openEmployeeDialog(employee = {}) {
   titleSelect.value = selectedTitle;
   form.elements.role.value = employee.role || 'employee';
   form.elements.assignment_mode.value = selectedTitle === 'גננת' ? 'fixed' : (employee.assignment_mode || (employee.primary_class_id ? 'fixed' : 'rotation'));
+  // Even inactive existing classes must remain selectable on edit.
+  if (employee.primary_class_id && ![...form.elements.primary_class_id.options].some(option=>option.value===employee.primary_class_id)) {
+    const existingClass=classById(employee.primary_class_id);
+    form.elements.primary_class_id.add(new Option(existingClass?.name || "כיתה משויכת",employee.primary_class_id));
+  }
   form.elements.primary_class_id.value = employee.primary_class_id || '';
   form.elements.weekly_hours.value = employee.weekly_hours ?? '';
   form.elements.max_weekly_hours.value = employee.max_weekly_hours ?? '';
@@ -2221,6 +2238,14 @@ async function saveEmployee(event) {
   const noSchedule=['מנהלת מעון','אחות','מזכירה'].includes(data.job_title);
   data.assignment_mode = noSchedule ? 'no_schedule' : (data.job_title === 'גננת' ? 'fixed' : form.elements.assignment_mode.value);
   data.primary_class_id = data.assignment_mode === 'fixed' ? form.elements.primary_class_id.value : '';
+  if (data.assignment_mode === 'fixed' && !data.primary_class_id) {
+    showToast('יש לבחור כיתה קבועה לפני שמירת העובד', 'error');
+    form.elements.primary_class_id.focus();
+    return;
+  }
+  // Ensure an old custom error does not block a valid edited time.
+  $$('#employeeForm input[data-hadas24h]').forEach(input=>input.dispatchEvent(new Event('change')));
+  if (!form.reportValidity()) return;
   data.weekly_patterns = data.assignment_mode === 'no_schedule' ? [] : collectWeeklyPatterns();
   data.constraints = data.assignment_mode === 'no_schedule' ? [] : collectConstraints();
   setBusy(button, true, 'שומר עובד…');
