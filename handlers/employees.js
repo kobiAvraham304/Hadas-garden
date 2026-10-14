@@ -78,7 +78,7 @@ function employeePayload(body) {
     payload.is_schedulable = true;
   } else if (payload.assignment_mode === 'fixed') {
     payload.is_schedulable = true;
-    if (body.primary_class_id === '') payload.primary_class_id = null;
+    if (!payload.primary_class_id && body.current_assignment_mode === 'fixed' && body.current_primary_class_id) payload.primary_class_id = body.current_primary_class_id;
   }
   return payload;
 }
@@ -108,8 +108,15 @@ function normalizeWeeklyPatterns(patterns, assignmentMode) {
 async function replaceWeeklyPatterns(employeeId, patterns, assignmentMode) {
   const rows = normalizeWeeklyPatterns(patterns, assignmentMode);
   if (rows === null) return null;
-  assertDb(await db().from('hadas_employee_weekly_patterns').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן את ימי העבודה הקבועים');
-  if (rows.length) assertDb(await db().from('hadas_employee_weekly_patterns').insert(rows.map((row) => ({ ...row, employee_id:employeeId }))), 'לא ניתן לשמור את ימי העבודה הקבועים');
+  // Avoid a delete-then-insert gap; the six weekday rows have a composite primary key.
+  if (rows.length) {
+    assertDb(await db().from('hadas_employee_weekly_patterns').upsert(
+      rows.map(row=>({ ...row, employee_id:employeeId })),
+      { onConflict:'employee_id,weekday' }
+    ), 'לא ניתן לשמור את ימי העבודה הקבועים');
+  } else {
+    assertDb(await db().from('hadas_employee_weekly_patterns').delete().eq('employee_id',employeeId), 'לא ניתן לעדכן את ימי העבודה הקבועים');
+  }
   return rows.map((row)=>({ ...row, employee_id:employeeId }));
 }
 
@@ -238,7 +245,8 @@ module.exports = async function handler(req,res) {
       await ensureAdminRemains(user.id,nextRole,nextActive);
       if (employeeId === caller.employee.id && nextActive === false) throw httpError(400,'לא ניתן להשבית את המשתמש המחובר');
 
-      const employeeUpdate = employeePayload({ ...body, current_job_title:employee.job_title, current_primary_class_id:employee.primary_class_id });
+      const employeeUpdate = employeePayload({ ...body, current_job_title:employee.job_title, current_primary_class_id:employee.primary_class_id, current_assignment_mode:employee.assignment_mode });
+      if (Array.isArray(body.weekly_patterns)) normalizeWeeklyPatterns(body.weekly_patterns, employeeUpdate.assignment_mode || employee.assignment_mode);
       const userUpdate = {};
       if (body.phone !== undefined) {
         const phone = normalizePhone(body.phone);
