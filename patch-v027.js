@@ -495,32 +495,23 @@
     document.querySelector('#autoScheduleWeek')?.addEventListener('change',async(event)=>{await loadGeneralDaysOffForWeek(event.target.value).catch(()=>{});enhanceAutoWeekSelector();});
   }
 
-  revalidateAutomaticPreview = async function v027RevalidateAutomaticPreview() {
+  revalidateAutomaticPreview = async function v027RevalidateAutomaticPreview(options = {}) {
     const previous = new Map(state.autoScheduleIssueDecisions);
-    await previousRevalidateAutomaticPreview();
-    for (const item of state.autoSchedulePreview?.validation?.errors || []) {
+    const updated = await previousRevalidateAutomaticPreview({ render:false });
+    for (const item of updated?.validation?.errors || []) {
       const prior = previous.get(autoIssueKey(item));
-      if (prior === 'rejected' || (prior === 'approved' && autoIssueCanApprove(item))) state.autoScheduleIssueDecisions.set(autoIssueKey(item), prior);
+      if (prior === 'rejected' || (prior === 'approved' && autoIssueCanApprove(item))) {
+        state.autoScheduleIssueDecisions.set(autoIssueKey(item),prior);
+      }
     }
-    renderAutomaticSchedulePreview(state.autoSchedulePreview);
+    if (options.render !== false && updated) renderAutomaticSchedulePreview(updated);
+    return updated;
   };
 
+  // The base workflow deliberately saves a draft before the separate validation phase.
+  // The old v0.27 wrapper blocked every undecided issue, overriding that behavior.
   applyAutomaticSchedule = async function v027ApplyAutomaticSchedule() {
-    const preview=state.autoSchedulePreview;if(!preview)return false;
-    const errors=preview.validation?.errors||[];
-    const hard=errors.filter((item)=>!autoIssueCanApprove(item));
-    if(hard.length){showToast(`יש ${hard.length} נקודות שחייבות תיקון לפני החלת השיבוץ.`,'error');return false;}
-    const decisions=errors.map((item)=>state.autoScheduleIssueDecisions.get(autoIssueKey(item))||'');
-    const undecided=decisions.filter((value)=>!value||value==='fixing').length;
-    if(undecided){showToast(`יש ${undecided} נקודות שעדיין דורשות החלטה.`,'error');return false;}
-    const rejected=decisions.filter((value)=>value==='rejected').length;
-    const button=document.querySelector('#autoSchedulePreview [data-auto-action="apply"]');setBusy(button,true,'שומר טיוטה…');
-    try{
-      const result=await apiFetch('/api/shifts',{method:'POST',body:{action:'auto_apply',week_start:preview.weekStart,mode:preview.mode,selected_dates:preview.selectedDates||state.autoScheduleSelectedDates,signature:preview.signature,manual_generated:state.autoScheduleManualGenerated,allow_incomplete:errors.length>0},timeout:30000});
-      document.querySelector('#autoScheduleDialog')?.close();state.shiftSuggestionCache.clear();state.weekStart=startOfWeek(parseDateValue(preview.weekStart));await refreshScheduleWeek({force:true});state.scheduleIssuesOpen=rejected>0;renderValidationPanel(state.scheduleIssuesOpen);
-      showToast(rejected?`השיבוץ נשמר עם ${rejected} נקודות שסומנו לבדיקה`:`נשמרו ${result.count||0} שיבוצים אוטומטיים בטיוטה`,'success');
-      return true;
-    }catch(error){if(error.status===409&&/השתנו/.test(error.message)){showToast(error.message,'error');}else showToast(error.message,'error');return false;}finally{setBusy(button,false);}
+    return previousApplyAutomaticSchedule();
   };
 
   function installGeneralDayOffCalendarType() {

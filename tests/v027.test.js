@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 
 test('0.27 release layers remain wired under current release', () => {
-  assert.equal(JSON.parse(read('package.json')).version, '0.40.1');
+  assert.equal(JSON.parse(read('package.json')).version, '0.40.2');
   assert.match(read('VERSION.md'), /גרסה 0.35.0/);
   const api = read('api/index.js');
   assert.match(api, /'calendar': require\('\.\.\/lib\/calendar-v032'\)/);
@@ -70,9 +70,9 @@ test('0.27 automatic scheduling has quick week choice and preserves rejected dec
   assert.match(patch, /בעוד שבועיים/);
   assert.match(patch, /v027-auto-week-quick/);
   assert.match(patch, /prior === 'rejected'/);
-  assert.match(patch, /const hard=errors\.filter\(\(item\)=>!autoIssueCanApprove\(item\)\)/);
-  assert.match(patch, /allow_incomplete:errors\.length>0/);
-  assert.match(patch, /state\.scheduleIssuesOpen=rejected>0/);
+  assert.match(patch, /return previousApplyAutomaticSchedule\(\)/);
+  assert.doesNotMatch(patch, /נקודות שעדיין דורשות החלטה/);
+  assert.match(read('app.js'), /allow_incomplete:true/);
 });
 
 test('0.27 general nursery day off is manager-controlled, removes only safe schedules and blocks new shifts', () => {
