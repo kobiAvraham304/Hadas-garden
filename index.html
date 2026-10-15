@@ -32,13 +32,15 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
-  <link rel="manifest" href="/site.webmanifest?v=0402" />
+  <link rel="manifest" href="/site.webmanifest?v=0403" />
   <link rel="stylesheet" href="/styles.css?v=0362" />
+  <link rel="stylesheet" href="/schedule-issues-v0403.css?v=0403" />
   <link rel="stylesheet" href="/patch-v025.css?v=0350" />
   <link rel="stylesheet" href="/push-v0372.css?v=0380" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0402" defer></script>
-  <script src="/patch-v025.js?v=0402" defer></script>
+  <script src="/app.js?v=0403" defer></script>
+  <script src="/patch-v025.js?v=0403" defer></script>
+  <script src="/schedule-issues-v0403.js?v=0403" defer></script>
   <script src="/push-v0372.js?v=0380" defer></script>
   <link rel="stylesheet" href="/library.css?v=0401" />
   <script src="/library.js?v=0401" defer></script>
@@ -372,10 +374,8 @@
         <label><span class="field-title">מקסימום שעות שבועיות</span><input name="max_weekly_hours" type="number" inputmode="decimal" min="0" max="80" step="0.25" placeholder="לדוגמה 40" /></label>
         <label id="maxWorkDaysField" class="hidden"><span class="field-title">מקסימום ימי עבודה בשבוע</span><select name="max_work_days_per_week"><option value="">ללא מגבלה</option><option value="1">1 יום</option><option value="2">2 ימים</option><option value="3">3 ימים</option><option value="4">4 ימים</option><option value="5">5 ימים</option><option value="6">6 ימים</option></select><small>למשל: זמינה בשלושה ימים, אבל בכל שבוע ניתן לשבץ אותה לכל היותר פעמיים.</small></label>
         <label><span class="field-title">אחוז משרה</span><input name="employment_percent" type="number" inputmode="numeric" min="0" max="200" step="1" placeholder="100" /></label>
-        <label><span class="field-title">שעת התחלה רגילה</span><input name="default_start" type="time" value="07:30" /></label>
-        <label><span class="field-title">שעת סיום רגילה</span><input name="default_end" type="time" value="15:30" /></label>
       </div></section>
-      <details id="employeeScheduleSection" class="employee-form-details" open><summary><span class="section-number">4</span><span><strong>ימי עבודה ושעות</strong><small>לכל יום יש כלל חד-משמעי שהשיבוץ האוטומטי חייב לכבד.</small></span><i>⌄</i></summary><fieldset class="weekly-patterns-box"><legend class="sr-only">ימי עבודה וחופשה קבועים</legend><p class="field-help"><strong>יום עבודה (קבוע)</strong> — משבצים לפי השעות; <strong>יום חופשי</strong> — אסור לשיבוץ אוטומטי; <strong>לפי צורך</strong> — רק אם חסר כוח אדם ובעדיפות נמוכה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset></details>
+      <details id="employeeScheduleSection" class="employee-form-details" open><summary><span class="section-number">4</span><span><strong>ימי עבודה ושעות</strong><small>לכל יום יש כלל חד-משמעי שהשיבוץ האוטומטי חייב לכבד.</small></span><i>⌄</i></summary><div class="v0403-default-hours"><div><strong>שעות עבודה רגילות</strong><small>השעות האלה חלות על ימי העבודה, אלא אם הוגדרו שעות שונות ביום מסוים.</small></div><div class="v0403-default-hours-inputs"><label>התחלה<input name="default_start" type="time" value="07:30" /></label><label>סיום<input name="default_end" type="time" value="15:30" /></label></div><small>ביום שישי שעת הסיום מוגבלת ל־12:00. עובד חדש מוגדר ראשון–חמישי; אפשר להפעיל גם שישי.</small></div><fieldset class="weekly-patterns-box"><legend class="sr-only">ימי עבודה וחופשה קבועים</legend><p class="field-help"><strong>יום עבודה (קבוע)</strong> — משבצים לפי השעות; <strong>יום חופשי</strong> — אסור לשיבוץ אוטומטי; <strong>לפי צורך</strong> — רק אם חסר כוח אדם ובעדיפות נמוכה.</p><div id="weeklyPatternFields" class="weekly-pattern-grid"></div></fieldset></details>
       <details id="employeeConstraintsSection" class="employee-form-details"><summary><span class="section-number">5</span><span><strong>עדיפות כיתות והגבלות</strong><small>הכיתה הקבועה תמיד ראשונה; מדרגים רק את שאר הכיתות.</small></span><i>⌄</i></summary><fieldset class="constraints-box"><legend class="sr-only">העדפות והגבלות כיתה</legend><div id="constraintsFields" class="constraints-grid"></div></fieldset></details>
       <details id="employeeNotesSection" class="employee-form-details"><summary><span class="section-number">6</span><span><strong>הערה ניהולית</strong><small>מידע פרטי שרק לינור ואילנית רואות.</small></span><i>⌄</i></summary><label class="full-field employee-admin-note"><span class="field-title">הערה ניהולית</span><textarea name="admin_notes" rows="3" placeholder="מידע פרטי ורלוונטי לניהול השיבוץ"></textarea></label></details>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת העובד</button></div>

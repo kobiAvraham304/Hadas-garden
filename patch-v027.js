@@ -191,17 +191,29 @@
     const root = document.querySelector('#scheduleExport');
     if (!root) return;
     const problems = problemCellKeys();
+    const liveIssues = validateScheduleClient().errors || [];
+    const unsafeCodes = new Set(['overlap','outside_opening_hours','approved_absence','forbidden_class','teacher_fixed_class']);
     root.querySelectorAll('.schedule-cell, .mobile-week-class, .day-class-card').forEach((zone) => {
       const meta = cellMeta(zone); if (!meta) return;
       zone.classList.remove('v027-problem-cell', 'v027-general-day-off-cell');
       zone.querySelector('.v027-cell-flag')?.remove();
+      zone.querySelector('.v0403-issue-tools')?.remove();
       const closure = generalDayOff(meta.date);
       if (closure) {
         zone.classList.add('v027-general-day-off-cell');
         zone.insertAdjacentHTML('afterbegin', `<div class="v027-cell-flag closure">☀ ${escapeHtml(closure.title || 'יום חופשי כללי')}</div>`);
       } else if (problems.has(`${meta.date}|${meta.classId}`)) {
         zone.classList.add('v027-problem-cell');
-        zone.insertAdjacentHTML('afterbegin', '<div class="v027-cell-flag problem">נדרשת בדיקה</div>');
+        if (!isManager()) { zone.insertAdjacentHTML('afterbegin', '<div class="v027-cell-flag problem">נדרשת בדיקה</div>'); return; }
+        const cellIssues=liveIssues.filter(item=>item.date===meta.date && (item.classId||item.class_id)===meta.classId);
+        const safeToApprove=cellIssues.length>0 && cellIssues.length<=8 && cellIssues.every(item=>
+          item._v030ApprovalKey && /^[a-f0-9]{40}$/i.test(item._v030ApprovalKey) && !unsafeCodes.has(item.code)
+        );
+        const date=escapeHtml(meta.date),classId=escapeHtml(meta.classId);
+        zone.insertAdjacentHTML('afterbegin', `<div class="v0403-issue-tools">
+          <button type="button" class="v027-cell-flag problem v0403-issue-open" data-v0403-issue-open="1" data-v0403-date="${date}" data-v0403-class="${classId}" aria-label="הצגת הסיבות והפתרונות לבעיות התקינות">נדרשת בדיקה</button>
+          ${safeToApprove ? `<button type="button" class="v0403-issue-quick" data-v0403-issue-quick="1" data-v0403-date="${date}" data-v0403-class="${classId}" title="אישור ${cellIssues.length} חריגות בכיתה זו" aria-label="אישור מהיר של ${cellIssues.length} חריגות בכיתה זו">✓</button>` : ''}
+        </div>`);
       }
     });
   }
