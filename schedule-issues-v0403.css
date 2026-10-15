@@ -1,0 +1,34 @@
+/* 0.40.3: interactive schedule exceptions, intuitive weekly defaults */
+.v0403-issue-tools{display:inline-flex;align-items:center;gap:6px;max-width:100%;margin:3px 0 7px;flex-wrap:wrap}
+.v0403-issue-tools .v027-cell-flag.problem{margin:0;cursor:pointer;border:1px solid #e8b6b6;font:inherit;font-size:11px;font-weight:900;padding:5px 10px;min-height:29px}
+.v0403-issue-tools .v027-cell-flag.problem:hover{background:#fbe0e0}
+.v0403-issue-quick{display:inline-grid;place-items:center;border-radius:9px;background:#e5f7ed;color:#176b42;border:1px solid #9bdab5;min-height:29px;min-width:32px;font-size:19px;line-height:1;font-weight:900;cursor:pointer}
+.v0403-issue-quick:active{transform:scale(.96)}
+.v0403-issue-dialog{width:min(520px,calc(100% - 16px))}
+.v0403-issue-dialog .modal-card{max-height:min(83dvh,760px);overflow:auto}
+.v0403-issue-detail{padding:15px;border:1px solid #e7e5ee;border-radius:15px;margin:9px 0;background:#fff}
+.v0403-issue-detail>strong{display:block;color:#853d3d;font-size:1.06rem}
+.v0403-issue-detail>p{color:#494a5b;font-size:.95rem;line-height:1.55;margin:9px 0}
+.v0403-issue-solution{background:#eef5ff;border-radius:12px;padding:12px;display:grid;gap:5px;line-height:1.55}
+.v0403-issue-solution b{font-size:.8rem;color:#3d5ca1}
+.v0403-issue-solution span{color:#293952;font-size:.9rem}
+.v0403-issue-buttons{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:13px}
+.v0403-issue-buttons button{min-height:40px}
+.v0403-approve-button{background:#e1f5e9;border:1px solid #abd7bd;color:#176b42;border-radius:11px;font-weight:900;padding:9px 12px;cursor:pointer}
+.v0403-not-approvable{color:#913d3d;font-weight:750;font-size:.82rem}
+.v0403-all-resolved{padding:22px;text-align:center;background:#eaf7ef;color:#216c45;border-radius:14px;font-weight:850}
+.v0403-default-hours{display:grid;gap:10px;margin:12px 0;padding:14px;border-radius:15px;background:#f1f3ff;border:1px solid #d9ddf8}
+.v0403-default-hours>div:first-child{display:grid;gap:3px}
+.v0403-default-hours>div:first-child strong{font-size:1rem;color:#353a79}
+.v0403-default-hours small{color:#6b6e82;font-size:.78rem;line-height:1.55}
+.v0403-default-hours-inputs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.v0403-default-hours-inputs label{font-weight:800;color:#383a64;font-size:.85rem}
+.v0403-default-hours-inputs input{width:100%;margin-top:5px}
+.v0403-hours-status{display:flex;align-items:center;justify-content:space-between;gap:7px;grid-column:1/-1;font-size:.75rem}
+.v0403-hours-badge{display:inline-flex;align-items:center;border-radius:99px;padding:4px 8px;background:#eef5f2;color:#3f7660;font-weight:800}
+.weekly-pattern-row.hours-override{border:2px solid #d79546!important;background:#fffbef!important;box-shadow:inset 0 3px 0 #e1a147!important}
+.weekly-pattern-row.hours-override .v0403-hours-badge{background:#ffebc9;color:#945e1c}
+.v0403-reset-hours{font-size:.74rem;font-weight:800;border:none;background:transparent;color:#7461bb;cursor:pointer;padding:5px}
+.v0403-reset-hours[hidden]{display:none!important}
+.weekly-pattern-row:not(.is-work) .v0403-hours-status{display:none}
+@media(max-width:600px){.v0403-issue-tools{gap:5px}.v0403-issue-dialog .modal-card{padding:17px}.v0403-issue-buttons button{flex:1 1 150px}.v0403-default-hours{padding:11px}.v0403-default-hours-inputs{gap:8px}.v0403-hours-status{flex-wrap:wrap}}

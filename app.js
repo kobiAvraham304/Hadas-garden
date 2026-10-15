@@ -442,6 +442,7 @@ function bindEvents() {
   for (const name of ['class_id','start_time','end_time','shift_role']) $('#shiftForm [name="'+name+'"]').addEventListener(name.includes('time') ? 'input' : 'change', (event) => { if (name === 'shift_role') $('#shiftForm').dataset.roleTouched = 'true'; queueShiftRecommendations(event); });
   $('#shiftRecommendations').addEventListener('click', handleShiftRecommendationClick);
   $('#publishChangeNowBtn').addEventListener('click', publishPendingChangeNow);
+  ['default_start','default_end'].forEach(name=>$('#employeeForm').elements[name].addEventListener('change',syncInheritedWeeklyHours));
   $('#employeeForm').addEventListener('submit', saveEmployee);
   $('#requestForm').addEventListener('submit', saveRequest);
   $('#announcementForm').addEventListener('submit', saveAnnouncement);
@@ -2138,18 +2139,71 @@ function syncWeeklyPatternRow(row) {
   $$('.weekly-time', row).forEach((field) => { field.classList.toggle('hidden', type !== 'work'); field.querySelector('input').required = type === 'work'; });
   const note=$('.weekly-day-off-note',row); if(note) note.textContent=type==='as_needed'?'רק אם באמת חסר כוח אדם · עדיפות נמוכה':type==='day_off'?'אסור לשיבוץ אוטומטי':'שעות עבודה קבועות';
 }
+function weeklyEffectiveDefault(weekday) {
+  const form = $('#employeeForm');
+  const start = trimTime(form?.elements.default_start?.value) || '07:30';
+  const end = trimTime(form?.elements.default_end?.value) || '15:30';
+  return { start, end: weekday === 5 && timeToMinutes(end)>720 ? '12:00' : end };
+}
+function updateWeeklyHoursBadge(row) {
+  const weekday=Number(row.dataset.weekday), base=weeklyEffectiveDefault(weekday);
+  const override=$('.weekly-day-type',row).value==='work' && (
+    trimTime($('.weekly-start',row).value)!==base.start ||
+    trimTime($('.weekly-end',row).value)!==base.end
+  );
+  row.dataset.hoursOverride=String(override);
+  row.classList.toggle('hours-override',override);
+  const badge=$('.v0403-hours-badge',row);
+  if(badge) badge.textContent=override?'שעות שונות ביום הזה':'לפי שעות רגילות';
+  const reset=$('.v0403-reset-hours',row);
+  if(reset) reset.hidden=!override;
+}
+function syncInheritedWeeklyHours() {
+  $$('.weekly-pattern-row').forEach(row=>{
+    if(row.dataset.hoursOverride==='true') return;
+    const base=weeklyEffectiveDefault(Number(row.dataset.weekday));
+    $('.weekly-start',row).value=base.start;
+    $('.weekly-end',row).value=base.end;
+    updateWeeklyHoursBadge(row);
+  });
+}
 function renderWeeklyPatternFields(employee = {}) {
   const patterns = employee.weekly_patterns || [];
+  const hasPatterns=patterns.length>0;
   $('#weeklyPatternFields').innerHTML = Array.from({ length: 6 }, (_, weekday) => {
-    const pattern = patterns.find((row) => Number(row.weekday) === weekday);
-    const type = ['work','day_off','as_needed'].includes(pattern?.day_type) ? pattern.day_type : (pattern?.day_type === 'avoid' ? 'as_needed' : 'day_off');
-    const start = trimTime(pattern?.start_time) || trimTime(employee.default_start) || '07:30';
-    const fallbackEnd=weekday===5?'12:00':trimTime(employee.default_end)||'15:30';
-    let end = trimTime(pattern?.end_time) || fallbackEnd;
-    if (weekday===5 && timeToMinutes(end)>720) end='12:00';
-    return `<article class="weekly-pattern-row" data-weekday="${weekday}"><div class="weekly-pattern-head"><strong>${DAY_NAMES[weekday]}</strong><select class="weekly-day-type" aria-label="הגדרת יום ${DAY_NAMES[weekday]}"><option value="work" ${type==='work'?'selected':''}>יום עבודה (קבוע)</option><option value="day_off" ${type==='day_off'?'selected':''}>יום חופשי (אסור לשבץ)</option><option value="as_needed" ${type==='as_needed'?'selected':''}>לפי צורך (עדיפות נמוכה)</option></select></div><label class="weekly-time">התחלה<input class="weekly-start" type="time" value="${start}"/></label><label class="weekly-time">סיום<input class="weekly-end" type="time" value="${end}" ${weekday===5?'max="12:00"':''}/></label><span class="weekly-day-off-note"></span></article>`;
+    const pattern = patterns.find(row=>Number(row.weekday)===weekday);
+    // Existing day-off rules stay intact. New employees default to Sun–Thu work.
+    const type = ['work','day_off','as_needed'].includes(pattern?.day_type) ? pattern.day_type
+      : pattern?.day_type==='avoid' ? 'as_needed'
+      : !hasPatterns && weekday!==5 ? 'work' : 'day_off';
+    const base=weeklyEffectiveDefault(weekday);
+    const start=trimTime(pattern?.start_time) || base.start;
+    let end=trimTime(pattern?.end_time) || base.end;
+    if(weekday===5 && timeToMinutes(end)>720)end='12:00';
+    return `<article class="weekly-pattern-row" data-weekday="${weekday}"><div class="weekly-pattern-head"><strong>${DAY_NAMES[weekday]}</strong><select class="weekly-day-type" aria-label="הגדרת יום ${DAY_NAMES[weekday]}"><option value="work" ${type==='work'?'selected':''}>יום עבודה (קבוע)</option><option value="day_off" ${type==='day_off'?'selected':''}>יום חופשי (אסור לשבץ)</option><option value="as_needed" ${type==='as_needed'?'selected':''}>לפי צורך (עדיפות נמוכה)</option></select></div><div class="v0403-hours-status"><span class="v0403-hours-badge"></span><button type="button" class="v0403-reset-hours" hidden>↺ חזרה לשעות הרגילות</button></div><label class="weekly-time">התחלה<input class="weekly-start" type="time" value="${start}"/></label><label class="weekly-time">סיום<input class="weekly-end" type="time" value="${end}" ${weekday===5?'max="12:00"':''}/></label><span class="weekly-day-off-note"></span></article>`;
   }).join('');
-  $$('.weekly-pattern-row').forEach((row) => { syncWeeklyPatternRow(row); $('.weekly-day-type', row).addEventListener('change', () => syncWeeklyPatternRow(row)); });
+  $$('.weekly-pattern-row').forEach(row=>{
+    const type=$('.weekly-day-type',row);
+    const update=()=>{syncWeeklyPatternRow(row);updateWeeklyHoursBadge(row);};
+    type.addEventListener('change',()=>{
+      if(type.value==='work' && row.dataset.hoursOverride!=='true'){
+        const base=weeklyEffectiveDefault(Number(row.dataset.weekday));
+        $('.weekly-start',row).value=base.start;$('.weekly-end',row).value=base.end;
+      }
+      update();
+    });
+    $$('.weekly-start, .weekly-end',row).forEach(input=>{
+      input.addEventListener('change',()=>updateWeeklyHoursBadge(row));
+      input.addEventListener('input',()=>updateWeeklyHoursBadge(row));
+    });
+    $('.v0403-reset-hours',row).addEventListener('click',()=>{
+      const base=weeklyEffectiveDefault(Number(row.dataset.weekday));
+      $('.weekly-start',row).value=base.start;
+      $('.weekly-end',row).value=base.end;
+      update();
+    });
+    update();
+  });
 }
 function collectWeeklyPatterns() {
   return $$('.weekly-pattern-row').map((row) => ({ weekday:Number(row.dataset.weekday), day_type:$('.weekly-day-type', row).value, start_time:$('.weekly-start', row).value, end_time:$('.weekly-end', row).value }));
