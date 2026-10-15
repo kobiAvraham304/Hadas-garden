@@ -2423,13 +2423,26 @@ function updateRequestDuration() {
   $('#requestDuration').textContent=days>1?`${days} ימים`:'יום אחד';
   $('#leaveManualReminder').classList.toggle('hidden',!(type==='leave'&&days>2));
 }
+function initializeRequestDateInput(input, value) {
+  if (!input) return;
+  // iOS Safari may keep a previously viewed native calendar month after form.reset().
+  // Reinitialize the picker before setting the new explicit month/date.
+  if (/iPad|iPhone|iPod|Macintosh/i.test(navigator.userAgent) && input.type === 'date') {
+    input.type = 'text';
+    input.type = 'date';
+  }
+  input.defaultValue = value;
+  input.value = value;
+}
 function openRequestDialog(options={}) {
   const form = $('#requestForm'); form.reset(); state.swapCandidateSearch=''; $('#swapCandidateSearch').value='';
   const onBehalf=Boolean(options.onBehalf)&&isManager();
   const requesterField=$('#requestRequesterField'); requesterField?.classList.toggle('hidden',!onBehalf);
   if(form.elements.requester_id){form.elements.requester_id.required=onBehalf;form.elements.requester_id.innerHTML='<option value="">בחירת עובד</option>'+state.employees.filter((e)=>e.active).map((e)=>`<option value="${e.id}">${escapeHtml(e.full_name)} · ${escapeHtml(e.job_title||'')}</option>`).join('');form.elements.requester_id.value=options.employeeId||'';}
   form.elements.manager_apply_now.value=options.applyNow?'true':'false';
-  form.elements.request_date.value = options.date||dateISO(new Date()); form.elements.request_end_date.value = options.endDate||options.date||dateISO(new Date());
+  const today = dateISO(new Date());
+  initializeRequestDateInput(form.elements.request_date, options.date || today);
+  initializeRequestDateInput(form.elements.request_end_date, options.endDate || options.date || today);
   $('input[name="request_type"][value="leave"]', form).checked = true; state.swapCandidates=[];
   $('#requestDialogTitle').textContent=onBehalf?'בקשה חדשה עבור עובד':'מה תרצו לבקש?';
   renderFixedDayOffOptions(); updateRequestShiftOptions(); updateRequestFields(); $('#requestDialog').showModal();

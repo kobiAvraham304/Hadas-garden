@@ -46,6 +46,6 @@ test('0.39.4 reflects live employee/date changes and preserves mandatory server 
   assert.match(client,/function updateShiftEmployeeHint\(\) \{\s*syncApprovedLeaveOverride\(\);/);
   assert.match(client,/\[name="shift_date"\]'\)\.addEventListener\('change', \(\) => \{ syncApprovedLeaveOverride\(\);/);
   assert.match(server,/overrideApprovedLeave && \['leave','day_off'\]\.includes\(approvedAbsence\.request_type\)/);
-  assert.equal(JSON.parse(read('package.json')).version, '0.40.1');
+  assert.equal(JSON.parse(read('package.json')).version, '0.40.2');
   assert.match(read('patch-v025.js'),/patch-v0392\.css\?v=0393/);
 });
