@@ -350,6 +350,7 @@ function bindEvents() {
   $('#autoScheduleDateChoices')?.addEventListener('change',()=>{$$('.auto-date-chip').forEach((chip)=>chip.classList.toggle('selected',Boolean(chip.querySelector('input:checked'))));state.autoScheduleSelectedDates=autoSelectedDates();});
   $('#autoSchedulePreview').addEventListener('click', handleAutoSchedulePreviewClick);
   $$('#autoScheduleDialog input[name="auto_schedule_mode"]').forEach((input) => input.addEventListener('change', syncAutoScheduleModeCards));
+  installScheduleToolsMenu();
   $('#copyWeekBtn').addEventListener('click', openCopyWeekDialog);
   $('#copyReplaceBtn').addEventListener('click', () => copyPreviousWeek('replace'));
   $('#copyMergeBtn').addEventListener('click', () => copyPreviousWeek('merge'));
@@ -442,7 +443,8 @@ function bindEvents() {
   for (const name of ['class_id','start_time','end_time','shift_role']) $('#shiftForm [name="'+name+'"]').addEventListener(name.includes('time') ? 'input' : 'change', (event) => { if (name === 'shift_role') $('#shiftForm').dataset.roleTouched = 'true'; queueShiftRecommendations(event); });
   $('#shiftRecommendations').addEventListener('click', handleShiftRecommendationClick);
   $('#publishChangeNowBtn').addEventListener('click', publishPendingChangeNow);
-  ['default_start','default_end'].forEach(name=>$('#employeeForm').elements[name].addEventListener('change',syncInheritedWeeklyHours));
+  ['default_start','default_end'].forEach(name=>$('#employeeForm').elements[name].addEventListener('change',promptWeeklyDefaultHoursChoice));
+  $('#employeeDefaultHoursChoice').addEventListener('click',handleWeeklyDefaultHoursChoice);
   $('#employeeForm').addEventListener('submit', saveEmployee);
   $('#requestForm').addEventListener('submit', saveRequest);
   $('#announcementForm').addEventListener('submit', saveAnnouncement);
@@ -2139,6 +2141,89 @@ function syncWeeklyPatternRow(row) {
   $$('.weekly-time', row).forEach((field) => { field.classList.toggle('hidden', type !== 'work'); field.querySelector('input').required = type === 'work'; });
   const note=$('.weekly-day-off-note',row); if(note) note.textContent=type==='as_needed'?'רק אם באמת חסר כוח אדם · עדיפות נמוכה':type==='day_off'?'אסור לשיבוץ אוטומטי':'שעות עבודה קבועות';
 }
+function installScheduleToolsMenu() {
+  const menu=document.querySelector('.schedule-tools-menu'),summary=menu?.querySelector(':scope > summary');
+  if (!menu || !summary || menu.dataset.hadasMenuInstalled) return;
+  menu.dataset.hadasMenuInstalled='true';
+  summary.setAttribute('role','button');
+  summary.setAttribute('tabindex','0');
+  const sync=()=>summary.setAttribute('aria-expanded',String(menu.open));
+  // Use an explicit toggle: some tablet/Safari layouts hide a closed details body
+  // even when CSS displays its children.
+  summary.addEventListener('click',event=>{
+    event.preventDefault();
+    menu.open=!menu.open;
+    sync();
+  });
+  summary.addEventListener('keydown',event=>{
+    if(event.key!=='Enter' && event.key!==' ')return;
+    event.preventDefault();
+    menu.open=!menu.open;
+    sync();
+  });
+  document.addEventListener('click',event=>{
+    if(menu.open && !menu.contains(event.target)){menu.open=false;sync();}
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key==='Escape' && menu.open){menu.open=false;sync();summary.focus();}
+  });
+  menu.addEventListener('toggle',sync);
+  sync();
+}
+function employeeDefaultHoursValues() {
+  const form=$('#employeeForm');
+  return {start:trimTime(form.elements.default_start.value),end:trimTime(form.elements.default_end.value)};
+}
+function showEmployeeHoursChoice(open) {
+  const prompt=$('#employeeDefaultHoursChoice');
+  prompt.hidden=!open;
+  prompt.classList.toggle('hidden',!open);
+}
+function promptWeeklyDefaultHoursChoice() {
+  const current=employeeDefaultHoursValues();
+  const previous=state.employeeHoursBaseline||current;
+  const changed=current.start!==previous.start || current.end!==previous.end;
+  showEmployeeHoursChoice(changed);
+  if(!changed)return;
+  const active=$$('.weekly-pattern-row').filter(row=>$('.weekly-day-type',row).value==='work');
+  const overrides=active.filter(row=>row.dataset.hoursOverride==='true').length;
+  $('#employeeDefaultHoursExplanation').textContent=
+    'השעות החדשות יחולו על '+active.length+' ימי עבודה. ב־'+overrides+
+    ' ימים הוגדרו שעות שונות. איך תרצו לעדכן? ימים חופשיים לא ישתנו.';
+}
+function handleWeeklyDefaultHoursChoice(event) {
+  const button=event.target.closest('[data-hours-choice]');
+  if(!button)return;
+  const action=button.dataset.hoursChoice;
+  const form=$('#employeeForm');
+  const current=employeeDefaultHoursValues();
+  const old=state.employeeHoursBaseline||current;
+  if(action==='cancel'){
+    form.elements.default_start.value=old.start;
+    form.elements.default_end.value=old.end;
+    showEmployeeHoursChoice(false);
+    return;
+  }
+  if(!current.start || !current.end || timeToMinutes(current.end)<=timeToMinutes(current.start)){
+    showToast('יש לבחור שעות התחלה וסיום תקינות','error');
+    return;
+  }
+  if(action==='all'){
+    $$('.weekly-pattern-row').forEach(row=>{
+      if($('.weekly-day-type',row).value!=='work')return;
+      const base=weeklyEffectiveDefault(Number(row.dataset.weekday));
+      $('.weekly-start',row).value=base.start;
+      $('.weekly-end',row).value=base.end;
+      updateWeeklyHoursBadge(row);
+    });
+  }else if(action==='preserve'){
+    // Existing overrides remain untouched. Only inherited hours change.
+    syncInheritedWeeklyHours();
+  }else return;
+  state.employeeHoursBaseline=current;
+  showEmployeeHoursChoice(false);
+  showToast(action==='all'?'השעות הוחלו על כל ימי העבודה':'השעות עודכנו, ושעות מיוחדות נשמרו','success');
+}
 function weeklyEffectiveDefault(weekday) {
   const form = $('#employeeForm');
   const start = trimTime(form?.elements.default_start?.value) || '07:30';
@@ -2267,6 +2352,8 @@ function openEmployeeDialog(employee = {}) {
   form.elements.employment_percent.value = employee.employment_percent ?? '';
   form.elements.default_start.value = trimTime(employee.default_start) || '07:30';
   form.elements.default_end.value = trimTime(employee.default_end) || '15:30';
+  state.employeeHoursBaseline=employeeDefaultHoursValues();
+  showEmployeeHoursChoice(false);
   form.elements.admin_notes.value = employee.admin_notes || '';
   renderWeeklyPatternFields(employee); renderConstraintFields(employee); syncEmployeeAssignmentFields();
   $('#employeeDialogTitle').textContent = employee.full_name || 'עובד חדש';
@@ -2297,6 +2384,7 @@ async function saveEmployee(event) {
     form.elements.primary_class_id.focus();
     return;
   }
+  if (!$('#employeeDefaultHoursChoice').hidden) { showToast('יש לבחור איך להחיל את שינוי השעות לפני השמירה','error'); $('#employeeDefaultHoursChoice').scrollIntoView({block:'center',behavior:'smooth'}); return; }
   // Ensure an old custom error does not block a valid edited time.
   $$('#employeeForm input[data-hadas24h]').forEach(input=>input.dispatchEvent(new Event('change')));
   if (!form.reportValidity()) return;
