@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
 
-test('0.40.3 clickable problem badge and green quick approval target a concrete date/class',()=>{
+test('0.40.4 clickable problem badge and green quick approval target a concrete date/class',()=>{
  const patch=read('patch-v027.js');
  assert.match(patch,/data-v0403-issue-open/);
  assert.match(patch,/data-v0403-issue-quick/);
