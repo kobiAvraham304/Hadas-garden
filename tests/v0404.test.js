@@ -39,7 +39,7 @@ test('apply all overwrites prior special workday hours but preserves day-off cla
  const state={employeeHoursBaseline:{start:'07:30',end:'15:30'}},notice={hidden:false,classList:{toggle(){}}};
  const $=(q,r)=>r?r.elements[q]:({'#employeeForm':form,'#employeeDefaultHoursChoice':notice}[q]);
  const fn=new Function('$','$$','state','trimTime','timeToMinutes','showToast',block+'return handleWeeklyDefaultHoursChoice;')(
-   $,(q)=>rows,s=>s, s=>{const[h,m]=s.split(':').map(Number);return h*60+m},()=>{});
+   $,(q)=>rows,state,s=>s, s=>{const[h,m]=s.split(':').map(Number);return h*60+m},()=>{});
  fn({target:{closest:()=>({dataset:{hoursChoice:'all'}})}});
  assert.equal(rows[0].elements['.weekly-start'].value,'09:00');
  assert.equal(rows[1].elements['.weekly-start'].value,'09:00');
