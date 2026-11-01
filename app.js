@@ -133,7 +133,7 @@ function trimTime(value) { return value ? String(value).slice(0, 5) : ''; }
 // A constrained HH:MM text control keeps 24-hour formatting while preserving form values and validation.
 function initializeWindows24HourFields() {
   if (!/Windows NT/i.test(navigator.userAgent)) return;
-  const valid = /^(?:[01]\\d|2[0-3]):[0-5]\\d$/;
+  const valid = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
   const enhance = (input) => {
     if (!input || input.dataset.hadas24h) return;
     input.dataset.hadas24h = 'true';
@@ -147,8 +147,8 @@ function initializeWindows24HourFields() {
     input.autocomplete = 'off';
     const normalize = () => {
       const current = input.value.trim();
-      if (/^\\d{3,4}$/.test(current)) input.value = current.padStart(4,'0').replace(/^(\\d{2})(\\d{2})$/, '$1:$2');
-      else if (/^\\d{1,2}:\\d{2}$/.test(current)) input.value = current.padStart(5,'0');
+      if (/^\d{3,4}$/.test(current)) input.value = current.padStart(4,'0').replace(/^(\d{2})(\d{2})$/, '$1:$2');
+      else if (/^\d{1,2}:\d{2}$/.test(current)) input.value = current.padStart(5,'0');
       const value = input.value.trim(),min=input.getAttribute('min'),max=input.getAttribute('max');
       const invalid = value && (!valid.test(value) || (min && value < min) || (max && value > max));
       input.setCustomValidity(invalid ? 'יש להזין שעה תקינה בפורמט 24 שעות (לדוגמה 07:30) ובהתאם לטווח המותר.' : '');
