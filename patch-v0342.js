@@ -4,7 +4,7 @@
   window.__hadasV0342Installed = true;
 
   const VERSION = '0.36.0';
-  const SCALE = 2; // 1754×1240 logical -> 3508×2480 px, close to 300dpi A4 landscape.
+  const SCALE = 2; // 3508 × 2480 pixels; 300 DPI when printed on one landscape A4 page.
 
   function isSubstitute(employeeOrId) {
     const employee = typeof employeeOrId === 'object' ? employeeOrId : employeeById(employeeOrId);
@@ -164,23 +164,59 @@
     const role = /גנ(?:נ|ן)/.test(job) ? 'teacher'
       : /(?:סייעת|סייע)\s*מוביל|מוביל(?:ת|ה)?\s*כיתה/.test(job) ? 'lead'
       : String(shift?.shift_role || 'staff');
-    if (role === 'teacher') return { fill:'#b5e6cf', border:'#80bb9d', accent:'#24744f', meta:'#256343' };
-    if (role === 'lead') return { fill:'#dcc7f5', border:'#b394dc', accent:'#7546a2', meta:'#633c8a' };
-    if (role === 'replacement') return { fill:'#ffe3af', border:'#e9bf75', accent:'#a16a20', meta:'#795018' };
-    return { fill:'#eef1f9', border:'#d4daea', accent:'#7184aa', meta:'#5d647c' };
+    if (role === 'teacher') return { fill:'#DCF0E0', border:'#BFDCC9', accent:'#709D7D', meta:'#527860' };
+    if (role === 'lead') return { fill:'#EFE2F8', border:'#DDC9EC', accent:'#A27DB9', meta:'#78568E' };
+    if (role === 'replacement') return { fill:'#FFF0DA', border:'#EDD9BC', accent:'#B99259', meta:'#80633C' };
+    return { fill:'#F1F2F8', border:'#E3E4EF', accent:'#B6B9CB', meta:'#65697E' };
   }
 
   function pdfClassPalette(classItem, index) {
     const name = String(classItem?.name || '').trim();
     const choices = [
-      { fill:'#d0e3f9', line:'#8aabd8', text:'#345c91', row:'#f8fbff' },
-      { fill:'#ebd3f5', line:'#c190d0', text:'#75488c', row:'#fdf9ff' },
-      { fill:'#cdebdc', line:'#8ccba9', text:'#356c50', row:'#f8fdfa' },
+      { fill:'#E9F0FB', line:'#C9D9F2', text:'#56759D', row:'#FAFCFF' },
+      { fill:'#F8EAF2', line:'#EFCFE0', text:'#946783', row:'#FFFCFE' },
+      { fill:'#EBF6EF', line:'#CBE5D6', text:'#527E66', row:'#FBFEFC' },
     ];
     if (name.includes('סיני')) return choices[0];
     if (name.includes('אודם')) return choices[1];
     if (name.includes('גלבוע')) return choices[2];
     return choices[index % choices.length];
+  }
+
+  function pdfAbsencePalette(item) {
+    // Approved vacation is coral; recurring weekly day off stays neutral beige.
+    if (item?.absence_type === 'day_off_worked') return { fill:'#E5F5E9', border:'#C9E6D1', text:'#467C55' };
+    if (item?.absence_type === 'leave') return { fill:'#FBE4DC', border:'#EDC9BD', text:'#985748' };
+    if (item?.absence_type === 'day_off') return { fill:'#FCEADF', border:'#EED4C6', text:'#92624D' };
+    if (item?.absence_type === 'fixed_day_off') return { fill:'#F2EEE8', border:'#E0D8D1', text:'#6F665F' };
+    if (item?.absence_type === 'sick') return { fill:'#F9E3EA', border:'#E9C6D2', text:'#925A6D' };
+    return { fill:'#F2F2F7', border:'#E5E4ED', text:'#6F7180' };
+  }
+
+  function pdfClassIcon(ctx, name, x, y, palette) {
+    ctx.save();
+    roundRect(ctx, x-23, y-23, 46, 46, 15, '#FFFFFFBB', '#FFFFFF', 1);
+    ctx.strokeStyle = palette.text;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    if (String(name).includes('אודם')) {
+      ctx.moveTo(x, y+12);
+      ctx.bezierCurveTo(x-25,y-3,x-12,y-16,x,y-5);
+      ctx.bezierCurveTo(x+12,y-16,x+25,y-3,x,y+12);
+    } else if (String(name).includes('גלבוע')) {
+      ctx.moveTo(x,y+15);ctx.lineTo(x,y-11);
+      ctx.moveTo(x,y-2);ctx.quadraticCurveTo(x-18,y-17,x-17,y-2);ctx.quadraticCurveTo(x-9,y+6,x,y-2);
+      ctx.moveTo(x,y+3);ctx.quadraticCurveTo(x+17,y-16,x+17,y+1);ctx.quadraticCurveTo(x+8,y+9,x,y+3);
+    } else {
+      ctx.moveTo(x-16,y+7);ctx.bezierCurveTo(x-21,y-3,x-12,y-9,x-5,y-7);
+      ctx.bezierCurveTo(x-2,y-20,x+14,y-18,x+16,y-6);
+      ctx.bezierCurveTo(x+27,y-2,x+20,y+11,x+10,y+11);
+      ctx.lineTo(x-9,y+11);ctx.bezierCurveTo(x-14,y+11,x-16,y+10,x-16,y+7);
+    }
+    ctx.stroke();
+    ctx.restore();
   }
 
   function drawShiftCard(ctx, shift, x, y, width, height) {
@@ -191,16 +227,16 @@
     const time = `${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`;
     const meta = `${time}${role ? ` · ${role}` : ''}`;
     const compact = height < 34;
-    roundRect(ctx, x, y, width, height, 9, palette.fill, palette.border, 1.35);
-    // The solid colored stripe remains visible in the small PDF/WhatsApp preview.
+    roundRect(ctx, x, y, width, height, 10, palette.fill, palette.border, .8);
+    // Soft two-pixel role cue, kept legible without the heavy colored side bar.
     ctx.fillStyle = palette.accent;
-    ctx.fillRect(x + width - 6, y + 4, 3, Math.max(1, height - 8));
+    ctx.fillRect(x + width - 5, y + 6, 2, Math.max(1, height - 12));
     if (compact) {
       fitText(ctx, `${name} · ${meta}`, x + width - 11, y + height / 2, { size:15.5, minSize:8.5, weight:850, color:'#303449', maxWidth:width - 22, ellipsis:false });
       return;
     }
-    fitText(ctx, name, x + width - 12, y + height * .30, { size:22.6, minSize:15.2, weight:900, color:'#2a2e44', maxWidth:width - 24, ellipsis:false });
-    fitText(ctx, meta, x + width - 12, y + height * .74, { size:18.2, minSize:12.4, weight:800, color:palette.meta, maxWidth:width - 24, ellipsis:false });
+    fitText(ctx, name, x + width - 12, y + height * .30, { size:22.2, minSize:15.2, weight:900, color:'#2F3049', maxWidth:width - 24, ellipsis:false });
+    fitText(ctx, meta, x + width - 12, y + height * .74, { size:17.8, minSize:12.4, weight:750, color:palette.meta, maxWidth:width - 24, ellipsis:false });
   }
 
   function absenceEntriesForDate(iso, sourceRows = state.scheduleAbsences || []) {
@@ -281,23 +317,27 @@
     const classBodyHeight = Math.max(1, classesBottom - classesTop);
     const rowHeight = classBodyHeight / Math.max(1, classes.length);
 
-    roundRect(ctx, margin, headerTop, tableWidth, headerHeight, 18, '#eae8fc', '#d1cdef', 1.2);
-    text(ctx, 'שיבוץ שבועי · מעון הדס', logicalWidth - margin - 24, headerTop + 27, { size:31, weight:900, color:'#292d43' });
-    fitText(ctx, orderedWeekLabel(weekStart), logicalWidth - margin - 24, headerTop + 67, { size:30, minSize:25, weight:950, color:'#4c5270', maxWidth:660, ellipsis:false });
-    text(ctx, 'A4 לרוחב · עמוד אחד', margin + 22, headerTop + 46, { size:15.5, weight:750, color:'#777b8f', align:'left' });
+    roundRect(ctx, margin, headerTop, tableWidth, headerHeight, 19, '#F7F4FC', '#E8E1F3', .9);
+    // A restrained botanical accent inspired by the approved mockup.
+    ctx.save();
+    ctx.strokeStyle = '#B3C6B7';ctx.lineWidth = 2.2;ctx.lineCap = 'round';
+    ctx.beginPath();ctx.moveTo(margin + 27, headerTop + 80);
+    ctx.quadraticCurveTo(margin + 76, headerTop + 22, margin + 154, headerTop + 28);ctx.stroke();
+    ctx.fillStyle = '#D7E2D8';
+    for (const leaf of [[57,55,-.55],[90,35,.25],[116,30,-.45]]) {
+      ctx.beginPath();ctx.ellipse(margin+leaf[0],headerTop+leaf[1],17,7,leaf[2],0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+    text(ctx, 'שיבוץ שבועי – מעון הדס', logicalWidth - margin - 24, headerTop + 33, { size:35, weight:900, color:'#322747' });
+    roundRect(ctx, logicalWidth - margin - 490, headerTop + 53, 465, 32, 16, '#EFE9F8', '#E0D7EF', .8);
+    fitText(ctx, orderedWeekLabel(weekStart), logicalWidth - margin - 42, headerTop + 69, { size:22, minSize:20, weight:800, color:'#4F426D', maxWidth:424, ellipsis:false });
 
-    ctx.fillStyle = '#efeff7';
-    ctx.fillRect(classColumnX, dayHeaderTop, classColumnWidth, dayHeaderHeight);
-    ctx.strokeStyle = '#d9dbe7';
-    ctx.strokeRect(classColumnX, dayHeaderTop, classColumnWidth, dayHeaderHeight);
+    roundRect(ctx, classColumnX + 2, dayHeaderTop + 2, classColumnWidth - 4, dayHeaderHeight - 4, 13, '#EEEAF8', '#E9E4F3', .8);
     text(ctx, 'כיתה', classColumnX + classColumnWidth / 2, dayHeaderTop + dayHeaderHeight / 2, { size:22.5, weight:950, color:'#44485e', align:'center' });
 
     dates.forEach((date, index) => {
       const x = dayAreaX + (5 - index) * dayWidth;
-      ctx.fillStyle = index % 2 ? '#f6f5fd' : '#edeefd';
-      ctx.fillRect(x, dayHeaderTop, dayWidth, dayHeaderHeight);
-      ctx.strokeStyle = '#dfe1ea';
-      ctx.strokeRect(x, dayHeaderTop, dayWidth, dayHeaderHeight);
+      roundRect(ctx, x + 2, dayHeaderTop + 2, dayWidth - 4, dayHeaderHeight - 4, 13, '#F0EBF8', '#E8E3F1', .8);
       text(ctx, DAY_NAMES[date.getDay()], x + dayWidth / 2, dayHeaderTop + 21, { size:21.5, weight:950, align:'center' });
       text(ctx, shortDate(date), x + dayWidth / 2, dayHeaderTop + 44, { size:17.8, weight:800, color:'#72768a', align:'center' });
     });
@@ -311,15 +351,12 @@
       ctx.strokeStyle = '#dfe1ea';
       ctx.strokeRect(margin, y, tableWidth, h);
 
-      ctx.fillStyle = classPalette.fill;
-      ctx.fillRect(classColumnX, y, classColumnWidth, h);
-      ctx.fillStyle = classPalette.line;
-      ctx.fillRect(classColumnX + classColumnWidth - 7, y, 7, h);
-      ctx.strokeStyle = classPalette.line;
-      ctx.strokeRect(classColumnX, y, classColumnWidth, h);
-      fitText(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, y + h / 2 - 12, { size:27, minSize:20, weight:950, color:classPalette.text, align:'center', maxWidth:classColumnWidth - 18 });
+      roundRect(ctx, classColumnX + 7, y + 7, classColumnWidth - 14, h - 14, 15, classPalette.fill, classPalette.line, .8);
+      const labelY = y + h / 2;
+      if (h >= 142) pdfClassIcon(ctx, classItem.name, classColumnX + classColumnWidth / 2, labelY - 49, classPalette);
+      fitText(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, labelY + (h >= 142 ? 9 : -9), { size:28, minSize:20, weight:950, color:classPalette.text, align:'center', maxWidth:classColumnWidth - 26 });
       const weeklyCount = shiftRows.filter((row) => row.class_id === classItem.id && dates.some((date) => row.shift_date === dateISO(date))).length;
-      fitText(ctx, weeklyCount + ' שיבוצים', classColumnX + classColumnWidth / 2, y + h / 2 + 26, { size:13.8, minSize:11.5, weight:750, color:'#858197', align:'center', maxWidth:classColumnWidth - 18 });
+      fitText(ctx, weeklyCount + ' שיבוצים', classColumnX + classColumnWidth / 2, labelY + (h >= 142 ? 45 : 23), { size:13.8, minSize:11.5, weight:750, color:'#777389', align:'center', maxWidth:classColumnWidth - 26 });
 
       dates.forEach((date, index) => {
         const iso = dateISO(date);
@@ -334,11 +371,12 @@
           text(ctx, '—', x + dayWidth / 2, y + h / 2, { size:18, weight:650, color:'#b1b3bf', align:'center' });
           return;
         }
-        const gap = 5;
         const innerY = y + 10;
         const innerHeight = h - 20;
+        const gap = Math.min(5, innerHeight / Math.max(1, rows.length * 7));
         const maxCard = rows.length <= 4 ? 58 : 50;
-        const cardHeight = Math.max(31, Math.min(maxCard, (innerHeight - gap * (rows.length - 1)) / rows.length));
+        // Bound stack to its class cell; dense days must not spill into the next row.
+        const cardHeight = Math.max(1, Math.min(maxCard, (innerHeight - gap * (rows.length - 1)) / rows.length));
         const stackHeight = cardHeight * rows.length + gap * (rows.length - 1);
         let currentY = innerY + Math.max(0, (innerHeight - stackHeight) / 2);
         rows.forEach((shift) => {
@@ -374,17 +412,10 @@
     });
 
     const absenceTop = classesBottom;
-    ctx.fillStyle = '#fff8e8';
-    ctx.fillRect(margin, absenceTop, tableWidth, absenceHeight);
-    ctx.strokeStyle = '#e6ddc9';
-    ctx.strokeRect(margin, absenceTop, tableWidth, absenceHeight);
-
-    ctx.fillStyle = '#ffedc5';
-    ctx.fillRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
-    ctx.strokeStyle = '#e0d4bc';
-    ctx.strokeRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
-    fitText(ctx, 'חופש / היעדרות', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 - 14, { size:24.5, minSize:20, weight:950, color:'#735f3e', align:'center', maxWidth:classColumnWidth - 14, ellipsis:false });
-    text(ctx, 'לפי יום', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 + 22, { size:15.5, weight:750, color:'#9a886b', align:'center' });
+    roundRect(ctx, margin, absenceTop, tableWidth, absenceHeight, 14, '#FFFBF6', '#EFE5DA', .8);
+    roundRect(ctx, classColumnX + 7, absenceTop + 7, classColumnWidth - 14, absenceHeight - 14, 14, '#FBF0DD', '#EBD9BD', .8);
+    fitText(ctx, 'חופש / היעדרויות', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 - 14, { size:23, minSize:18, weight:950, color:'#806747', align:'center', maxWidth:classColumnWidth - 24, ellipsis:false });
+    text(ctx, 'לפי ימים', classColumnX + classColumnWidth / 2, absenceTop + absenceHeight / 2 + 24, { size:15, weight:750, color:'#A28A67', align:'center' });
 
     dates.forEach((date, index) => {
       const x = dayAreaX + (5 - index) * dayWidth;
@@ -399,25 +430,22 @@
       const columns = items.length > 4 ? 2 : 1;
       const rowsPerColumn = Math.ceil(items.length / columns);
       const gapX = 5;
-      const gapY = 5;
+      const gapY = Math.min(5, (absenceHeight - 16) / Math.max(1, rowsPerColumn * 6));
       const innerX = x + 7;
       const innerY = absenceTop + 8;
       const innerWidth = dayWidth - 14;
       const innerHeight = absenceHeight - 16;
       const cardWidth = (innerWidth - gapX * (columns - 1)) / columns;
-      const cardHeight = Math.max(30, Math.min(44, (innerHeight - gapY * (rowsPerColumn - 1)) / rowsPerColumn));
+      const cardHeight = Math.max(1, Math.min(44, (innerHeight - gapY * (rowsPerColumn - 1)) / rowsPerColumn));
 
       items.forEach((item, itemIndex) => {
         const column = Math.floor(itemIndex / rowsPerColumn);
         const row = itemIndex % rowsPerColumn;
         const cardX = innerX + (columns - 1 - column) * (cardWidth + gapX);
         const cardY = innerY + row * (cardHeight + gapY);
-        const worked = item.absence_type === 'day_off_worked';
-        const approvedLeave = item.absence_type === 'leave';
-        const fill = worked ? '#d7f1e1' : approvedLeave ? '#f9dfe2' : '#f0eff9';
-        const border = worked ? '#9ecdb0' : approvedLeave ? '#e4a5ad' : '#d8d2e8';
-        const color = worked ? '#2f754a' : approvedLeave ? '#923b3b' : '#555b6e';
-        roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 8, fill, border, 1);
+        const absenceStyle = pdfAbsencePalette(item);
+        const color = absenceStyle.text;
+        roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 9, absenceStyle.fill, absenceStyle.border, .8);
         const name = item.employee_name || employeeById(item.employee_id)?.full_name || 'עובד';
         const label = absencePdfLabel(item.absence_type);
         if (cardHeight >= 36) {
