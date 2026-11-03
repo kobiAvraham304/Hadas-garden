@@ -166,6 +166,21 @@
       if(shell&&!shell.classList.contains('hidden')){
         const tab=target==='announcement'?'announcements':target==='request'?'requests':target==='schedule'?'schedule':target==='attendance'?'attendance':target==='home'?'dashboard':null;
         if(tab)document.querySelector('[data-tab="'+tab+'"]')?.click();else if(target==='notifications')document.getElementById('notificationsBtn')?.click();
+        // Open the exact request after fresh data loads, without ever approving it automatically.
+        if(target==='request' && /^[0-9a-f-]{36}$/i.test(params.get('id')||'')){
+          const requestId=params.get('id');
+          for(let attempt=0;attempt<32;attempt++){
+            const request=typeof state!=='undefined'?(state.requests||[]).find(item=>item.id===requestId):null;
+            if(request){
+              state.requestStatusFilter='all';
+              if(request.status!=='pending' && request.request_date)state.requestPeriodMonth=String(request.request_date).slice(0,7);
+              if(typeof renderRequests==='function')renderRequests();
+              const card=[...document.querySelectorAll('#requestsList [data-request-id]')].find(item=>item.dataset.requestId===requestId);
+              if(card && !card.hidden){card.classList.add('push-request-focus');card.scrollIntoView({block:'center',behavior:'smooth'});break;}
+            }
+            await new Promise(resolve=>setTimeout(resolve,200));
+          }
+        }
         history.replaceState({},'',location.pathname);return;
       }
       await new Promise(r=>setTimeout(r,250));

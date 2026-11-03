@@ -1,5 +1,5 @@
 const {
-  requireSession, isManager, scheduleScope, canViewFullSchedule, canCreateContent, canManageDailyOperations, db, assertDb, displayPhone, israelDateISO, send, handleError,
+  requireSession, isManager, isTeacher, scheduleScope, canViewFullSchedule, canCreateContent, canManageDailyOperations, db, assertDb, displayPhone, israelDateISO, send, handleError,
 } = require('../lib/server');
 const { dateRange, buildScheduleAvailability } = require('../lib/schedule');
 
@@ -186,8 +186,12 @@ module.exports = async function handler(req, res) {
     // או פרטים אישיים, אך כן מוצגים ימי חופש קבועים גם כשאין חריגה.
     const absenceDates = [...new Set([...dateRange(weekStart, 6), today])];
     if (!manager) {
-      shifts = restoreLastPublished(shifts, scheduleChanges);
-      todayShifts = restoreLastPublished(todayShifts, todayChanges);
+      // Teachers need a read-only cross-class view, including drafts before publication.
+      // Other staff continue to see only the latest published schedule.
+      if (!isTeacher(caller)) {
+        shifts = restoreLastPublished(shifts, scheduleChanges);
+        todayShifts = restoreLastPublished(todayShifts, todayChanges);
+      }
       if (classScheduleViewer) {
         shifts = shifts.filter((row) => row.class_id === caller.employee.primary_class_id);
         todayShifts = todayShifts.filter((row) => row.class_id === caller.employee.primary_class_id);

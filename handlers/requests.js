@@ -176,7 +176,7 @@ module.exports = async function handler(req,res) {
         }));
       } else if(!onBehalf) {
         const manualNote = type === 'leave' && inclusiveDays(payload.request_date,payload.request_end_date) > 2 ? ' נדרשת גם השלמת טופס חופשה ידני.' : '';
-        postCreateTasks.push(notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id));
+        postCreateTasks.push(notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true,push:type==='leave',pushUrl:`/?push=request&id=${encodeURIComponent(request.id)}`,pushTag:`hadas-leave-request-${request.id}` },caller.employee.id));
       }
       await Promise.all(postCreateTasks);
       let finalRequest=request;

@@ -29,3 +29,6 @@
   .push-onboarding-dialog{max-width:calc(100vw - 28px)}.push-onboarding-card{padding:22px 17px 16px;border-radius:22px}
 }
 @media(prefers-reduced-motion:no-preference){.push-onboarding-dialog[open] .push-onboarding-card{animation:pushOnboardingIn .2s ease-out both}@keyframes pushOnboardingIn{from{opacity:0;transform:translateY(12px) scale(.98)}to{opacity:1;transform:none}}}
+
+/* Emphasize the request opened from a phone notification. */
+#requestsList .request-card.push-request-focus{outline:3px solid #7774cf;outline-offset:2px;scroll-margin-block:130px}
