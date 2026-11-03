@@ -173,9 +173,9 @@
   function pdfClassPalette(classItem, index) {
     const name = String(classItem?.name || '').trim();
     const choices = [
-      { fill:'#e0ebfa', line:'#8aabd8', text:'#345c91', row:'#f8fbff' },
-      { fill:'#f0dff5', line:'#c190d0', text:'#75488c', row:'#fdf9ff' },
-      { fill:'#ddf1e6', line:'#8ccba9', text:'#356c50', row:'#f8fdfa' },
+      { fill:'#d0e3f9', line:'#8aabd8', text:'#345c91', row:'#f8fbff' },
+      { fill:'#ebd3f5', line:'#c190d0', text:'#75488c', row:'#fdf9ff' },
+      { fill:'#cdebdc', line:'#8ccba9', text:'#356c50', row:'#f8fdfa' },
     ];
     if (name.includes('סיני')) return choices[0];
     if (name.includes('אודם')) return choices[1];

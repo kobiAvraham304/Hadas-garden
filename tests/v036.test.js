@@ -87,11 +87,11 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /עמוד נפרד לכל שבוע/);
   assert.match(patch, /v036-pdf-page-preview/);
   assert.match(patch, /absence_type === 'day_off_worked'/);
-  assert.match(patch, /#edf9f1/);
-  assert.match(patch, /#fff0f0/);
+  assert.match(patch, /#d7f1e1/);
+  assert.match(patch, /#f9dfe2/);
   assert.match(patch, /const approvedLeave = item\.absence_type === 'leave'/);
-  assert.match(patch, /approvedLeave \? '#fff0f0' : '#f8f8fb'/);
-  assert.match(patch, /approvedLeave \? '#efb1b1' : '#d9dbe5'/);
+  assert.match(patch, /approvedLeave \? '#f9dfe2' : '#f0eff9'/);
+  assert.match(patch, /approvedLeave \? '#e4a5ad' : '#d8d2e8'/);
   assert.match(patch, /function fitText/);
   assert.match(patch, /ellipsis = true/);
   assert.match(patch, /ellipsis:false/);
@@ -121,9 +121,9 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
 test('0.36 release bootstrap owns the final version guard after legacy layers', () => {
   const entry = read('patch-v025.js');
   const index = read('index.html');
-  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0370'/);
+  assert.match(entry, /V0342 = '\/patch-v0342\.js\?v=0408'/);
   assert.match(entry, /installReleaseVersionGuard/);
   assert.match(entry, /__hadasV034VersionObservers/);
   assert.match(entry, /__hadasReleaseVersionObservers/);
-  assert.match(index, /patch-v025\.js\?v=0407/);
+  assert.match(index, /patch-v025\.js\?v=0408/);
 });
