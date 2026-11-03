@@ -270,11 +270,11 @@
   };
 
   function absencePdfPalette(type) {
-    if (type === 'day_off_worked') return { fill: '#edf9f1', border: '#add7bb', text: '#2f754a' };
-    if (type === 'fixed_day_off') return { fill: '#f2f1fb', border: '#d6d2e8', text: '#5f5b78' };
-    if (type === 'day_off') return { fill: '#fff0f0', border: '#efb1b1', text: '#923b3b' };
-    if (type === 'leave') return { fill: '#fff8e8', border: '#ead29b', text: '#7a5b19' };
-    if (type === 'sick') return { fill: '#fff4ea', border: '#e6c1a5', text: '#815133' };
+    if (type === 'day_off_worked') return { fill: '#daf2e4', border: '#9bcfae', text: '#246a49' };
+    if (type === 'fixed_day_off') return { fill: '#e9e3f9', border: '#bfb1e3', text: '#59468a' };
+    if (type === 'day_off') return { fill: '#fbdfe3', border: '#e7a7ad', text: '#963b46' };
+    if (type === 'leave') return { fill: '#fff0c4', border: '#dfc27b', text: '#795b18' };
+    if (type === 'sick') return { fill: '#ffe4d1', border: '#e7b69a', text: '#86502b' };
     return { fill: '#f6f7fa', border: '#dfe1e8', text: '#676b78' };
   }
 
@@ -330,6 +330,7 @@
           if (cardY + 34 > y + rowHeight) return;
           const palette = exportRolePalette(shift.shift_role);
           fillRoundedRect(ctx, cellLeft + 7, cardY, dayWidth - 14, 34, 8, palette.fill, palette.border);
+          fillRoundedRect(ctx, cellRight - 12, cardY + 4, 4, 26, 2, palette.accent);
           drawCanvasText(ctx, employee?.full_name || 'עובד', cellRight - 16, cardY + 12, dayWidth - 102, { font: '800 16px Arial', color: '#303348' });
           drawCanvasText(ctx, isolateCanvasLtr(`${trimTime(shift.start_time)}-${trimTime(shift.end_time)}`), cellLeft + 16, cardY + 12, 92, { font: '800 14px Arial', color: palette.accent, align: 'left' });
           const note = [SHIFT_ROLE_SHORT_LABELS[shift.shift_role] || '', shift.public_note].filter(Boolean).join(' · ');
