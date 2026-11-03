@@ -36,7 +36,7 @@ test('asset cache busting and version number follow 0.40.9',()=>{
  const html=read('index.html'),boot=read('patch-v025.js'),pkg=require('../package.json');
  assert.equal(pkg.version,'0.40.9');
  for(const asset of ['styles.css','app.js'])assert.ok(html.includes(asset+'?v=0407'));
- assert.ok(html.includes('patch-v025.js?v=0408'));
+ assert.ok(html.includes('patch-v025.js?v=0409'));
  assert.match(boot,/patch-v0342\.js\?v=0409/);
  assert.match(boot,/patch-v026\.js\?v=0407/);
  assert.match(boot,/patch-v033\.js\?v=0407/);

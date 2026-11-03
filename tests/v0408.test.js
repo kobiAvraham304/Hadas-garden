@@ -40,7 +40,7 @@ test('class labels and row bands remain distinct for the three classrooms',()=>{
   assert.ok(colorDistanceFromWhite(g.fill)>35);
  }
  assert.ok(script.includes('ctx.fillStyle = classPalette.row'));
- assert.ok(script.includes('ctx.fillStyle = classPalette.fill'));
+ assert.ok(script.includes('roundRect(ctx, classColumnX + 7, y + 7, classColumnWidth - 14, h - 14'));
  assert.ok(script.includes('pdfClassIcon(ctx, classItem.name,'));
 });
 

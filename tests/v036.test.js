@@ -98,7 +98,7 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /const meta =/);
   assert.match(patch, /size:22, minSize:20, weight:800/);
   assert.match(patch, /const dayHeaderHeight = 64/);
-  assert.match(patch, /size:24\.5, minSize:20, weight:950/);
+  assert.match(patch, /size:23, minSize:18, weight:950/);
   assert.match(patch, /size:17\.4, minSize:12\.8/);
   assert.match(patch, /size:24, minSize:19, weight:950/);
   assert.match(patch, /const compact = height < 34/);
