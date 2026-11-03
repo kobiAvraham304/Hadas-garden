@@ -87,11 +87,11 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /עמוד נפרד לכל שבוע/);
   assert.match(patch, /v036-pdf-page-preview/);
   assert.match(patch, /absence_type === 'day_off_worked'/);
-  assert.match(patch, /#d7f1e1/);
-  assert.match(patch, /#f9dfe2/);
+  assert.match(patch, /#E5F5E9/);
+  assert.match(patch, /#FBE4DC/);
   assert.match(patch, /const approvedLeave = item\.absence_type === 'leave'/);
-  assert.match(patch, /approvedLeave \? '#f9dfe2' : '#f0eff9'/);
-  assert.match(patch, /approvedLeave \? '#e4a5ad' : '#d8d2e8'/);
+  assert.match(patch, /approvedLeave \? '#FBE4DC' : '#f0eff9'/);
+  assert.match(patch, /absenceStyle\.border/);
   assert.match(patch, /function fitText/);
   assert.match(patch, /ellipsis = true/);
   assert.match(patch, /ellipsis:false/);
