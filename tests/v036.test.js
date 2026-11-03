@@ -89,14 +89,14 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /absence_type === 'day_off_worked'/);
   assert.match(patch, /#E5F5E9/);
   assert.match(patch, /#FBE4DC/);
-  assert.match(patch, /const approvedLeave = item\.absence_type === 'leave'/);
-  assert.match(patch, /approvedLeave \? '#FBE4DC' : '#f0eff9'/);
+  assert.match(patch, /const absenceStyle = pdfAbsencePalette\(item\)/);
+  assert.match(patch, /item\?\.absence_type === 'leave'/);
   assert.match(patch, /absenceStyle\.border/);
   assert.match(patch, /function fitText/);
   assert.match(patch, /ellipsis = true/);
   assert.match(patch, /ellipsis:false/);
   assert.match(patch, /const meta =/);
-  assert.match(patch, /size:30, minSize:25, weight:950/);
+  assert.match(patch, /size:22, minSize:20, weight:800/);
   assert.match(patch, /const dayHeaderHeight = 64/);
   assert.match(patch, /size:24\.5, minSize:20, weight:950/);
   assert.match(patch, /size:17\.4, minSize:12\.8/);
@@ -104,7 +104,7 @@ test('0.36 schedule export is unified and keeps old image actions hidden', () =>
   assert.match(patch, /const compact = height < 34/);
   assert.doesNotMatch(patch, /const fill = worked \? '#edf9f1' : '#fff0f0'/);
   assert.doesNotMatch(patch, /\+.*נוספים/);
-  assert.match(patch, /size:27, minSize:20, weight:950/);
+  assert.match(patch, /size:28, minSize:20, weight:950/);
   assert.match(patch, /const absenceHeight = 192/);
   assert.match(patch, /className = 'v036-print-page'/);
   assert.doesNotMatch(patch, /window\.open\('',\s*'_blank'/);
