@@ -49,5 +49,5 @@ test('preserve path retains exceptional hours and updates inherited hours',()=>{
  const s=read('app.js');assert.match(s,/else if\(action==='preserve'\)/);
  assert.match(s,/syncInheritedWeeklyHours\(\)/);
  assert.match(s,/if\(\$\(\'\.weekly-day-type\',row\)\.value!==\'work\'\)return/);
- assert.match(read('index.html'),/styles\.css\?v=0404/);
+ assert.match(read('index.html'),/styles\.css\?v=0406/);
 });
