@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.6 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.7 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -299,15 +299,24 @@ async function apiFetch(url, options = {}) {
   throw lastError || new Error('לא ניתן להתחבר לשרת');
 }
 
+function setScheduleToolsOpen(menu, opened) {
+  const trigger = menu?.querySelector('.schedule-tools-trigger');
+  const actions = menu?.querySelector('.schedule-secondary-actions');
+  if (!trigger || !actions) return;
+  menu.toggleAttribute('open', Boolean(opened));
+  trigger.setAttribute('aria-expanded', String(Boolean(opened)));
+  actions.hidden = !opened;
+}
 function syncScheduleToolsForViewport() {
   const tools = document.querySelector('.schedule-tools-menu');
-  if (!tools) return;
-  tools.open = !window.matchMedia('(max-width: 820px)').matches;
+  if (!tools || tools.dataset.viewportMenuInitialized === 'true') return;
+  tools.dataset.viewportMenuInitialized = 'true';
+  // Initialize once; iOS scroll/resize must never reset the user's choice.
+  setScheduleToolsOpen(tools, !window.matchMedia('(max-width: 820px)').matches);
 }
 async function init() {
   bindEvents();
   syncScheduleToolsForViewport();
-  window.addEventListener('resize', debounce(syncScheduleToolsForViewport, 120));
   try {
     const configResponse = await fetch('/api/config', { cache: 'no-store' });
     state.config = await configResponse.json();
@@ -1832,10 +1841,10 @@ function drawCanvasText(ctx, text, x, y, maxWidth, { font = '700 18px Arial', co
 }
 function isolateCanvasLtr(value) { return `\u2066${String(value || '')}\u2069`; }
 function exportRolePalette(role) {
-  if (role === 'teacher') return { fill: '#e8f6ef', border: '#b9dfca', accent: '#267454' };
-  if (role === 'lead') return { fill: '#f1ecfa', border: '#d7c8ee', accent: '#6b4aa0' };
-  if (role === 'replacement') return { fill: '#fff7e8', border: '#efd9aa', accent: '#9a6a13' };
-  return { fill: '#f7f8fb', border: '#e2e4ec', accent: '#61677c' };
+  if (role === 'teacher') return { fill: '#d8f0e1', border: '#9bcfb3', accent: '#246b4c' };
+  if (role === 'lead') return { fill: '#e5dcf7', border: '#bca9e1', accent: '#603d94' };
+  if (role === 'replacement') return { fill: '#ffe9c3', border: '#e9bb73', accent: '#8b5914' };
+  return { fill: '#eef0f8', border: '#cdd2e5', accent: '#525c7b' };
 }
 function weeklyExportLayout(payload, weekStart) {
   const dates = Array.from({ length: 6 }, (_, index) => addDays(weekStart, index));
@@ -1907,6 +1916,7 @@ function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStar
         if (cardY + 34 > y + rowHeight) return;
         const palette = exportRolePalette(shift.shift_role);
         fillRoundedRect(ctx, cellLeft + 7, cardY, dayWidth - 14, 34, 8, palette.fill, palette.border);
+        fillRoundedRect(ctx, cellRight - 12, cardY + 4, 4, 26, 2, palette.accent);
         drawCanvasText(ctx, employee?.full_name || 'עובד', cellRight - 16, cardY + 12, dayWidth - 102, { font: '800 16px Arial', color: '#303348' });
         drawCanvasText(ctx, isolateCanvasLtr(`${trimTime(shift.start_time)}-${trimTime(shift.end_time)}`), cellLeft + 16, cardY + 12, 92, { font: '800 14px Arial', color: palette.accent, align: 'left' });
         const note = [exportRoleShort(shift.shift_role), shift.public_note].filter(Boolean).join(' · ');
@@ -2145,33 +2155,21 @@ function syncWeeklyPatternRow(row) {
   const note=$('.weekly-day-off-note',row); if(note) note.textContent=type==='as_needed'?'רק אם באמת חסר כוח אדם · עדיפות נמוכה':type==='day_off'?'אסור לשיבוץ אוטומטי':'שעות עבודה קבועות';
 }
 function installScheduleToolsMenu() {
-  const menu=document.querySelector('.schedule-tools-menu'),summary=menu?.querySelector(':scope > summary');
-  if (!menu || !summary || menu.dataset.hadasMenuInstalled) return;
-  menu.dataset.hadasMenuInstalled='true';
-  summary.setAttribute('role','button');
-  summary.setAttribute('tabindex','0');
-  const sync=()=>summary.setAttribute('aria-expanded',String(menu.open));
-  // Use an explicit toggle: some tablet/Safari layouts hide a closed details body
-  // even when CSS displays its children.
-  summary.addEventListener('click',event=>{
-    event.preventDefault();
-    menu.open=!menu.open;
-    sync();
+  const menu = document.querySelector('.schedule-tools-menu');
+  const trigger = menu?.querySelector('.schedule-tools-trigger');
+  if (!menu || !trigger || menu.dataset.hadasMenuInstalled === 'true') return;
+  menu.dataset.hadasMenuInstalled = 'true';
+  trigger.addEventListener('click', () => setScheduleToolsOpen(menu, !menu.hasAttribute('open')));
+  document.addEventListener('click', event => {
+    if (menu.hasAttribute('open') && !menu.contains(event.target)) setScheduleToolsOpen(menu, false);
   });
-  summary.addEventListener('keydown',event=>{
-    if(event.key!=='Enter' && event.key!==' ')return;
-    event.preventDefault();
-    menu.open=!menu.open;
-    sync();
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && menu.hasAttribute('open')) {
+      setScheduleToolsOpen(menu, false);
+      trigger.focus();
+    }
   });
-  document.addEventListener('click',event=>{
-    if(menu.open && !menu.contains(event.target)){menu.open=false;sync();}
-  });
-  document.addEventListener('keydown',event=>{
-    if(event.key==='Escape' && menu.open){menu.open=false;sync();summary.focus();}
-  });
-  menu.addEventListener('toggle',sync);
-  sync();
+  setScheduleToolsOpen(menu, menu.hasAttribute('open'));
 }
 function employeeDefaultHoursValues() {
   const form=$('#employeeForm');

@@ -4,7 +4,7 @@ const fs=require('node:fs'); const path=require('node:path'); const root=path.re
 const { employeeAvailability, generateAutomaticSchedule }=require('../lib/auto-schedule');
 const { rankCandidates }=require('../lib/matching');
 
-test('0.21 migration remains compatible under current release',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.40.6'); assert.match(read('handlers/health.js'),/schema_version === '0.40.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\(1,'0\.21\.0','0\.21\.0'/); });
+test('0.21 migration remains compatible under current release',()=>{ assert.equal(JSON.parse(read('package.json')).version,'0.40.7'); assert.match(read('handlers/health.js'),/schema_version === '0.40.0'/); assert.match(read('supabase/update-v0.21.0.sql'),/values\(1,'0\.21\.0','0\.21\.0'/); });
 
 test('employee day editor has exactly work, day off and as-needed semantics',()=>{ const app=read('app.js'); assert.match(app,/יום עבודה \(קבוע\)/); assert.match(app,/יום חופשי \(אסור לשבץ\)/); assert.match(app,/לפי צורך \(עדיפות נמוכה\)/); assert.doesNotMatch(app,/>לא קבוע</); const weeklySelect=app.match(/<select class=\"weekly-day-type\"[\s\S]*?<\/select>/)?.[0]||''; assert.doesNotMatch(weeklySelect,/value=\"avoid\"/); const handler=read('handlers/employees.js'); assert.match(handler,/\['work','day_off','as_needed'\]/); assert.match(handler,/seen\.size !== 6/); });
 
@@ -18,7 +18,7 @@ test('manual scheduling override is explicit and persisted',()=>{ const html=rea
 
 test('task badge ignores assignments belonging to inactive tasks',()=>{ const app=read('app.js'); assert.match(app,/function activeTaskAssignments/); assert.match(app,/activeIds\.has\(assignment\.task_id\)/); assert.equal((app.match(/activeTaskAssignments\(\)\.length/g)||[]).length>=2,true); });
 
-test('schedule rows have fixed role order and PDF colors are teacher green lead purple',()=>{ const app=read('app.js'); assert.match(app,/teacher:0, lead:1, staff:2, replacement:3/); assert.match(app,/role === 'teacher'.*#e8f6ef/); assert.match(app,/role === 'lead'.*#f1ecfa/); assert.ok((app.match(/sortScheduleRows\(/g)||[]).length>=6); });
+test('schedule rows have fixed role order and PDF colors are teacher green lead purple',()=>{ const app=read('app.js'); assert.match(app,/teacher:0, lead:1, staff:2, replacement:3/); assert.match(app,/role === 'teacher'.*#d8f0e1/); assert.match(app,/role === 'lead'.*#e5dcf7/); assert.ok((app.match(/sortScheduleRows\(/g)||[]).length>=6); });
 
 test('automatic scheduling chooses a whole week, not an arbitrary date',()=>{ const html=read('index.html'); assert.match(html,/<select id="autoScheduleWeek"/); assert.doesNotMatch(html,/id="autoScheduleWeek"[^>]*type="date"/); assert.match(read('app.js'),/function populateAutoScheduleWeeks/); });
 

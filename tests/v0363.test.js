@@ -52,8 +52,8 @@ test('0.36 daily matching is responsive on narrow screens', () => {
 test('0.36 hf11 cache chain exposes the daily coverage update', () => {
   const index = read('index.html');
   const entry = read('patch-v025.js');
-  assert.match(index, /app\.js\?v=0406/);
-  assert.match(index, /patch-v025\.js\?v=0406/);
+  assert.match(index, /app\.js\?v=0407/);
+  assert.match(index, /patch-v025\.js\?v=0407/);
   assert.match(entry, /patch-v0342\.js\?v=0370/);
 });
 
@@ -82,7 +82,7 @@ test('0.38.0 mobile schedule controls remain user-controlled and focus uses visi
   assert.match(core, /scrollIntoView\(\{behavior:'smooth',block:'center',inline:'nearest'\}\)/);
   assert.match(v032, /patch-v032-core\.js\?v=0321hf10/);
   assert.match(v033, /patch-v032\.js\?v=0321hf10/);
-  assert.match(entry, /patch-v033\.js\?v=0333hf14/);
+  assert.match(entry, /patch-v033\.js\?v=0407/);
 });
 
 

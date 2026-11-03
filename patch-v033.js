@@ -346,7 +346,7 @@
       // Initialize once only. Re-applying role UI must not overwrite the user's
       // native <details> open/closed choice on mobile.
       if (visible && !tools.dataset.v0364OpenInitialized) {
-        tools.open = !matchMedia('(max-width:760px)').matches;
+        if (typeof setScheduleToolsOpen === 'function') setScheduleToolsOpen(tools, !matchMedia('(max-width:820px)').matches);
         tools.dataset.v0364OpenInitialized = 'true';
       }
     }
