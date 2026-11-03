@@ -92,10 +92,10 @@ test('0.37.1 suggestion UI supports multi-segment plans and safe rollback after 
 });
 
 test('0.37.1 release chain exposes the updated planner and UI',()=>{
-  assert.equal(JSON.parse(read('package.json')).version,'0.40.8');
+  assert.equal(JSON.parse(read('package.json')).version,'0.40.9');
   assert.match(read('index.html'),/app\.js\?v=0407/);
-  assert.match(read('index.html'),/patch-v025\.js\?v=0408/);
-  assert.match(read('patch-v025.js'),/VERSION = '0\.40\.8'/);
+  assert.match(read('index.html'),/patch-v025\.js\?v=0409/);
+  assert.match(read('patch-v025.js'),/VERSION = '0\.40\.9'/);
   assert.match(read('patch-v025.js'),/patch-v033\.js\?v=0407/);
   assert.match(read('patch-v033.js'),/auto-review-route/);
 });
