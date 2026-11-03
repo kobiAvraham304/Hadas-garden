@@ -42,5 +42,5 @@ test('0.36 hf13 cache chain delivers the mobile layout fix plus clarity update',
   assert.match(index, /app\.js\?v=0407/);
   assert.match(index, /patch-v025\.js\?v=0408/);
   assert.match(entry, /patch-v026\.js\?v=0407/);
-  assert.match(entry, /patch-v0342\.js\?v=0370/);
+  assert.match(entry, /patch-v0342\.js\?v=0408/);
 });

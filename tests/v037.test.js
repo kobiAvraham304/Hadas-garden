@@ -103,7 +103,7 @@ test('0.37 release cache chain exposes all changed client layers', () => {
   assert.match(index,/app\.js\?v=0407/);
   assert.match(index,/patch-v025\.js\?v=0408/);
   assert.match(entry,/patch-v033\.js\?v=0407/);
-  assert.match(entry,/patch-v0342\.js\?v=0370/);
+  assert.match(entry,/patch-v0342\.js\?v=0408/);
 });
 
 
