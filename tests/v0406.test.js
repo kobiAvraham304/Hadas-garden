@@ -23,7 +23,7 @@ test('leave submission sends management push with direct request link', () => {
   assert.ok(handler.includes("actionRequired:true,push:type==='leave'"));
   assert.ok(handler.includes('pushUrl:`/?push=request&id='));
   const backend=read('lib/server.js');
-  assert.ok(backend.includes(".in('role', ['admin', 'scheduler'])"));
+  assert.ok(backend.includes(".in('role', ['admin','scheduler'])"));
   assert.ok(backend.includes('if(push||automaticPushForNotification'));
 });
 test('request push opens the exact request without auto-approval', () => {
