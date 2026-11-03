@@ -157,20 +157,50 @@
     return '';
   }
 
+  // These are the actual A4/PDF export colors. The older canvas renderer is not used here.
+  // Employee type wins for teachers/leads, so a temporary schedule role doesn't erase their color.
+  function pdfShiftPalette(shift, employee) {
+    const job = String(employee?.job_title || '').trim();
+    const role = /גנ(?:נ|ן)/.test(job) ? 'teacher'
+      : /(?:סייעת|סייע)\s*מוביל|מוביל(?:ת|ה)?\s*כיתה/.test(job) ? 'lead'
+      : String(shift?.shift_role || 'staff');
+    if (role === 'teacher') return { fill:'#b5e6cf', border:'#80bb9d', accent:'#24744f', meta:'#256343' };
+    if (role === 'lead') return { fill:'#dcc7f5', border:'#b394dc', accent:'#7546a2', meta:'#633c8a' };
+    if (role === 'replacement') return { fill:'#ffe3af', border:'#e9bf75', accent:'#a16a20', meta:'#795018' };
+    return { fill:'#eef1f9', border:'#d4daea', accent:'#7184aa', meta:'#5d647c' };
+  }
+
+  function pdfClassPalette(classItem, index) {
+    const name = String(classItem?.name || '').trim();
+    const choices = [
+      { fill:'#e0ebfa', line:'#8aabd8', text:'#345c91', row:'#f8fbff' },
+      { fill:'#f0dff5', line:'#c190d0', text:'#75488c', row:'#fdf9ff' },
+      { fill:'#ddf1e6', line:'#8ccba9', text:'#356c50', row:'#f8fdfa' },
+    ];
+    if (name.includes('סיני')) return choices[0];
+    if (name.includes('אודם')) return choices[1];
+    if (name.includes('גלבוע')) return choices[2];
+    return choices[index % choices.length];
+  }
+
   function drawShiftCard(ctx, shift, x, y, width, height) {
     const employee = employeeById(shift.employee_id);
+    const palette = pdfShiftPalette(shift, employee);
     const name = employee?.full_name || 'עובד';
     const role = roleMark(shift.shift_role);
     const time = `${trimTime(shift.start_time)}–${trimTime(shift.end_time)}`;
     const meta = `${time}${role ? ` · ${role}` : ''}`;
     const compact = height < 34;
-    roundRect(ctx, x, y, width, height, 9, '#f7f7fc', '#d9dbea', 1);
+    roundRect(ctx, x, y, width, height, 9, palette.fill, palette.border, 1.35);
+    // The solid colored stripe remains visible in the small PDF/WhatsApp preview.
+    ctx.fillStyle = palette.accent;
+    ctx.fillRect(x + width - 6, y + 4, 3, Math.max(1, height - 8));
     if (compact) {
-      fitText(ctx, `${name} · ${meta}`, x + width - 8, y + height / 2, { size:15.5, minSize:8.5, weight:850, color:'#454a60', maxWidth:width - 16, ellipsis:false });
+      fitText(ctx, `${name} · ${meta}`, x + width - 11, y + height / 2, { size:15.5, minSize:8.5, weight:850, color:'#303449', maxWidth:width - 22, ellipsis:false });
       return;
     }
-    fitText(ctx, name, x + width - 9, y + height * .30, { size:22.6, minSize:15.2, weight:900, maxWidth:width - 18, ellipsis:false });
-    fitText(ctx, meta, x + width - 9, y + height * .74, { size:18.2, minSize:12.4, weight:800, color:'#61677b', maxWidth:width - 18, ellipsis:false });
+    fitText(ctx, name, x + width - 12, y + height * .30, { size:22.6, minSize:15.2, weight:900, color:'#2a2e44', maxWidth:width - 24, ellipsis:false });
+    fitText(ctx, meta, x + width - 12, y + height * .74, { size:18.2, minSize:12.4, weight:800, color:palette.meta, maxWidth:width - 24, ellipsis:false });
   }
 
   function absenceEntriesForDate(iso, sourceRows = state.scheduleAbsences || []) {
@@ -251,7 +281,7 @@
     const classBodyHeight = Math.max(1, classesBottom - classesTop);
     const rowHeight = classBodyHeight / Math.max(1, classes.length);
 
-    roundRect(ctx, margin, headerTop, tableWidth, headerHeight, 18, '#f4f3fb', '#ddddea', 1.2);
+    roundRect(ctx, margin, headerTop, tableWidth, headerHeight, 18, '#eae8fc', '#d1cdef', 1.2);
     text(ctx, 'שיבוץ שבועי · מעון הדס', logicalWidth - margin - 24, headerTop + 27, { size:31, weight:900, color:'#292d43' });
     fitText(ctx, orderedWeekLabel(weekStart), logicalWidth - margin - 24, headerTop + 67, { size:30, minSize:25, weight:950, color:'#4c5270', maxWidth:660, ellipsis:false });
     text(ctx, 'A4 לרוחב · עמוד אחד', margin + 22, headerTop + 46, { size:15.5, weight:750, color:'#777b8f', align:'left' });
@@ -264,7 +294,7 @@
 
     dates.forEach((date, index) => {
       const x = dayAreaX + (5 - index) * dayWidth;
-      ctx.fillStyle = index % 2 ? '#fbfbfe' : '#f7f7fc';
+      ctx.fillStyle = index % 2 ? '#f6f5fd' : '#edeefd';
       ctx.fillRect(x, dayHeaderTop, dayWidth, dayHeaderHeight);
       ctx.strokeStyle = '#dfe1ea';
       ctx.strokeRect(x, dayHeaderTop, dayWidth, dayHeaderHeight);
@@ -275,16 +305,19 @@
     classes.forEach((classItem, classIndex) => {
       const y = classesTop + classIndex * rowHeight;
       const h = classIndex === classes.length - 1 ? classesBottom - y : rowHeight;
-      ctx.fillStyle = classIndex % 2 ? '#ffffff' : '#fdfdff';
+      const classPalette = pdfClassPalette(classItem, classIndex);
+      ctx.fillStyle = classPalette.row;
       ctx.fillRect(margin, y, tableWidth, h);
       ctx.strokeStyle = '#dfe1ea';
       ctx.strokeRect(margin, y, tableWidth, h);
 
-      ctx.fillStyle = classIndex % 2 ? '#f7f4fc' : '#f3f0fa';
+      ctx.fillStyle = classPalette.fill;
       ctx.fillRect(classColumnX, y, classColumnWidth, h);
-      ctx.strokeStyle = '#dad9e7';
+      ctx.fillStyle = classPalette.line;
+      ctx.fillRect(classColumnX + classColumnWidth - 7, y, 7, h);
+      ctx.strokeStyle = classPalette.line;
       ctx.strokeRect(classColumnX, y, classColumnWidth, h);
-      fitText(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, y + h / 2 - 12, { size:27, minSize:20, weight:950, color:'#4a4562', align:'center', maxWidth:classColumnWidth - 18 });
+      fitText(ctx, classItem.name || 'כיתה', classColumnX + classColumnWidth / 2, y + h / 2 - 12, { size:27, minSize:20, weight:950, color:classPalette.text, align:'center', maxWidth:classColumnWidth - 18 });
       const weeklyCount = shiftRows.filter((row) => row.class_id === classItem.id && dates.some((date) => row.shift_date === dateISO(date))).length;
       fitText(ctx, weeklyCount + ' שיבוצים', classColumnX + classColumnWidth / 2, y + h / 2 + 26, { size:13.8, minSize:11.5, weight:750, color:'#858197', align:'center', maxWidth:classColumnWidth - 18 });
 
@@ -341,12 +374,12 @@
     });
 
     const absenceTop = classesBottom;
-    ctx.fillStyle = '#fbf7ed';
+    ctx.fillStyle = '#fff8e8';
     ctx.fillRect(margin, absenceTop, tableWidth, absenceHeight);
     ctx.strokeStyle = '#e6ddc9';
     ctx.strokeRect(margin, absenceTop, tableWidth, absenceHeight);
 
-    ctx.fillStyle = '#f5eedf';
+    ctx.fillStyle = '#ffedc5';
     ctx.fillRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
     ctx.strokeStyle = '#e0d4bc';
     ctx.strokeRect(classColumnX, absenceTop, classColumnWidth, absenceHeight);
@@ -381,8 +414,8 @@
         const cardY = innerY + row * (cardHeight + gapY);
         const worked = item.absence_type === 'day_off_worked';
         const approvedLeave = item.absence_type === 'leave';
-        const fill = worked ? '#edf9f1' : approvedLeave ? '#fff0f0' : '#f8f8fb';
-        const border = worked ? '#add7bb' : approvedLeave ? '#efb1b1' : '#d9dbe5';
+        const fill = worked ? '#d7f1e1' : approvedLeave ? '#f9dfe2' : '#f0eff9';
+        const border = worked ? '#9ecdb0' : approvedLeave ? '#e4a5ad' : '#d8d2e8';
         const color = worked ? '#2f754a' : approvedLeave ? '#923b3b' : '#555b6e';
         roundRect(ctx, cardX, cardY, cardWidth, cardHeight, 8, fill, border, 1);
         const name = item.employee_name || employeeById(item.employee_id)?.full_name || 'עובד';
