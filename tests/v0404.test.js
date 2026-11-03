@@ -7,18 +7,25 @@ test('extra schedule tools remain accessible above and below tablet breakpoint',
  assert.match(css,/@media\(max-width:820px\)\{\.schedule-tools-menu\[open\]>/);
  assert.match(app,/installScheduleToolsMenu\(\)/);
 });
-test('schedule menu toggles with tap keyboard and closes on outside press',()=>{
- const src=read('app.js');
- const block=src.slice(src.indexOf('function installScheduleToolsMenu()'),src.indexOf('function employeeDefaultHoursValues()'));
- const ev={},de={},summary={setAttribute(k,v){this[k]=v},addEventListener(k,fn){ev[k]=fn},focus(){this.focused=true}};
- const menu={open:false,dataset:{},querySelector:()=>summary,contains:v=>v===summary,addEventListener(){}};
- const doc={querySelector:()=>menu,addEventListener(k,fn){de[k]=fn}};
- new Function('document',block+'return installScheduleToolsMenu;')(doc)();
- ev.click({preventDefault(){}});assert.equal(menu.open,true);
- de.click({target:{}});assert.equal(menu.open,false);
- ev.keydown({key:'Enter',preventDefault(){}});assert.equal(menu.open,true);
- de.keydown({key:'Escape'});assert.equal(menu.open,false);
- assert.equal(summary.focused,true);
+test('tools menu opens via button, remains open for an inside tap and closes on outside/Escape',()=>{
+ const source=read('app.js');
+ const setFn=source.slice(source.indexOf('function setScheduleToolsOpen('),source.indexOf('function syncScheduleToolsForViewport()'));
+ const installer=source.slice(source.indexOf('function installScheduleToolsMenu()'),source.indexOf('function employeeDefaultHoursValues()'));
+ const events={},documentEvents={};
+ const trigger={setAttribute(name,value){this[name]=value},addEventListener(name,fn){events[name]=fn},focus(){this.focused=true}};
+ const body={hidden:true},attrs=new Set();
+ const menu={dataset:{},querySelector(s){return s==='.schedule-tools-trigger'?trigger:body},
+  toggleAttribute(name,on){on?attrs.add(name):attrs.delete(name)},
+  hasAttribute(name){return attrs.has(name)},
+  contains(value){return value===trigger||value===body}};
+ const document={querySelector:()=>menu,addEventListener(name,fn){documentEvents[name]=fn}};
+ new Function('document',setFn+installer+'return installScheduleToolsMenu;')(document)();
+ events.click();assert.equal(menu.hasAttribute('open'),true);assert.equal(body.hidden,false);
+ assert.equal(trigger['aria-expanded'],'true');
+ documentEvents.click({target:trigger});assert.equal(menu.hasAttribute('open'),true);
+ documentEvents.click({target:{}});assert.equal(menu.hasAttribute('open'),false);
+ events.click();documentEvents.keydown({key:'Escape'});
+ assert.equal(body.hidden,true);assert.equal(trigger.focused,true);
 });
 test('changing baseline hours asks for a clear choice and blocks saving until resolved',()=>{
  const s=read('app.js'),html=read('index.html');
@@ -49,5 +56,5 @@ test('preserve path retains exceptional hours and updates inherited hours',()=>{
  const s=read('app.js');assert.match(s,/else if\(action==='preserve'\)/);
  assert.match(s,/syncInheritedWeeklyHours\(\)/);
  assert.match(s,/if\(\$\(\'\.weekly-day-type\',row\)\.value!==\'work\'\)return/);
- assert.match(read('index.html'),/styles\.css\?v=0406/);
+ assert.match(read('index.html'),/styles\.css\?v=0407/);
 });
