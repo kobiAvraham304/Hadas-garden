@@ -53,8 +53,8 @@ test('0.36 hf11 cache chain exposes the daily coverage update', () => {
   const index = read('index.html');
   const entry = read('patch-v025.js');
   assert.match(index, /app\.js\?v=0407/);
-  assert.match(index, /patch-v025\.js\?v=0407/);
-  assert.match(entry, /patch-v0342\.js\?v=0370/);
+  assert.match(index, /patch-v025\.js\?v=0408/);
+  assert.match(entry, /patch-v0342\.js\?v=0408/);
 });
 
 
