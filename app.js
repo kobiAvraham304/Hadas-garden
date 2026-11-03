@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.24.0 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.6 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -1099,8 +1099,11 @@ function renderPublicationState() {
     button.classList.add('publication-toggle'); button.classList.toggle('is-published',clean); button.classList.toggle('has-drafts',drafts>0); button.classList.toggle('is-unpublished',!clean);
     button.innerHTML=clean?'<span class="publication-toggle-dot"></span><span>מפורסם</span>':`<span class="publication-toggle-dot"></span><span>${published?'שינויים לא פורסמו':'לא פורסם'}</span>`;
   }
+  const teacherPreview = !isManager() && /גנ(?:נ|ן)/.test(String(state.profile?.job_title || ''));
   const text=drafts
-    ? `<div class="publication-banner compact draft"><div><strong>${drafts} שינויים ממתינים לפרסום</strong><small>הצוות ממשיך לראות את הגרסה האחרונה שפורסמה.</small></div></div>`
+    ? teacherPreview
+      ? `<div class="publication-banner compact draft"><div><strong>תצוגת גננת · השיבוץ עדיין בטיוטה</strong><small>ניתן לצפות בכל הכיתות, אך השיבוצים עשויים להשתנות עד הפרסום.</small></div></div>`
+      : `<div class="publication-banner compact draft"><div><strong>${drafts} שינויים ממתינים לפרסום</strong><small>הצוות ממשיך לראות את הגרסה האחרונה שפורסמה.</small></div></div>`
     : published
       ? `<div class="publication-banner compact published"><div><strong>השבוע מפורסם</strong><small>גרסה ${state.publication.revision||1} · ${formatDate(published,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div></div>`
       : '<div class="publication-banner compact"><div><strong>השבוע טרם פורסם</strong><small>פרסום מתבצע מהכפתור למעלה.</small></div></div>';
