@@ -19,8 +19,8 @@ test('A4 PDF assigns clear green to teachers and purple to lead assistants even 
  const staffShift={shift_role:'staff'};
  const teacher=palettes.pdfShiftPalette(staffShift,{job_title:'גננת'});
  const lead=palettes.pdfShiftPalette(staffShift,{job_title:'סייעת מובילה'});
- assert.equal(teacher.fill,'#b5e6cf');
- assert.equal(lead.fill,'#dcc7f5');
+ assert.equal(teacher.fill,'#DCF0E0');
+ assert.equal(lead.fill,'#EFE2F8');
  assert.ok(colorDistanceFromWhite(teacher.fill)>100);
  assert.ok(colorDistanceFromWhite(lead.fill)>100);
  assert.notEqual(teacher.fill,lead.fill);
@@ -41,7 +41,7 @@ test('class labels and row bands remain distinct for the three classrooms',()=>{
  }
  assert.ok(script.includes('ctx.fillStyle = classPalette.row'));
  assert.ok(script.includes('ctx.fillStyle = classPalette.fill'));
- assert.ok(script.includes('ctx.fillRect(classColumnX + classColumnWidth - 7, y, 7, h)'));
+ assert.ok(script.includes('pdfClassIcon(ctx, classItem.name,'));
 });
 
 test('active PDF card renderer really paints palette colors for compact and regular shifts',()=>{
@@ -58,8 +58,8 @@ test('active PDF card renderer really paints palette colors for compact and regu
  const ctx={fillStyle:null,fillRect(x,y,w,h){fills.push({fill:this.fillStyle,x,y,w,h});}};
  renderer(ctx,{employee_id:'t',shift_role:'staff',start_time:'08:00',end_time:'15:00'},0,0,220,45);
  renderer(ctx,{employee_id:'l',shift_role:'staff',start_time:'08:00',end_time:'15:00'},0,50,220,30);
- assert.deepEqual(rounded.map(x=>x.fill),['#b5e6cf','#dcc7f5']);
- assert.deepEqual(fills.map(x=>x.fill),['#24744f','#7546a2']);
+ assert.deepEqual(rounded.map(x=>x.fill),['#DCF0E0','#EFE2F8']);
+ assert.deepEqual(fills.map(x=>x.fill),['#709D7D','#A27DB9']);
  assert.equal(texts.length,3);
 });
 
@@ -70,7 +70,7 @@ test('unified weekly and monthly PDF exports call the corrected A4 renderer',()=
  assert.match(script,/drawShiftCard\(ctx, shift,/);
  assert.match(script,/pdfFromCanvases\(context\.canvases\)/);
  const bootstrap=read('patch-v025.js');
- assert.match(bootstrap,/V0342 = '\/patch-v0342\.js\?v=0408'/);
- assert.equal(JSON.parse(read('package.json')).version,'0.40.8');
- assert.match(read('index.html'),/patch-v025\.js\?v=0408/);
+ assert.match(bootstrap,/V0342 = '\/patch-v0342\.js\?v=0409'/);
+ assert.equal(JSON.parse(read('package.json')).version,'0.40.9');
+ assert.match(read('index.html'),/patch-v025\.js\?v=0409/);
 });
