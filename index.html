@@ -33,13 +33,13 @@
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest?v=0405" />
-  <link rel="stylesheet" href="/styles.css?v=0407" />
+  <link rel="stylesheet" href="/styles.css?v=0410" />
   <link rel="stylesheet" href="/schedule-issues-v0403.css?v=0403" />
   <link rel="stylesheet" href="/patch-v025.css?v=0350" />
   <link rel="stylesheet" href="/push-v0372.css?v=0406" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0407" defer></script>
-  <script src="/patch-v025.js?v=0409" defer></script>
+  <script src="/app.js?v=0410" defer></script>
+  <script src="/patch-v025.js?v=0410" defer></script>
   <script src="/schedule-issues-v0403.js?v=0403" defer></script>
   <script src="/push-v0372.js?v=0406" defer></script>
   <link rel="stylesheet" href="/library.css?v=0401" />
@@ -283,7 +283,7 @@
   <dialog id="shiftDialog" class="modal">
     <form id="shiftForm" method="dialog" class="modal-card">
       <div class="modal-heading"><div><p class="eyebrow">שיבוץ צוות</p><h3>הוספה או עריכה</h3></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
-      <input type="hidden" name="id" /><input type="hidden" name="override_day_off" value="false" /><input type="hidden" name="override_rules" value="false" /><input type="hidden" name="override_reason" value="" />
+      <input type="hidden" name="id" /><input type="hidden" name="override_day_off" value="false" /><input type="hidden" name="override_rules" value="false" /><input type="hidden" name="override_hours" value="false" /><input type="hidden" name="override_reason" value="" />
       <div class="form-grid">
         <label>תאריך<input name="shift_date" type="date" required /></label>
         <label>כיתה<select name="class_id" required></select></label>
@@ -303,6 +303,20 @@
       </div>
       <div class="notice soft-notice">כל שינוי נשמר כטיוטה ומופיע לצוות רק לאחר פרסום השיבוץ.</div>
       <div class="modal-actions shift-modal-actions"><button id="deleteShiftFromDialogBtn" type="button" class="danger-btn hidden">מחיקת השיבוץ</button><button id="addLeaveFromShiftBtn" type="button" class="secondary-btn manager-only hidden">☀ הוספת חופשה</button><span class="modal-action-spacer"></span><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שמירת השיבוץ</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="shiftHoursOverrideDialog" class="modal shift-hours-override-dialog" aria-labelledby="shiftHoursOverrideTitle">
+    <form method="dialog" class="modal-card">
+      <div class="modal-heading"><div><p class="eyebrow">אישור חריגה נקודתית</p><h3 id="shiftHoursOverrideTitle">שיבוץ מחוץ לשעות הקבועות</h3></div></div>
+      <p class="shift-hours-override-intro"><strong id="shiftHoursOverrideEmployee"></strong> – השיבוץ המבוקש חורג משעות העבודה הקבועות לאותו יום.</p>
+      <div class="shift-hours-override-comparison">
+        <div><small>שעות קבועות</small><strong id="shiftHoursOverrideFixed"></strong></div>
+        <span aria-hidden="true">←</span>
+        <div><small>השיבוץ המבוקש</small><strong id="shiftHoursOverrideRequested"></strong></div>
+      </div>
+      <p class="shift-hours-override-note">האישור תקף רק לשיבוץ הזה. השעות הקבועות של העובדת לא ישתנו, ושאר בדיקות התקינות יישארו בתוקף. השיבוץ יישמר כטיוטה והחריגה תתועד.</p>
+      <div class="modal-actions"><button type="submit" class="ghost-btn" value="cancel">חזרה לעריכה</button><button type="submit" class="primary-btn" value="approve">✓ אשר כחריגה ושמור</button></div>
     </form>
   </dialog>
 

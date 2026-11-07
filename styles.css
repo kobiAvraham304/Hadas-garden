@@ -1322,3 +1322,18 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
 .schedule-command-bar:has(.schedule-tools-menu[open]){overflow:visible!important}
 .schedule-tools-menu[open]>.schedule-secondary-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
+
+/* v0.40.10 – explicit approval for exceeding a worker's recurring hours */
+.shift-hours-override-dialog .modal-card{width:min(520px,calc(100vw - 26px));max-width:520px;text-align:right;gap:15px}
+.shift-hours-override-dialog .modal-heading{margin-bottom:0}
+.shift-hours-override-intro{margin:0;color:var(--text);line-height:1.7}
+.shift-hours-override-comparison{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;background:#f8f7ff;border:1px solid #e7e3f7;border-radius:17px}
+.shift-hours-override-comparison>div{display:grid;gap:5px;flex:1;min-width:0}
+.shift-hours-override-comparison>div:first-child{background:#fff;border-radius:12px;padding:11px 13px}
+.shift-hours-override-comparison>div:last-child{background:#fff3e5;border-radius:12px;padding:11px 13px}
+.shift-hours-override-comparison small{font-size:.77rem;color:#6c687f;font-weight:800}
+.shift-hours-override-comparison strong{font-size:1.15rem;font-variant-numeric:tabular-nums;direction:ltr;text-align:center}
+.shift-hours-override-note{margin:0;color:#6e687b;font-size:.85rem;line-height:1.55}
+.shift-hours-override-dialog .modal-actions{gap:9px;flex-wrap:wrap}
+.shift-hours-override-dialog .modal-actions button{flex:1;min-height:46px}
+@media(max-width:520px){.shift-hours-override-dialog .modal-card{padding:18px 15px}.shift-hours-override-comparison{padding:8px;gap:5px}.shift-hours-override-comparison>div:first-child,.shift-hours-override-comparison>div:last-child{padding:10px 6px}.shift-hours-override-dialog .modal-actions{flex-direction:column-reverse}.shift-hours-override-dialog .modal-actions button{width:100%}}

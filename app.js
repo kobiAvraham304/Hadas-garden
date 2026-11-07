@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.7 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.10 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -1523,8 +1523,11 @@ function openShiftDialog(shift = {}) {
   form.elements.shift_role.value = shift.shift_role || suggestedShiftRoleForEmployee(employeeById(initialEmployee));
   form.elements.public_note.value = shift.public_note || "";
   const existingLeaveOverride = /שיבוץ ידני בזמן חופשה מאושרת/.test(shift.rule_override_note || '');
+  const existingHoursOverride = Boolean(shift.rule_override) && String(shift.rule_override_note||'').startsWith('חריגה מאושרת משעות קבועות');
+  form.elements.override_hours.value=existingHoursOverride?'true':'false';
+  form.dataset.hoursOverrideSignature=existingHoursOverride?fixedHoursOverrideSignature({employee_id:shift.employee_id,shift_date:shift.shift_date,start_time:shift.start_time,end_time:shift.end_time}):'';
   form.elements.override_day_off.value = "false";
-  form.elements.override_rules.value = shift.rule_override && !existingLeaveOverride ? "true" : "false";
+  form.elements.override_rules.value = shift.rule_override && !existingLeaveOverride && !existingHoursOverride ? "true" : "false";
   form.elements.override_reason.value = existingLeaveOverride ? '' : (shift.rule_override_note || '');
   form.elements.override_approved_leave.checked = existingLeaveOverride;
   syncApprovedLeaveOverride();
@@ -1550,9 +1553,32 @@ async function publishPendingChangeNow() {
   await openPublishDialog();
 }
 
+function fixedHoursOverrideSignature(data) {
+  return [data.employee_id||'',data.shift_date||'',trimTime(data.start_time),trimTime(data.end_time)].join('|');
+}
+function isFixedHoursShiftError(error) {
+  return error?.status===409 && /השעות חורגות מהשעות הקבועות/.test(String(error.message||''));
+}
+function confirmFixedHoursShiftOverride(data, employeeName, message) {
+  const dialog=$('#shiftHoursOverrideDialog');
+  const pattern=employeePatternForDate(data.employee_id,data.shift_date);
+  const range=String(message||'').match(/(\d{2}:\d{2})[–-](\d{2}:\d{2})/);
+  const start=trimTime(pattern?.start_time)||range?.[1]||'—';
+  const end=trimTime(pattern?.end_time)||range?.[2]||'—';
+  $('#shiftHoursOverrideEmployee').textContent=employeeName;
+  $('#shiftHoursOverrideFixed').textContent=`${start}–${end}`;
+  $('#shiftHoursOverrideRequested').textContent=`${trimTime(data.start_time)}–${trimTime(data.end_time)}`;
+  dialog.returnValue='';
+  return new Promise((resolve)=>{
+    dialog.addEventListener('close',()=>resolve(dialog.returnValue==='approve'),{once:true});
+    dialog.showModal();
+  });
+}
+
 async function saveShift(event) {
   event.preventDefault(); const form = event.currentTarget; const button = form.querySelector('button[value="default"]'); const data = formObject(form); data.override_day_off = data.override_day_off === 'true'; data.override_rules=data.override_rules==='true';
   data.override_approved_leave = Boolean(form.elements.override_approved_leave.checked);
+  data.override_hours=data.override_hours==='true' && form.dataset.hoursOverrideSignature===fixedHoursOverrideSignature(data);
   if (data.override_approved_leave && !approvedLeaveForShift(data.employee_id, data.shift_date)) return showToast('החופשה כבר אינה מאושרת בנתונים. יש לרענן את השיבוץ.', 'error');
   if (data.override_approved_leave) data.override_day_off = true;
   const selectedEmployee=employeeById(data.employee_id); if(selectedEmployee) data.shift_role=suggestedShiftRoleForEmployee(selectedEmployee);
@@ -1570,13 +1596,25 @@ async function saveShift(event) {
 להמשיך ולשמור?`)) return; setBusy(button, true);
   try {
     const candidate = selectedShiftCandidate();
-    if (!data.override_rules && !data.override_approved_leave && candidate && candidate.employee_id === data.employee_id) {
-      await apiFetch('/api/shifts', { method:'POST', body:{ action:'apply_suggestion', target_shift_id:data.id || null, candidate_id:data.employee_id, candidate_type:candidate.candidate_type || 'direct', source_shift_id:candidate.source_shift_id || null, shift_date:data.shift_date, class_id:data.class_id, start_time:data.start_time, end_time:data.end_time, shift_role:data.shift_role, public_note:data.public_note } });
-    } else {
-      try { await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); }
-      catch (error) { if (error.status === 409 && /יום החופשי/.test(error.message) && confirm(`${error.message}\nלשמור בכל זאת?`)) { data.override_day_off = true; await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); } else throw error; }
+    let approvedHoursNow=false;
+    try {
+      if (!data.override_rules && !data.override_approved_leave && !data.override_hours && candidate && candidate.employee_id === data.employee_id) {
+        await apiFetch('/api/shifts', { method:'POST', body:{ action:'apply_suggestion', target_shift_id:data.id || null, candidate_id:data.employee_id, candidate_type:candidate.candidate_type || 'direct', source_shift_id:candidate.source_shift_id || null, shift_date:data.shift_date, class_id:data.class_id, start_time:data.start_time, end_time:data.end_time, shift_role:data.shift_role, public_note:data.public_note } });
+      } else {
+        try { await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); }
+        catch (error) { if (error.status === 409 && /יום החופשי/.test(error.message) && confirm(`${error.message}\nלשמור בכל זאת?`)) { data.override_day_off = true; await apiFetch('/api/shifts', { method: data.id ? 'PATCH' : 'POST', body: data }); } else throw error; }
+      }
+    } catch(error) {
+      if(!isFixedHoursShiftError(error) || data.override_rules || data.override_approved_leave || data.override_hours) throw error;
+      setBusy(button,false);
+      if(!await confirmFixedHoursShiftOverride(data,employeeName,error.message)) return;
+      data.override_hours=true;
+      setBusy(button,true,'שומר חריגה…');
+      // Retry as a direct shift save: suggestions are not allowed to bypass confirmation.
+      await apiFetch('/api/shifts', {method:data.id?'PATCH':'POST',body:data});
+      approvedHoursNow=true;
     }
-    $('#shiftDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({ force: true }); showToast(candidate?.candidate_type === 'transfer' ? 'העובד הועבר בבטחה והשיבוץ נשמר בטיוטה' : 'השיבוץ נשמר בטיוטה', 'success');
+    $('#shiftDialog').close(); state.shiftSuggestionCache.clear(); await refreshScheduleWeek({ force: true }); showToast(approvedHoursNow||data.override_hours ? 'השיבוץ נשמר כחריגה מאושרת מהשעות הקבועות (טיוטה)' : candidate?.candidate_type === 'transfer' ? 'העובד הועבר בבטחה והשיבוץ נשמר בטיוטה' : 'השיבוץ נשמר בטיוטה', 'success');
     if(wasPublished)showPostPublishChangePrompt({title:data.id?'שיבוץ פורסם עודכן':'נוסף שיבוץ לשבוע שכבר פורסם',message:`השינוי עבור ${employeeName} עדיין אינו גלוי לצוות. לפרסם אותו עכשיו?`});
   } catch (error) { showToast(error.message, 'error'); } finally { setBusy(button, false); }
 }
