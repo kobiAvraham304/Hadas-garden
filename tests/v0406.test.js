@@ -36,5 +36,5 @@ test('request push opens the exact request without auto-approval', () => {
 });
 test('phone absence grid uses the actual class name', () => {
   assert.ok(read('styles.css').includes('.absence-grid{grid-template-columns:minmax(0,1fr)!important}'));
-  assert.ok(read('index.html').includes('/styles.css?v=0407'));
+  assert.ok(read('index.html').includes('/styles.css?v=0410'));
 });

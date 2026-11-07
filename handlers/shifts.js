@@ -64,7 +64,7 @@ async function assertShiftsSafeToDelete(shifts) {
   if((assertDb(sourceRequestsR,'לא ניתן לבדוק בקשות מקושרות')||[]).length||(assertDb(targetRequestsR,'לא ניתן לבדוק בקשות מקושרות')||[]).length)throw httpError(409,'לא ניתן למחוק שיבוץ שמקושר לבקשה פתוחה. יש לטפל בבקשה תחילה.');
 }
 
-async function validateShift(payload, id, overrideDayOff = false, overrideRules = false, overrideApprovedLeave = false) {
+async function validateShift(payload, id, overrideDayOff = false, overrideRules = false, overrideApprovedLeave = false, overrideHours = false) {
   if (!payload.shift_date || !payload.class_id || !payload.employee_id) throw httpError(400, 'חסרים פרטי שיבוץ');
   if (!payload.start_time || !payload.end_time || timeToMinutes(payload.end_time) <= timeToMinutes(payload.start_time)) throw httpError(400, 'שעות השיבוץ אינן תקינות');
   const [employeeR, classR, settingsR, patternR, requestsR] = await Promise.all([
@@ -93,6 +93,7 @@ async function validateShift(payload, id, overrideDayOff = false, overrideRules 
     if(!dates.has(payload.shift_date)&&dates.size>=Number(employee.max_work_days_per_week)) throw httpError(409,`לעובד הוגדר מקסימום ${employee.max_work_days_per_week} ימי עבודה בשבוע. ניתן לשמור רק כשיבוץ ידני חריג.`);
   }
 
+  let hoursOverrideNote = null;
   if (!overrideRules) {
     if (employee.job_title === 'גננת' && employee.primary_class_id && employee.primary_class_id !== payload.class_id) throw httpError(409, 'גננת ניתנת לשיבוץ רק בכיתה הקבועה שלה');
     const constraintRows = assertDb(await db().from('hadas_employee_class_constraints').select('id,reason,valid_from,valid_to').eq('employee_id', payload.employee_id).eq('class_id', payload.class_id).eq('constraint_type', 'forbidden'), 'בדיקת אילוצים נכשלה') || [];
@@ -105,9 +106,13 @@ async function validateShift(payload, id, overrideDayOff = false, overrideRules 
     const day = new Date(`${payload.shift_date}T12:00:00Z`).getUTCDay(); const pattern = weeklyPatterns.find((row) => Number(row.weekday) === day);
     if (!pattern) throw httpError(409, 'היום אינו מוגדר בכרטיס העובד. יש לעדכן יום עבודה/חופשי/לפי צורך או לבחור שיבוץ ידני חריג');
     const fixedDayOff = pattern.day_type === 'day_off'; if (fixedDayOff && !(overrideDayOff||overrideRules)) throw httpError(409, 'זהו יום חופשי קבוע של העובד. ניתן לשמור רק כשיבוץ ידני חריג');
-    if (pattern.day_type==='work' && (timeToMinutes(payload.start_time)<timeToMinutes(pattern.start_time)||timeToMinutes(payload.end_time)>timeToMinutes(pattern.end_time))) throw httpError(409, `השעות חורגות מהשעות הקבועות ${String(pattern.start_time).slice(0,5)}–${String(pattern.end_time).slice(0,5)}`);
+    if (pattern.day_type==='work' && (timeToMinutes(payload.start_time)<timeToMinutes(pattern.start_time)||timeToMinutes(payload.end_time)>timeToMinutes(pattern.end_time))) {
+      const fixedRange=`${String(pattern.start_time).slice(0,5)}–${String(pattern.end_time).slice(0,5)}`;
+      if (!overrideHours) throw httpError(409, `השעות חורגות מהשעות הקבועות ${fixedRange}`);
+      hoursOverrideNote=`חריגה מאושרת משעות קבועות ${fixedRange} ← שיבוץ ${String(payload.start_time).slice(0,5)}–${String(payload.end_time).slice(0,5)}`;
+    }
   }
-  return { employee, classItem };
+  return { employee, classItem, hoursOverrideNote };
 }
 
 async function loadAutomaticScheduleData(weekStart) {
@@ -549,7 +554,11 @@ module.exports = async function handler(req, res) {
         rule_override_note:Boolean(body.override_approved_leave) ? 'שיבוץ ידני בזמן חופשה מאושרת — אישור מפורש' : (Boolean(body.override_rules) ? (String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית') : null),
         created_by: caller.employee.id,
       };
-      await validateShift(payload, null, Boolean(body.override_day_off), Boolean(body.override_rules), Boolean(body.override_approved_leave));
+      const checked=await validateShift(payload, null, Boolean(body.override_day_off), Boolean(body.override_rules), Boolean(body.override_approved_leave), body.override_hours === true);
+      if (checked.hoursOverrideNote && !body.override_rules && !body.override_approved_leave) {
+        payload.rule_override=true;
+        payload.rule_override_note=checked.hoursOverrideNote;
+      }
       const shift = assertDb(await db().from('hadas_shifts').insert(payload).select('*').single(), 'לא ניתן לשמור שיבוץ');
       await recordChange(caller, 'create', null, shift);
       await audit(caller.employee.id, 'create', 'shift', shift.id, payload);
@@ -571,10 +580,17 @@ module.exports = async function handler(req, res) {
         shift_role: body.shift_role || current.shift_role,
         status: 'draft',
         public_note: body.public_note === undefined ? current.public_note : (String(body.public_note || '').trim() || null),
-        rule_override:body.override_rules === undefined && body.override_approved_leave === undefined ? Boolean(current.rule_override) : Boolean(body.override_rules || body.override_approved_leave),
+        rule_override:body.override_rules === undefined && body.override_approved_leave === undefined && body.override_hours === undefined ? Boolean(current.rule_override) : Boolean(body.override_rules || body.override_approved_leave || body.override_hours),
         rule_override_note:Boolean(body.override_approved_leave) ? 'שיבוץ ידני בזמן חופשה מאושרת — אישור מפורש' : (body.override_rules === undefined ? current.rule_override_note : (Boolean(body.override_rules)?(String(body.override_reason||'חריגה ידנית').trim().slice(0,500)||'חריגה ידנית'):null)),
       };
-      await validateShift(payload, id, Boolean(body.override_day_off), Boolean(body.override_rules), Boolean(body.override_approved_leave));
+      const checked=await validateShift(payload, id, Boolean(body.override_day_off), Boolean(body.override_rules), Boolean(body.override_approved_leave), body.override_hours === true);
+      if (checked.hoursOverrideNote && !body.override_rules && !body.override_approved_leave) {
+        payload.rule_override=true;
+        payload.rule_override_note=checked.hoursOverrideNote;
+      } else if (body.override_hours !== undefined && !body.override_rules && !body.override_approved_leave) {
+        payload.rule_override=false;
+        payload.rule_override_note=null;
+      }
       const updated = assertDb(await db().from('hadas_shifts').update(payload).eq('id', id).select('*').single(), 'לא ניתן לעדכן שיבוץ');
       await recordChange(caller, 'update', current, updated);
       await audit(caller.employee.id, 'update', 'shift', id, payload);
