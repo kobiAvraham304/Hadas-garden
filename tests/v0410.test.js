@@ -12,7 +12,7 @@ function createValidationFixture({overlap=false,sick=false,forbidden=false,close
  const info={hadas_employees:employee,hadas_classes:{id:'c1',active:true},hadas_app_settings:{id:1,opening_time:'07:30',closing_time:close,friday_closing_time:'12:00'},hadas_employee_weekly_patterns:[{employee_id:'e1',weekday:2,day_type:'work',start_time:'07:40:00',end_time:'13:00:00'}],hadas_requests:sick?[{request_type:'sick',status:'approved',request_date:date,request_end_date:date}]:[],hadas_shifts:overlap?[{id:'other'}]:[],hadas_employee_class_constraints:forbidden?[{id:'f1',reason:'לא מתאים'}]:[]};
  const db=()=>({from(table){const chain={select(){return chain},eq(){return chain},in(){return chain},lte(){return chain},gte(){return chain},lt(){return chain},gt(){return chain},neq(){return chain},limit(){return chain},maybeSingle(){return Promise.resolve({data:info[table]})},then(resolve,reject){return Promise.resolve({data:info[table]}).then(resolve,reject)}};return chain}});
  const validator=new Function('db','assertDb','httpError','timeToMinutes','closingTimeForDate','employeeCanLead','getSunday','addDays',handler.slice(begin,end)+'return validateShift;')(
- db(),r=>r?.data,makeError,timeToMinutes,()=>close,()=>true,()=> '2026-11-08',()=> '2026-11-13');
+ db,r=>r?.data,makeError,timeToMinutes,()=>close,()=>true,()=> '2026-11-08',()=> '2026-11-13');
  const payload={employee_id:'e1',class_id:'c1',shift_date:date,start_time:'07:40',end_time:'15:30',shift_role:'lead'};
  return {validator,payload};
 }
