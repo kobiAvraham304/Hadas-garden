@@ -353,7 +353,7 @@ test('0.10 notifications are personal, actionable and available from header and 
   assert.match(data,/hadas_notifications/);
   assert.match(app,/renderNotifications/);
   assert.match(app,/data-dashboard-notifications/);
-  assert.match(app,/if\(type==='request'\) switchTab\('requests'\)/);
+  assert.match(app,/if\(type==='request'\) \{ switchTab\('requests'\); focusRequestCard\(card\.dataset\.entityId\); \}/);
 });
 
 test('0.10 removes the generic Other request from both UI and API', () => {

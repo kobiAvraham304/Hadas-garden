@@ -35,7 +35,7 @@ test('weekly PDF uses distinct, clearly visible fill colors for every staffing r
 test('asset cache busting and version number follow 0.40.11',()=>{
  const html=read('index.html'),boot=read('patch-v025.js'),pkg=require('../package.json');
  assert.equal(pkg.version,'0.40.11');
- for(const asset of ['styles.css','app.js'])assert.ok(html.includes(asset+'?v=0410'));
+ for(const asset of ['styles.css','app.js'])assert.ok(html.includes(asset+'?v=0411'));
  assert.ok(html.includes('patch-v025.js?v=0411'));
  assert.match(boot,/patch-v0342\.js\?v=0409/);
  assert.match(boot,/patch-v026\.js\?v=0407/);
