@@ -71,6 +71,6 @@ test('unified weekly and monthly PDF exports call the corrected A4 renderer',()=
  assert.match(script,/pdfFromCanvases\(context\.canvases\)/);
  const bootstrap=read('patch-v025.js');
  assert.match(bootstrap,/V0342 = '\/patch-v0342\.js\?v=0409'/);
- assert.equal(JSON.parse(read('package.json')).version,'0.40.10');
- assert.match(read('index.html'),/patch-v025\.js\?v=0410/);
+ assert.equal(JSON.parse(read('package.json')).version,'0.40.11');
+ assert.match(read('index.html'),/patch-v025\.js\?v=0411/);
 });
