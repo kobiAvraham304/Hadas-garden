@@ -7,6 +7,18 @@ const {
 const { timeToMinutes } = require('../lib/schedule');
 
 const REQUEST_TYPES = new Set(['leave','day_off','late_start','early_finish','sick','swap']);
+const REQUEST_LABELS = Object.freeze({
+  leave:'חופשה',day_off:'יום חופשי',late_start:'התחלה מאוחרת',
+  early_finish:'סיום מוקדם',sick:'מחלה',swap:'החלפת שיבוץ',
+});
+function requestNotificationText(request, employeeName) {
+  const type=REQUEST_LABELS[request.request_type]||'אילוץ';
+  const time=request.request_type==='late_start'&&request.requested_start
+    ? ` · הגעה ב-${String(request.requested_start).slice(0,5)}`
+    : request.request_type==='early_finish'&&request.requested_end
+      ? ` · יציאה ב-${String(request.requested_end).slice(0,5)}` : '';
+  return {title:`בקשה חדשה: ${type}`,message:`${employeeName} הגיש/ה בקשת ${type} לתאריך ${requestRangeLabel(request)}${time}.`};
+}
 const CERTIFICATE_TYPES = new Set(['application/pdf','image/jpeg','image/png','image/webp']);
 const CERTIFICATE_BUCKET = 'hadas-sick-certificates';
 
@@ -20,7 +32,7 @@ async function getRequest(id) {
   return assertDb(await db().from('hadas_requests').select('*').eq('id',id).maybeSingle(),'הבקשה לא נמצאה');
 }
 async function clearRequestActionNotifications(requestId,employeeId=null) {
-  const query=db().from('hadas_notifications').update({action_required:false}).eq('entity_type','request').eq('entity_id',String(requestId));
+  const query=db().from('hadas_notifications').update({action_required:false,read_at:new Date().toISOString()}).eq('entity_type','request').eq('entity_id',String(requestId)).eq('action_required',true);
   if(employeeId)query.eq('employee_id',employeeId);
   assertDb(await query,'לא ניתן לעדכן את מצב ההתראות');
 }
@@ -174,9 +186,18 @@ module.exports = async function handler(req,res) {
           message:`${onBehalf?'הנהלת המעון':caller.employee.full_name} ביקש/ה להחליף איתך בתאריך ${payload.request_date}.`,
           entityType:'request',entityId:request.id,actionRequired:true,
         }));
-      } else if(!onBehalf) {
-        const manualNote = type === 'leave' && inclusiveDays(payload.request_date,payload.request_end_date) > 2 ? ' נדרשת גם השלמת טופס חופשה ידני.' : '';
-        postCreateTasks.push(notifyManagers({ type:'request',title:'בקשה חדשה ממתינה לטיפול',message:`${caller.employee.full_name} שלח בקשת ${type === 'leave' ? 'חופשה' : type === 'sick' ? 'מחלה' : type === 'day_off' ? 'יום חופשי' : 'שינוי שעות'} (${requestRangeLabel(request)}).${manualNote}`,entityType:'request',entityId:request.id,actionRequired:true,push:type==='leave',pushUrl:`/?push=request&id=${encodeURIComponent(request.id)}`,pushTag:`hadas-leave-request-${request.id}` },caller.employee.id));
+      }
+      // Managers receive every employee-submitted request, including swaps and hour constraints.
+      // Swap approval remains gated by the target employee's consent.
+      if(!onBehalf) {
+        const notice=requestNotificationText(request,caller.employee.full_name);
+        const manualNote=type==='leave'&&inclusiveDays(payload.request_date,payload.request_end_date)>2?' יש להשלים גם טופס חופשה ידני.':'';
+        postCreateTasks.push(notifyManagers({
+          type:'request',title:notice.title,message:notice.message+manualNote,
+          entityType:'request',entityId:request.id,actionRequired:true,
+          push:true,pushUrl:`/?push=request&id=${encodeURIComponent(request.id)}`,
+          pushTag:`hadas-request-${request.id}`,
+        },caller.employee.id));
       }
       await Promise.all(postCreateTasks);
       let finalRequest=request;
@@ -213,7 +234,7 @@ module.exports = async function handler(req,res) {
       assertDb(await db().from('hadas_requests').update({ target_approved:true }).eq('id',request.id),'לא ניתן לאשר את ההחלפה');
       await clearRequestActionNotifications(request.id,caller.employee.id);
       await notifyEmployees([request.requester_id],{ type:'swap',title:'בקשת ההחלפה אושרה על ידי העובד',message:`${caller.employee.full_name} אישר את ההחלפה. הבקשה הועברה לאישור מנהלת המעון או אחראית השיבוץ.`,entityType:'request',entityId:request.id });
-      await notifyManagers({ type:'swap',title:'החלפה ממתינה לאישור הנהלה',message:`${caller.employee.full_name} אישר את בקשת ההחלפה לתאריך ${request.request_date}.`,entityType:'request',entityId:request.id,actionRequired:true },caller.employee.id);
+      await notifyManagers({ type:'swap',title:'החלפה ממתינה לאישור הנהלה',message:`${caller.employee.full_name} אישר את בקשת ההחלפה לתאריך ${request.request_date}.`,entityType:'request',entityId:request.id,actionRequired:true,push:true,pushUrl:`/?push=request&id=${encodeURIComponent(request.id)}`,pushTag:`hadas-swap-ready-${request.id}` },caller.employee.id);
     } else if (action === 'target_reject') {
       if (request.target_employee_id !== caller.employee.id) throw httpError(403,'רק העובד שקיבל את ההצעה יכול לדחות');
       if (request.status !== 'pending' || request.target_approved) throw httpError(409,'הבקשה כבר טופלה');
