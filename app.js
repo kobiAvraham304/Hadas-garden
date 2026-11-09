@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.10 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.11 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -54,6 +54,9 @@ const state = {
   calendarEvents: [],
   notifications: [],
   notificationFilter: 'action',
+  employeeActivity: null,
+  employeeActivityLoadedAt: 0,
+  employeeActivityLoading: false,
   swapCandidates: [],
   swapCandidatesLoading: false,
   publication: null,
@@ -558,6 +561,7 @@ function switchTab(tab) {
     renderAttendance();
     loadSelfAttendance(state.attendanceDate).catch(() => {});
   } else renderPanel(tab);
+  if(tab==='employees')void loadEmployeeActivity();
   window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 function scheduleCacheKey(date = state.weekStart) { return dateISO(startOfWeek(date)); }
@@ -707,6 +711,7 @@ async function refreshAll(showSuccess = false) {
     if(canManageDailyOperations()) state.dailyCache.set(state.dailyDate,{ operations:state.dailyOperations,shifts:state.dailyShifts,attendance:state.dailyAttendance,scheduleMeta:state.dailyScheduleMeta,fetchedAt:Date.now() });
     state.calendarCache.set(monthParam(state.calendarMonth), { events: state.calendarEvents, fetchedAt: Date.now() });
     state.lastRefreshAt = Date.now(); applyPermissions(); populateSelects(); renderAll(); prefetchAdjacentWeeks(); setSyncState('online', 'מעודכן בזמן אמת');
+    if(state.activeTab==='employees')void loadEmployeeActivity(showSuccess);
     prefetchCalendarMonths();
     if (showSuccess) showToast('הנתונים עודכנו', 'success');
   } catch (error) {
@@ -795,7 +800,7 @@ function renderAll() { renderDashboard(); renderPanel(state.activeTab); renderNa
 function renderNavBadges() {
   const unread = state.announcements.filter((announcement) => announcement.requires_acknowledgement !== false && !state.announcementReads.some((read) => read.announcement_id === announcement.id && read.employee_id === state.profile.id)).length;
   const openTasks = activeTaskAssignments().length;
-  const notificationCount = state.notifications.filter((item) => !item.read_at).length;
+  const notificationCount = state.notifications.filter(notificationIsUnread).length;
   for (const [id, count] of [['announcementBadge', unread], ['taskBadge', openTasks], ['notificationBadge', notificationCount]]) { const element = $(`#${id}`); if (!element) continue; element.textContent = count > 99 ? '99+' : String(count); element.classList.toggle('hidden', !count); }
 }
 
@@ -944,7 +949,7 @@ function renderDashboard() {
   const pending=state.requests.filter((request)=>request.status==='pending'||request.cancellation_status==='pending').length;
   const dueTasks=activeTaskAssignments().length;
   const unread=state.announcements.filter((announcement)=>announcement.requires_acknowledgement!==false&&!state.announcementReads.some((read)=>read.announcement_id===announcement.id&&read.employee_id===state.profile.id)).length;
-  const unreadNotifications=state.notifications.filter((item)=>!item.read_at).length;
+  const unreadNotifications=state.notifications.filter(notificationIsUnread).length;
   const absentToday=new Set([
     ...state.scheduleAbsences.filter((item)=>item.absence_date===today).map((item)=>item.employee_id),
     ...state.todayAttendance.filter((item)=>['absent','sick'].includes(item.status)).map((item)=>item.employee_id),
@@ -2130,6 +2135,21 @@ function employeeRegistrationState(employee) {
   if (employee.last_login_at) return { className:'started', label:'בהרשמה', detail:'נדרשת החלפת סיסמה' };
   return { className:'not-registered', label:'טרם נרשם/ה', detail:'הסיסמה הראשונית היא hadas' };
 }
+async function loadEmployeeActivity(force=false) {
+  if(!isManager()||state.activeTab!=='employees'||state.employeeActivityLoading)return;
+  if(!force&&state.employeeActivity&&Date.now()-state.employeeActivityLoadedAt<90000)return;
+  state.employeeActivityLoading=true;
+  try {
+    const result=await apiFetch('/api/employees?activity=weekly',{timeout:15000});
+    if(!isManager())return;
+    state.employeeActivity=result.byEmployee||{};
+    state.employeeActivityLoadedAt=Date.now();
+    if(state.activeTab==='employees')renderEmployees();
+  } catch(error) {
+    // Employee management must remain usable if the optional activity request fails.
+    console.warn('Weekly employee activity unavailable',error?.message||error);
+  } finally {state.employeeActivityLoading=false;}
+}
 function renderEmployees() {
   syncFilterChips('#employeeStatusChips', state.employeeStatusFilter); syncFilterChips('#employeeTypeChips', state.employeeTypeFilter);
   const term = state.employeeSearch.trim().toLowerCase();
@@ -2150,8 +2170,13 @@ function renderEmployees() {
   $('#employeeSummary').innerHTML = summaryItems.map(([key,label,icon])=>`<button type="button" class="mini-stat employee-summary-button ${state.employeeTypeFilter===key?'active':''}" data-employee-summary-filter="${key}"><span>${icon}</span><strong>${counts[key]}</strong><small>${label}</small></button>`).join('');
   $('#employeesList').innerHTML = filtered.length ? filtered.map((employee) => {
     const type = employeeType(employee); const registration=employeeRegistrationState(employee);
+    const activity=state.employeeActivity?.[employee.id];
+    const activityReady=Boolean(state.employeeActivity);
+    const entryCount=Number(activity?.logins_this_week||0);
+    const pushEnabled=Boolean(activity?.push_enabled);
+    const activityBadges=`<div class="employee-card-activity" aria-label="פעילות דיגיטלית"><span class="employee-activity-pill entry-count" title="מספר התחברויות מוצלחות מתחילת השבוע הנוכחי (יום ראשון)"><span aria-hidden="true">↪</span> <strong>${activityReady?entryCount:'…'}</strong> כניסות השבוע</span><span class="employee-activity-pill push-state ${activityReady?(pushEnabled?'enabled':'disabled'):'loading'}" title="${activityReady?(pushEnabled?'יש לפחות מכשיר אחד שרשום לקבלת התראות פוש':'לא נמצא מכשיר עם הרשמה פעילה לפוש'):'מצב ההתראות נטען'}"><span aria-hidden="true">${activityReady?(pushEnabled?'🔔':'🔕'):'◌'}</span> ${activityReady?(pushEnabled?'פוש פעיל':'פוש כבוי'):'בודק פוש'}</span></div>`;
     const titleBadge = type === 'teacher' ? '✿ גננת' : type === 'lead' ? '★ סייעת מובילה' : type === 'assistant' ? '☀ סייעת/ סייע' : type === 'flexible' ? '↻ צוות גמיש' : employee.job_title === 'אחות' ? '✚ אחות' : employee.job_title === 'מזכירה' ? '▤ מזכירה' : '♙ ניהול';
-    return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><div class="employee-card-badges"><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><span class="employee-registration-badge ${registration.className}" title="${escapeHtml(registration.detail)}" aria-label="${escapeHtml(registration.label)}: ${escapeHtml(registration.detail)}"><i>${registration.className==='registered'?'✓':registration.className==='started'?'◷':'○'}</i>${registration.label}</span></div><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)}${employeeAssignmentLabel(employee) ? ` · ${escapeHtml(employeeAssignmentLabel(employee))}` : ''}</p></div></div><div class="employee-role-strip"><span>${titleBadge}</span>${employee.can_lead ? '<span>תפקיד הובלה</span>' : ''}${employee.is_schedulable === false ? '<span>ללא שיבוץ</span>' : ''}</div><div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות מתוכננות / מקסימום</small><strong>${employee.weekly_hours ?? '—'} / ${employee.max_weekly_hours ?? '—'}</strong></div><div><small>ימי חופשה קבועים</small><strong>${escapeHtml(employeeDaysOffLabel(employee))}</strong></div></div><div class="employee-pattern-preview"><small>ימים קבועים</small><span>${escapeHtml(employeeWorkPatternLabel(employee))}</span></div><div class="card-actions"><button type="button" class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button type="button" class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button type="button" class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`;
+    return `<article data-employee-card="${employee.id}" class="employee-card employee-type-${type} ${employee.active ? '' : 'inactive'}"><div class="employee-card-accent"></div><div class="employee-card-badges"><span class="employee-card-status status-chip ${employee.active ? 'ok' : 'error'}">${employee.active ? 'פעיל' : 'לא פעיל'}</span><span class="employee-registration-badge ${registration.className}" title="${escapeHtml(registration.detail)}" aria-label="${escapeHtml(registration.label)}: ${escapeHtml(registration.detail)}"><i>${registration.className==='registered'?'✓':registration.className==='started'?'◷':'○'}</i>${registration.label}</span></div><div class="employee-card-head"><span class="employee-avatar">${escapeHtml(initials(employee.full_name))}</span><div><h3>${escapeHtml(employee.full_name)}</h3><p>${escapeHtml(employee.job_title)}${employeeAssignmentLabel(employee) ? ` · ${escapeHtml(employeeAssignmentLabel(employee))}` : ''}</p></div></div><div class="employee-role-strip"><span>${titleBadge}</span>${employee.can_lead ? '<span>תפקיד הובלה</span>' : ''}${employee.is_schedulable === false ? '<span>ללא שיבוץ</span>' : ''}</div>${activityBadges}<div class="employee-card-meta"><div><small>טלפון</small><strong>${escapeHtml(employee.phone || '—')}</strong></div><div><small>הרשאה</small><strong>${escapeHtml(ROLE_LABELS[employee.role] || 'עובד')}</strong></div><div><small>שעות מתוכננות / מקסימום</small><strong>${employee.weekly_hours ?? '—'} / ${employee.max_weekly_hours ?? '—'}</strong></div><div><small>ימי חופשה קבועים</small><strong>${escapeHtml(employeeDaysOffLabel(employee))}</strong></div></div><div class="employee-pattern-preview"><small>ימים קבועים</small><span>${escapeHtml(employeeWorkPatternLabel(employee))}</span></div><div class="card-actions"><button type="button" class="secondary-btn" data-action="edit" data-id="${employee.id}"><span>✎</span> עריכת כרטיס</button><button type="button" class="ghost-btn" data-action="reset" data-id="${employee.id}">איפוס סיסמה</button><button type="button" class="${employee.active ? 'danger-btn' : 'primary-btn'}" data-action="toggle" data-id="${employee.id}">${employee.active ? 'השבתה' : 'הפעלה'}</button></div></article>`;
   }).join('') : '<div class="empty-state">לא נמצאו עובדים לפי הסינון.</div>';
 }
 function renderConstraintFields(employee = {}) {
@@ -2503,11 +2528,21 @@ async function handleFeedbackAction(event){ const button=event.target.closest('[
 function notificationIcon(type) {
   return ({ swap:'↔',request:'◷',schedule:'▦',announcement:'◉',task:'☑',calendar:'◫',feedback:'💬',daily_operation:'⚡' })[type] || '●';
 }
+function notificationIsUnread(item) {
+  if(item.read_at)return false;
+  if(!isManager()||item.entity_type!=='request'||!item.entity_id)return true;
+  // Legacy manager alerts can remain unread after a request was resolved.
+  // Keep employee decision/result messages unread until opened.
+  if(!/^(בקשה חדשה|החלפה ממתינה לאישור הנהלה|בקשת ביטול חופשה ממתינה לאישור)/.test(String(item.title||'')))return true;
+  const request=state.requests.find(row=>String(row.id)===String(item.entity_id));
+  if(!request)return true;
+  return request.cancellation_status==='pending'||request.status==='pending';
+}
 function notificationNeedsAction(item) {
   const entityId=String(item.entity_id||'');
   if(item.entity_type==='request'){
     const request=state.requests.find((row)=>String(row.id)===entityId);if(!request)return Boolean(item.action_required);
-    if(isManager())return Boolean(item.action_required&&(request.cancellation_status==='pending'||request.status==='approved'||(request.status==='pending'&&(request.request_type!=='swap'||request.target_approved))));
+    if(isManager())return Boolean(item.action_required&&(request.cancellation_status==='pending'||(request.status==='pending'&&(request.request_type!=='swap'||request.target_approved))));
     return Boolean(item.action_required&&request.request_type==='swap'&&request.status==='pending'&&request.target_employee_id===state.profile.id&&!request.target_approved);
   }
   if(item.entity_type==='task'){
@@ -2521,19 +2556,19 @@ function handleNotificationFilterClick(event){const button=event.target.closest(
 function renderNotifications() {
   const list = $('#notificationsList');
   if (!list) return;
-  const decorated=state.notifications.map((item)=>({...item,effectiveAction:notificationNeedsAction(item)}));
-  const actionable=decorated.filter((item)=>item.effectiveAction),unread=decorated.filter((item)=>!item.read_at);
+  const decorated=state.notifications.map((item)=>({...item,effectiveAction:notificationNeedsAction(item),effectiveUnread:notificationIsUnread(item)}));
+  const actionable=decorated.filter((item)=>item.effectiveAction),unread=decorated.filter((item)=>item.effectiveUnread);
   const summary=$('#notificationsSummary');if(summary)summary.innerHTML=`<span><strong>${actionable.length}</strong> דורשות טיפול</span><span><strong>${unread.length}</strong> לא נקראו</span><span><strong>${decorated.length}</strong> עדכונים</span>`;
   $$('#notificationFilterChips [data-notification-filter]').forEach((button)=>button.classList.toggle('active',button.dataset.notificationFilter===state.notificationFilter));
-  const rows=decorated.filter((item)=>state.notificationFilter==='action'?item.effectiveAction:state.notificationFilter==='unread'?!item.read_at:true).sort((a,b)=>Number(b.effectiveAction)-Number(a.effectiveAction)||new Date(b.created_at)-new Date(a.created_at));
+  const rows=decorated.filter((item)=>state.notificationFilter==='action'?item.effectiveAction:state.notificationFilter==='unread'?item.effectiveUnread:true).sort((a,b)=>Number(b.effectiveAction)-Number(a.effectiveAction)||new Date(b.created_at)-new Date(a.created_at));
   list.innerHTML = rows.length ? rows.map((item) => `
-    <article class="notification-card ${item.read_at ? 'read' : 'unread'} ${item.effectiveAction ? 'requires-action' : ''}" data-id="${item.id}" data-entity-type="${escapeHtml(item.entity_type || '')}" data-entity-id="${escapeHtml(item.entity_id || '')}">
+    <article class="notification-card ${item.effectiveUnread ? 'unread' : 'read'} ${item.effectiveAction ? 'requires-action' : ''}" data-id="${item.id}" data-entity-type="${escapeHtml(item.entity_type || '')}" data-entity-id="${escapeHtml(item.entity_id || '')}">
       <span class="notification-icon">${notificationIcon(item.notification_type)}</span>
-      <div><div class="notification-title-row"><strong>${escapeHtml(item.title)}</strong>${!item.read_at ? '<i>חדש</i>' : ''}</div><p>${escapeHtml(item.message || '')}</p><small>${formatDate(item.created_at,{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})}${item.effectiveAction ? ' · דורש טיפול' : item.action_required ? ' · הטיפול הושלם' : ''}</small></div>
+      <div><div class="notification-title-row"><strong>${escapeHtml(item.title)}</strong>${item.effectiveUnread ? '<i>חדש</i>' : ''}</div><p>${escapeHtml(item.message || '')}</p><small>${formatDate(item.created_at,{day:'numeric',month:'numeric',hour:'2-digit',minute:'2-digit'})}${item.effectiveAction ? ' · דורש טיפול' : item.action_required ? ' · הטיפול הושלם' : ''}</small></div>
       <button type="button" class="ghost-btn" data-action="open-notification">${notificationOpenLabel(item)}</button>
     </article>`).join('') : `<div class="empty-state">${state.notificationFilter==='action'?'אין כרגע פעולות שממתינות לך.':state.notificationFilter==='unread'?'כל העדכונים נקראו.':'אין עדיין עדכונים.'}</div>`;
 }
-function openNotificationsDialog() { const items=state.notifications.map((item)=>({...item,effectiveAction:notificationNeedsAction(item)}));state.notificationFilter=items.some((item)=>item.effectiveAction)?'action':items.some((item)=>!item.read_at)?'unread':'all';renderNotifications(); $('#notificationsDialog').showModal(); }
+function openNotificationsDialog() { const items=state.notifications.map((item)=>({...item,effectiveAction:notificationNeedsAction(item),effectiveUnread:notificationIsUnread(item)}));state.notificationFilter=items.some((item)=>item.effectiveAction)?'action':items.some((item)=>item.effectiveUnread)?'unread':'all';renderNotifications(); $('#notificationsDialog').showModal(); }
 async function markAllNotificationsRead() {
   try { await apiFetch('/api/notifications',{method:'POST',body:{action:'mark_all_read'}}); state.notifications=state.notifications.map((item)=>({...item,read_at:item.read_at||new Date().toISOString()})); renderNotifications(); renderNavBadges(); } catch(error){ showToast(error.message,'error'); }
 }
@@ -2544,7 +2579,7 @@ async function handleNotificationClick(event) {
   if(item) item.read_at=item.read_at||new Date().toISOString();
   $('#notificationsDialog').close(); renderNavBadges();
   const type=card.dataset.entityType;
-  if(type==='request') switchTab('requests');
+  if(type==='request') { switchTab('requests'); focusRequestCard(card.dataset.entityId); }
   else if(type==='schedule') switchTab('schedule');
   else if(type==='announcement') switchTab('announcements');
   else if(type==='task') switchTab('tasks');
@@ -2752,6 +2787,18 @@ function requestConversationHtml(request){
   const thread=messages.length?messages.map((m)=>`<div class="request-message ${m.author_id===state.profile.id?'mine':''} ${m.author_is_manager?'manager':''}"><small>${escapeHtml(m.author_name||'עובד')} · ${formatDate(m.created_at,{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small><p>${escapeHtml(m.message||'')}</p></div>`).join(''):'<small class="muted">אין עדיין תגובות לבקשה.</small>';
   const canReply=isManager()||request.requester_id===state.profile.id||request.target_employee_id===state.profile.id;
   return `<div class="request-conversation"><strong>שיחה על הבקשה</strong><div class="request-conversation-thread">${thread}</div>${canReply?`<div class="request-reply-row"><input data-request-reply-input="${request.id}" maxlength="2000" placeholder="כתיבת תגובה…"/><button type="button" class="secondary-btn" data-action="comment" data-id="${request.id}">שליחה</button></div>`:''}</div>`;
+}
+function focusRequestCard(requestId) {
+  if(!requestId)return false;
+  state.requestStatusFilter='all';
+  state.requestSearch='';
+  const input=$('#requestSearch');if(input)input.value='';
+  renderRequests();
+  const card=[...document.querySelectorAll('#requestsList [data-request-id]')].find(node=>node.dataset.requestId===String(requestId));
+  if(!card)return false;
+  card.classList.add('push-request-focus');
+  card.scrollIntoView({block:'center',behavior:'smooth'});
+  return true;
 }
 function renderRequests(){renderRequestsBase();for(const request of state.requests){const card=document.querySelector(`[data-request-id="${request.id}"]`);if(card)card.insertAdjacentHTML('beforeend',requestConversationHtml(request));}}
 async function handleRequestClick(event){

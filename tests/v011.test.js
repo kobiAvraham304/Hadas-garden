@@ -75,7 +75,7 @@ test('vacation request shows manual form reminder after two days and stores day-
   assert.match(html,/id="leaveManualReminder"/);
   assert.match(html,/name="allow_schedule_on_day_off"/);
   assert.match(app,/type==='leave'&&days>2/);
-  assert.match(api,/inclusiveDays\(payload\.request_date,payload\.request_end_date\) > 2/);
+  assert.match(api,/inclusiveDays\(payload\.request_date,payload\.request_end_date\)>2/);
   assert.match(api,/allow_schedule_on_day_off/);
 });
 

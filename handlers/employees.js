@@ -196,9 +196,24 @@ async function ensureAdminRemains(userIdToChange, nextRole, nextActive) {
   if (activeAdmins.length <= 1) throw httpError(409,'חייב להישאר לפחות מנהל פעיל אחד במערכת');
 }
 
+const { sundayOf,activitySinceUtc,summarizeActivity }=require('../lib/employee-activity');
+
 module.exports = async function handler(req,res) {
   try {
     const caller = await requireSession(req,{ manager:true });
+    if(req.method==='GET' && String(req.query?.activity||'')==='weekly'){
+      const weekStart=sundayOf(israelDateISO());
+      // Do not expose credentials, device endpoints or session identifiers.
+      const [usersR,sessionsR,subscriptionsR]=await Promise.all([
+        db().from('hadas_users').select('id,employee_id'),
+        db().from('hadas_sessions').select('user_id,created_at').gte('created_at',activitySinceUtc(weekStart)).order('created_at',{ascending:false}).limit(2000),
+        db().from('hadas_push_subscriptions').select('employee_id,active').eq('active',true),
+      ]);
+      const users=assertDb(usersR,'לא ניתן לטעון חשבונות משתמשים')||[];
+      const sessions=assertDb(sessionsR,'לא ניתן לטעון כניסות השבוע')||[];
+      const subscriptions=assertDb(subscriptionsR,'לא ניתן לבדוק הפעלת פוש')||[];
+      return send(res,200,{ok:true,weekStart,byEmployee:summarizeActivity({users,sessions,subscriptions,weekStart}),counting:'successful_logins',pushMeaning:'active_subscription'});
+    }
     const body = parseBody(req);
 
     if (req.method === 'POST') {

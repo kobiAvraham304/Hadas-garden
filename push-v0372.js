@@ -174,6 +174,7 @@
             if(request){
               state.requestStatusFilter='all';
               if(request.status!=='pending' && request.request_date)state.requestPeriodMonth=String(request.request_date).slice(0,7);
+              if(typeof focusRequestCard==='function' && focusRequestCard(requestId))break;
               if(typeof renderRequests==='function')renderRequests();
               const card=[...document.querySelectorAll('#requestsList [data-request-id]')].find(item=>item.dataset.requestId===requestId);
               if(card && !card.hidden){card.classList.add('push-request-focus');card.scrollIntoView({block:'center',behavior:'smooth'});break;}

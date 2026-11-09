@@ -37,6 +37,6 @@ test('classroom palettes and gentle decorative header are rendered with actual A
  assert.match(source,/ctx\.ellipse\(margin\+leaf\[0\]/);
  assert.match(source,/fillText/);
  assert.match(read('patch-v025.js'),/V0342 = '\/patch-v0342\.js\?v=0409'/);
- assert.match(read('index.html'),/patch-v025\.js\?v=0410/);
- assert.equal(JSON.parse(read('package.json')).version,'0.40.10');
+ assert.match(read('index.html'),/patch-v025\.js\?v=0411/);
+ assert.equal(JSON.parse(read('package.json')).version,'0.40.11');
 });

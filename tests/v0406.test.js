@@ -20,7 +20,7 @@ test('other staff keep their existing schedule restrictions', () => {
 });
 test('leave submission sends management push with direct request link', () => {
   const handler=read('handlers/requests.js');
-  assert.ok(handler.includes("actionRequired:true,push:type==='leave'"));
+  assert.ok(handler.includes('actionRequired:true,') && handler.includes('push:true,pushUrl:'));
   assert.ok(handler.includes('pushUrl:`/?push=request&id='));
   const backend=read('lib/server.js');
   assert.ok(backend.includes(".in('role', ['admin','scheduler'])"));
@@ -36,5 +36,5 @@ test('request push opens the exact request without auto-approval', () => {
 });
 test('phone absence grid uses the actual class name', () => {
   assert.ok(read('styles.css').includes('.absence-grid{grid-template-columns:minmax(0,1fr)!important}'));
-  assert.ok(read('index.html').includes('/styles.css?v=0410'));
+  assert.ok(read('index.html').includes('/styles.css?v=0411'));
 });

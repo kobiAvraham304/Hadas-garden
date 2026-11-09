@@ -1337,3 +1337,15 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
 .shift-hours-override-dialog .modal-actions{gap:9px;flex-wrap:wrap}
 .shift-hours-override-dialog .modal-actions button{flex:1;min-height:46px}
 @media(max-width:520px){.shift-hours-override-dialog .modal-card{padding:18px 15px}.shift-hours-override-comparison{padding:8px;gap:5px}.shift-hours-override-comparison>div:first-child,.shift-hours-override-comparison>div:last-child{padding:10px 6px}.shift-hours-override-dialog .modal-actions{flex-direction:column-reverse}.shift-hours-override-dialog .modal-actions button{width:100%}}
+
+
+/* v0.40.11: compact staff activity badges; no extra card height on mobile */
+.employee-card-activity{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin:-3px 0 1px;min-width:0}
+.employee-activity-pill{display:inline-flex;align-items:center;gap:4px;max-width:100%;min-height:25px;padding:4px 9px;border:1px solid #e4e6f0;background:#f8f9fe;color:#626783;border-radius:999px;font-size:.67rem;font-weight:800;line-height:1.2;white-space:nowrap;transition:background .2s ease,border-color .2s ease}
+.employee-activity-pill strong{font-variant-numeric:tabular-nums;font-weight:950;color:#4e4d88}
+.employee-activity-pill.push-state.enabled{color:#287b61;border-color:#d4ebdf;background:#edf9f3}
+.employee-activity-pill.push-state.disabled{color:#777b8f;border-color:#e6e7ec;background:#f7f7fa}
+.employee-activity-pill.push-state.loading{opacity:.72}
+.employee-card:hover .employee-activity-pill.entry-count{background:#f0eeff;border-color:#dcdafa}
+@media(max-width:760px){.employee-card-activity{gap:5px}.employee-activity-pill{padding:4px 7px;font-size:.64rem}}
+@media(prefers-reduced-motion:reduce){.employee-activity-pill{transition:none}}

@@ -39,7 +39,7 @@ test('setup complexity remains removed', () => {
 
 test('version, security headers and health route are consistent', () => {
   const pkg=JSON.parse(read('package.json')); const vercel=JSON.parse(read('vercel.json'));
-  assert.equal(pkg.version,'0.40.10'); assert.equal(Object.hasOwn(pkg,'engines'),false);
+  assert.equal(pkg.version,'0.40.11'); assert.equal(Object.hasOwn(pkg,'engines'),false);
   assert.ok(vercel.rewrites.some(item=>item.source==='/health'&&item.destination==='/health.html'));
   const raw=read('vercel.json');
   for(const header of ['Content-Security-Policy','X-Content-Type-Options','X-Frame-Options','Cross-Origin-Resource-Policy']) assert.match(raw,new RegExp(header));
@@ -353,7 +353,7 @@ test('0.10 notifications are personal, actionable and available from header and 
   assert.match(data,/hadas_notifications/);
   assert.match(app,/renderNotifications/);
   assert.match(app,/data-dashboard-notifications/);
-  assert.match(app,/if\(type==='request'\) switchTab\('requests'\)/);
+  assert.match(app,/if\(type==='request'\) \{ switchTab\('requests'\); focusRequestCard\(card\.dataset\.entityId\); \}/);
 });
 
 test('0.10 removes the generic Other request from both UI and API', () => {
