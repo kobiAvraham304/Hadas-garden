@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.11 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.12 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -1908,6 +1908,20 @@ function weeklyExportLayout(payload, weekStart) {
   const height = margin * 2 + headerHeight + daysHeaderHeight + rowHeights.reduce((sum, value) => sum + value, 0) + absenceHeight + footerHeight;
   return { width, height: Math.max(960, height), dates, shifts, classes, rowHeights, absenceHeight, headerHeight, daysHeaderHeight, footerHeight, margin };
 }
+// Use a verified Hebrew font for all PDF and image exports, regardless of device.
+async function ensureScheduleExportFont() {
+  if (!document.fonts?.load || !document.fonts?.check) {
+    throw new Error('המכשיר אינו תומך בטעינת גופן לייצוא. נסו דפדפן מעודכן.');
+  }
+  const sample='שיבוץ מעון הדס אודם גלבוע סיני 0123456789';
+  for (const weight of [600,700,800,900]) {
+    const spec=`${weight} 24px "Heebo"`;
+    const faces=await document.fonts.load(spec,sample);
+    if(!faces.length || !document.fonts.check(spec,sample)){
+      throw new Error('לא ניתן לטעון את הגופן האחיד של השיבוץ. בדקו חיבור לאינטרנט ונסו שוב.');
+    }
+  }
+}
 function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStart = state.weekStart, title = 'שיבוץ שבועי') {
   const layout = weeklyExportLayout(payload, weekStart);
   const canvas = document.createElement('canvas'); canvas.width = layout.width; canvas.height = layout.height;
@@ -1921,17 +1935,17 @@ function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStar
   const dayWidth = (contentWidth - classColumnWidth) / 6;
 
   fillRoundedRect(ctx, margin, margin, contentWidth, headerHeight - 12, 24, '#f5f4ff', '#dedff0');
-  drawCanvasText(ctx, 'מערכת ניהול שיבוצים מעון הדס', width - margin - 28, margin + 31, 760, { font: '800 22px Arial', color: '#6267bb' });
-  drawCanvasText(ctx, title, width - margin - 28, margin + 72, 760, { font: '900 42px Arial', color: '#2f3246' });
-  drawCanvasText(ctx, `${formatDate(weekStart, { day: 'numeric', month: 'long' })} – ${formatDate(addDays(weekStart, 5), { day: 'numeric', month: 'long', year: 'numeric' })}`, margin + 28, margin + 67, 650, { font: '800 26px Arial', color: '#474b66', align: 'left' });
+  drawCanvasText(ctx, 'מערכת ניהול שיבוצים מעון הדס', width - margin - 28, margin + 31, 760, { font: '800 22px Heebo', color: '#6267bb' });
+  drawCanvasText(ctx, title, width - margin - 28, margin + 72, 760, { font: '900 42px Heebo', color: '#2f3246' });
+  drawCanvasText(ctx, `${formatDate(weekStart, { day: 'numeric', month: 'long' })} – ${formatDate(addDays(weekStart, 5), { day: 'numeric', month: 'long', year: 'numeric' })}`, margin + 28, margin + 67, 650, { font: '800 26px Heebo', color: '#474b66', align: 'left' });
 
   let y = margin + headerHeight;
   fillRoundedRect(ctx, margin, y, contentWidth, daysHeaderHeight, 16, '#eef0ff', '#dcdfee');
-  drawCanvasText(ctx, 'כיתה', width - margin - classColumnWidth / 2, y + daysHeaderHeight / 2, classColumnWidth - 20, { font: '900 22px Arial', align: 'center' });
+  drawCanvasText(ctx, 'כיתה', width - margin - classColumnWidth / 2, y + daysHeaderHeight / 2, classColumnWidth - 20, { font: '900 22px Heebo', align: 'center' });
   dates.forEach((date, index) => {
     const xRight = width - margin - classColumnWidth - index * dayWidth;
-    drawCanvasText(ctx, DAY_NAMES[date.getDay()], xRight - dayWidth / 2, y + 23, dayWidth - 20, { font: '900 20px Arial', align: 'center' });
-    drawCanvasText(ctx, formatDate(date, { day: '2-digit', month: '2-digit' }), xRight - dayWidth / 2, y + 46, dayWidth - 20, { font: '700 15px Arial', color: '#777b91', align: 'center' });
+    drawCanvasText(ctx, DAY_NAMES[date.getDay()], xRight - dayWidth / 2, y + 23, dayWidth - 20, { font: '900 20px Heebo', align: 'center' });
+    drawCanvasText(ctx, formatDate(date, { day: '2-digit', month: '2-digit' }), xRight - dayWidth / 2, y + 46, dayWidth - 20, { font: '700 15px Heebo', color: '#777b91', align: 'center' });
     if (index < 5) { ctx.strokeStyle = '#d9dcea'; ctx.beginPath(); ctx.moveTo(xRight - dayWidth, y); ctx.lineTo(xRight - dayWidth, y + daysHeaderHeight); ctx.stroke(); }
   });
   y += daysHeaderHeight;
@@ -1941,7 +1955,7 @@ function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStar
     ctx.fillStyle = rowIndex % 2 ? '#fcfcff' : '#ffffff'; ctx.fillRect(margin, y, contentWidth, rowHeight);
     ctx.strokeStyle = '#e2e4ed'; ctx.lineWidth = 1; ctx.strokeRect(margin, y, contentWidth, rowHeight);
     ctx.fillStyle = '#f8f7ff'; ctx.fillRect(width - margin - classColumnWidth, y, classColumnWidth, rowHeight);
-    drawCanvasText(ctx, classItem.name, width - margin - classColumnWidth / 2, y + rowHeight / 2, classColumnWidth - 24, { font: '900 27px Arial', align: 'center' });
+    drawCanvasText(ctx, classItem.name, width - margin - classColumnWidth / 2, y + rowHeight / 2, classColumnWidth - 24, { font: '900 27px Heebo', align: 'center' });
 
     dates.forEach((date, index) => {
       const iso = dateISO(date);
@@ -1950,7 +1964,7 @@ function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStar
       const cellLeft = cellRight - dayWidth;
       ctx.strokeStyle = '#e4e6ef'; ctx.beginPath(); ctx.moveTo(cellLeft, y); ctx.lineTo(cellLeft, y + rowHeight); ctx.stroke();
       if (!items.length) {
-        drawCanvasText(ctx, '—', cellLeft + dayWidth / 2, y + rowHeight / 2, dayWidth - 30, { font: '700 25px Arial', color: '#b2b4c0', align: 'center' });
+        drawCanvasText(ctx, '—', cellLeft + dayWidth / 2, y + rowHeight / 2, dayWidth - 30, { font: '700 25px Heebo', color: '#b2b4c0', align: 'center' });
         return;
       }
       items.forEach((shift, itemIndex) => {
@@ -1960,10 +1974,10 @@ function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStar
         const palette = exportRolePalette(shift.shift_role);
         fillRoundedRect(ctx, cellLeft + 7, cardY, dayWidth - 14, 34, 8, palette.fill, palette.border);
         fillRoundedRect(ctx, cellRight - 12, cardY + 4, 4, 26, 2, palette.accent);
-        drawCanvasText(ctx, employee?.full_name || 'עובד', cellRight - 16, cardY + 12, dayWidth - 102, { font: '800 16px Arial', color: '#303348' });
-        drawCanvasText(ctx, isolateCanvasLtr(`${trimTime(shift.start_time)}-${trimTime(shift.end_time)}`), cellLeft + 16, cardY + 12, 92, { font: '800 14px Arial', color: palette.accent, align: 'left' });
+        drawCanvasText(ctx, employee?.full_name || 'עובד', cellRight - 16, cardY + 12, dayWidth - 102, { font: '800 16px Heebo', color: '#303348' });
+        drawCanvasText(ctx, isolateCanvasLtr(`${trimTime(shift.start_time)}-${trimTime(shift.end_time)}`), cellLeft + 16, cardY + 12, 92, { font: '800 14px Heebo', color: palette.accent, align: 'left' });
         const note = [exportRoleShort(shift.shift_role), shift.public_note].filter(Boolean).join(' · ');
-        drawCanvasText(ctx, note, cellRight - 16, cardY + 25, dayWidth - 32, { font: '600 12px Arial', color: '#74788b' });
+        drawCanvasText(ctx, note, cellRight - 16, cardY + 25, dayWidth - 32, { font: '600 12px Heebo', color: '#74788b' });
       });
     });
     y += rowHeight;
@@ -1973,20 +1987,20 @@ function drawWeeklyScheduleCanvas(payload = schedulePayloadFromState(), weekStar
   ctx.fillStyle = '#fffaf0'; ctx.fillRect(margin, y, contentWidth, absenceHeight);
   ctx.strokeStyle = '#eadfca'; ctx.strokeRect(margin, y, contentWidth, absenceHeight);
   ctx.fillStyle = '#fff4d8'; ctx.fillRect(width - margin - classColumnWidth, y, classColumnWidth, absenceHeight);
-  drawCanvasText(ctx, 'חופש / היעדרות', width - margin - classColumnWidth / 2, y + absenceHeight / 2, classColumnWidth - 20, { font: '900 20px Arial', color: '#7d5c1f', align: 'center' });
+  drawCanvasText(ctx, 'חופש / היעדרות', width - margin - classColumnWidth / 2, y + absenceHeight / 2, classColumnWidth - 20, { font: '900 20px Heebo', color: '#7d5c1f', align: 'center' });
   dates.forEach((date, index) => {
     const cellRight = width - margin - classColumnWidth - index * dayWidth; const cellLeft = cellRight - dayWidth;
     const items = absences.filter((item) => item.absence_date === dateISO(date));
     ctx.strokeStyle = '#eadfca'; ctx.beginPath(); ctx.moveTo(cellLeft, y); ctx.lineTo(cellLeft, y + absenceHeight); ctx.stroke();
-    if (!items.length) drawCanvasText(ctx, 'אין', cellLeft + dayWidth / 2, y + absenceHeight / 2, dayWidth - 24, { font: '600 14px Arial', color: '#a99b83', align: 'center' });
+    if (!items.length) drawCanvasText(ctx, 'אין', cellLeft + dayWidth / 2, y + absenceHeight / 2, dayWidth - 24, { font: '600 14px Heebo', color: '#a99b83', align: 'center' });
     items.forEach((item, itemIndex) => {
       const employee = employeeById(item.employee_id); const worked=item.absence_type==='day_off_worked';
       const rowY=y+8+itemIndex*24; fillRoundedRect(ctx,cellLeft+7,rowY,dayWidth-14,20,7,worked?'#edf9f1':'#fff0f0',worked?'#add7bb':'#efb1b1');
-      drawCanvasText(ctx, `${employee?.full_name || item.employee_name || 'עובד'} · ${absenceLabel(item.absence_type)}`, cellRight - 12, rowY + 10, dayWidth - 24, { font: '700 12px Arial', color: worked?'#2f754a':'#923b3b' });
+      drawCanvasText(ctx, `${employee?.full_name || item.employee_name || 'עובד'} · ${absenceLabel(item.absence_type)}`, cellRight - 12, rowY + 10, dayWidth - 24, { font: '700 12px Heebo', color: worked?'#2f754a':'#923b3b' });
     });
   });
   y += absenceHeight;
-  drawCanvasText(ctx, `נוצר בתאריך ${formatDate(new Date(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, margin, y + 22, 600, { font: '600 12px Arial', color: '#9699a7', align: 'left' });
+  drawCanvasText(ctx, `נוצר בתאריך ${formatDate(new Date(), { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, margin, y + 22, 600, { font: '600 12px Heebo', color: '#9699a7', align: 'left' });
   return canvas;
 }
 async function canvasBlob(canvas) {
@@ -2010,7 +2024,7 @@ async function shareOrDownloadFiles(files, title) {
 async function downloadScheduleImage() {
   const button = $('#imageBtn'); setBusy(button, true, 'מכין תמונה…');
   try {
-    await document.fonts?.ready;
+    await ensureScheduleExportFont();
     const canvas = drawWeeklyScheduleCanvas(); const blob = await canvasBlob(canvas);
     const file = new File([blob], `שיבוץ-שבועי-מעון-הדס-${dateISO(state.weekStart)}.png`, { type: 'image/png' });
     const mode = await shareOrDownloadFiles([file], 'שיבוץ שבועי מעון הדס');
@@ -2027,7 +2041,7 @@ async function monthSchedulePayloads(monthDate) {
 async function downloadMonthlyScheduleImage() {
   const button = $('#monthImageBtn'); setBusy(button, true, 'מכין תמונות…');
   try {
-    await document.fonts?.ready;
+    await ensureScheduleExportFont();
     const monthDate = monthStart(state.weekStart); const weeks = await monthSchedulePayloads(monthDate);
     const monthLabel = formatDate(monthDate, { month: 'long', year: 'numeric' });
     const files = [];
@@ -2048,7 +2062,7 @@ async function printWeeklySchedule() {
   if (!printWindow) return showToast('יש לאפשר חלונות קופצים כדי להדפיס', 'error');
   setBusy(button, true, 'מכין PDF…');
   try {
-    await document.fonts?.ready;
+    await ensureScheduleExportFont();
     const canvas = drawWeeklyScheduleCanvas(); const dataUrl = canvas.toDataURL('image/png', 0.98);
     const printHtml = `<!doctype html><html dir="rtl"><head><meta charset="utf-8"><title>שיבוץ שבועי מעון הדס</title><style>@page{size:A4 landscape;margin:6mm}html,body{margin:0;background:#fff}img{display:block;width:100%;height:auto;object-fit:contain}</style></head><body><img id="scheduleImage" src="${dataUrl}"><script>document.getElementById('scheduleImage').addEventListener('load',()=>setTimeout(()=>window.print(),150));<\/script></body></html>`;
     const printUrl = URL.createObjectURL(new Blob([printHtml], { type:'text/html;charset=utf-8' }));

@@ -86,8 +86,8 @@ test('decided requests stop looking pending, without hiding employee outcome not
 });
 test('release assets are versioned and retain existing scheduling module',()=>{
  const index=read('index.html'),boot=read('patch-v025.js');
- assert.equal(require('../package.json').version,'0.40.11');
- for(const file of ['app.js','styles.css','push-v0372.js','patch-v025.js'])assert.ok(index.includes(file+'?v=0411'));
- assert.match(boot,/const VERSION = '0\.40\.11'/);
+ assert.equal(require('../package.json').version,'0.40.12');
+ for(const file of ['app.js','patch-v025.js'])assert.ok(index.includes(file+'?v=0412')); for(const file of ['styles.css','push-v0372.js'])assert.ok(index.includes(file+'?v=0411'));
+ assert.match(boot,/const VERSION = '0\.40\.12'/);
  assert.match(read('api/index.js'),/'shifts': require\('\.\.\/lib\/shifts-v039'\)/);
 });
