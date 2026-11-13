@@ -34,7 +34,7 @@ test('0.39.2 uses consistent Hebrew font and 24-hour windows input', () => {
   const css=read('patch-v0392.css'),html=read('index.html'),client=read('app.js');
   assert.match(html,/fonts\.googleapis\.com/);
   assert.match(css,/Heebo/);
-  assert.match(client,/Windows NT/);
-  assert.match(client,/HH:MM/);
+  assert.match(client,/pointer:fine/);
+  assert.match(client,/0730 → 07:30/);
   assert.match(client,/setCustomValidity/);
 });

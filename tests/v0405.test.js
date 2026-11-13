@@ -7,7 +7,7 @@ const start = app.indexOf('function initializeWindows24HourFields() {');
 const end = app.indexOf('\ninitializeWindows24HourFields();', start);
 assert.ok(start >= 0 && end > start);
 const initializer = app.slice(start, end);
-const build = (values, userAgent='Mozilla/5.0 (Windows NT 10.0; Win64; x64)') => {
+const build = (values, userAgent='Mozilla/5.0 (Windows NT 10.0; Win64; x64)',pointer='fine') => {
   const controls=values.map(({value='',min=null,max=null}={})=>{
     const listeners={};
     return {
@@ -19,7 +19,7 @@ const build = (values, userAgent='Mozilla/5.0 (Windows NT 10.0; Win64; x64)') =>
   });
   const document={body:{},querySelectorAll(sel){assert.equal(sel,'input[type="time"]');return controls;}};
   class MutationObserver { constructor(fn){this.fn=fn;this.instance=this;}observe(){} }
-  const init=new Function('navigator','document','MutationObserver',initializer+'; return initializeWindows24HourFields;')({userAgent},document,MutationObserver);
+  const init=new Function('navigator','document','MutationObserver','window',initializer+'; return initializeWindows24HourFields;')({userAgent},document,MutationObserver,{matchMedia:()=>({matches:pointer==='fine'})});
   init();
   return controls;
 };
@@ -56,10 +56,13 @@ test('Windows: time value assigned by code is validated correctly on focus and c
  field.value='12:01';field.dispatch('change');assert.notEqual(field.validationMessage,'');
  field.value='12:00';field.dispatch('change');assert.equal(field.validationMessage,'');
 });
-test('macOS/iOS: native time fields remain native and untouched',()=>{
- const [field]=build([{value:'07:30'}],'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5)');
- assert.equal(field.type,'time');
- assert.equal(field.dataset.hadas24h,undefined);
+test('macOS desktop: type 0730 without colon; iPhone native time picker stays available',()=>{
+ const [mac]=build([{value:'0730'}],'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5)','fine');
+ assert.equal(mac.type,'text');
+ assert.equal(mac.value,'07:30');
+ const [phone]=build([{value:'07:30'}],'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0 like Mac OS X)','coarse');
+ assert.equal(phone.type,'time');
+ assert.equal(phone.dataset.hadas24h,undefined);
 });
 test('do not double-attach Windows time listeners on repeated calls',()=>{
  const [field]=build([{value:'08:00'}]);
