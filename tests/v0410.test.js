@@ -67,6 +67,6 @@ test('the UI provides an explicit accessible approve/cancel dialog and retains t
  assert.match(app,/data\.override_hours=data\.override_hours==='true' && form\.dataset\.hoursOverrideSignature===fixedHoursOverrideSignature\(data\)/);
  assert.match(app,/const existingHoursOverride = Boolean\(shift\.rule_override\)/);
  assert.match(app,/await apiFetch\('\/api\/shifts', \{method:data\.id\?'PATCH':'POST',body:data\}\)/);
- assert.match(read('patch-v025.js'),/const VERSION = '0\.40\.12'/);
- assert.equal(require('../package.json').version,'0.40.12');
+ assert.match(read('patch-v025.js'),/const VERSION = '0\.40\.13'/);
+ assert.equal(require('../package.json').version,'0.40.13');
 });
