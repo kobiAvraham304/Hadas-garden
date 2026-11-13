@@ -19,8 +19,8 @@ test('weekly PDF and weekly/monthly image exports await font loading',()=>{
   assert.match(app.slice(from,to),/await ensureScheduleExportFont\(\)/);
  }
 });
-test('0.40.13 version is consistent',()=>{
- assert.equal(require('../package.json').version,'0.40.13');
- assert.match(html,/app\.js\?v=0413/);
- assert.match(fs.readFileSync('patch-v025.js','utf8'),/const VERSION = '0\.40\.13'/);
+test('0.40.14 version is consistent',()=>{
+ assert.equal(require('../package.json').version,'0.40.14');
+ assert.match(html,/app\.js\?v=0414/);
+ assert.match(fs.readFileSync('patch-v025.js','utf8'),/const VERSION = '0\.40\.14'/);
 });
