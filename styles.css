@@ -1349,3 +1349,44 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
 .employee-card:hover .employee-activity-pill.entry-count{background:#f0eeff;border-color:#dcdafa}
 @media(max-width:760px){.employee-card-activity{gap:5px}.employee-activity-pill{padding:4px 7px;font-size:.64rem}}
 @media(prefers-reduced-motion:reduce){.employee-activity-pill{transition:none}}
+
+
+/* v0.40.13 – request to work, compact and calm on desktop and phones */
+.request-type-card.request-type-work{border:1px solid #cce6de;background:#f2faf7;position:relative}
+.request-type-work .request-icon{background:#dbf0e7!important;color:#387e68!important}
+.request-type-work:has(input:checked){border-color:#6bb899;box-shadow:0 0 0 3px rgba(92,180,139,.12)}
+.request-type-work b,.work-request-flag{color:#34795e!important}
+.work-day-box{border:1px solid #cde9df;background:linear-gradient(145deg,#f8fffc,#eff9f5);border-radius:18px;padding:16px;display:grid;gap:11px}
+.work-day-head{display:flex;align-items:center;gap:11px}
+.work-day-head>div{display:grid;gap:4px;min-width:0}
+.work-day-head strong{font-size:.93rem;color:#245d4b}
+.work-day-head small,.work-day-hint{color:#668075;font-size:.74rem;line-height:1.5}
+.work-day-symbol{display:grid;place-items:center;width:41px;height:41px;flex:none;border-radius:13px;background:#d9f1e6;color:#3c9673;font-size:1.35rem}
+.work-day-picker{display:grid;gap:6px;font-size:.78rem;font-weight:800}
+.work-day-picker select{min-height:47px;border-radius:13px;background:#fff;border:1px solid #cce4d9;font-size:.9rem;padding:9px 12px;width:100%}
+.work-day-hint{margin:0}
+.request-card.type-work{border-inline-start:4px solid #76b79d!important}
+.work-request-flag{display:inline-block;border-radius:999px;background:#e5f6ee;padding:3px 8px;font-size:.63rem;font-weight:900;margin-block:5px}
+.work-request-summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0;padding:10px 12px;border:1px solid #d7eee3;border-radius:13px;background:#f5fbf8;color:#407d63;font-size:.75rem}
+.work-approval-dialog .modal-card{width:min(580px,calc(100vw - 24px));max-width:580px;gap:14px}
+.work-approve-tip{padding:11px 13px;border-radius:13px;background:#f3f5fb;color:#666b84;font-size:.78rem;line-height:1.6}
+.work-class-field{padding:0;border:0;min-width:0}
+.work-class-field legend{font-weight:900;margin-bottom:10px}
+.work-class-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.work-class-choice{cursor:pointer;position:relative;min-width:0}
+.work-class-choice>input{position:absolute;opacity:0;width:1px;height:1px}
+.work-class-card{min-height:112px;padding:13px 7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;border-radius:17px;border:1.5px solid #e0e3ef;background:#fff;transition:transform .18s ease,border-color .18s ease,background .18s ease,box-shadow .18s ease}
+.work-class-card strong{font-size:.92rem}
+.work-class-card small{font-size:.61rem;color:#73758a;line-height:1.3}
+.work-class-marker{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;background:#f0effa;color:#8986c6}
+.work-class-choice:has(input:checked) .work-class-card{background:#f3f9f6;border-color:#73b995;box-shadow:0 0 0 3px rgba(112,183,145,.12);transform:translateY(-1px)}
+.work-class-choice:focus-within .work-class-card{outline:2px solid #6d8dcb;outline-offset:2px}
+.work-class-choice:has(input:checked) small{color:#347b5e}
+.work-approve-hours{gap:12px}
+.work-approve-hours input{min-height:47px;width:100%;direction:ltr;text-align:center;font-variant-numeric:tabular-nums}
+.work-approve-note{display:grid;gap:7px}
+.work-approve-note textarea{min-height:70px;resize:vertical}
+.work-approval-summary{display:flex;align-items:center;gap:9px;background:#f4fbf7;color:#3c7b5f;padding:12px;border-radius:13px;font-size:.78rem;line-height:1.45}
+.work-approval-summary span{display:grid;place-items:center;width:24px;height:24px;flex:none;background:#d5eddf;border-radius:50%}
+@media(max-width:520px){.work-approval-dialog .modal-card{padding:17px 13px}.work-class-choices{gap:6px}.work-class-card{min-height:99px;padding:10px 4px;border-radius:12px}.work-class-card strong{font-size:.82rem}.work-class-card small{font-size:.57rem}.work-day-box{padding:12px}}
+@media(prefers-reduced-motion:reduce){.work-class-card{transition:none}}

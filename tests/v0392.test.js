@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const read = p => fs.readFileSync(p,'utf8');
 
 test('0.39.2 version is aligned in bootstrap and UI', () => {
-  assert.equal(JSON.parse(read('package.json')).version,'0.40.12');
-  assert.match(read('patch-v025.js'),/const VERSION = '0\.40\.12'/);
+  assert.equal(JSON.parse(read('package.json')).version,'0.40.13');
+  assert.match(read('patch-v025.js'),/const VERSION = '0\.40\.13'/);
   assert.match(read('patch-v0391.js'),/const VERSION = '0\.40\.5'/);
 });
 
@@ -34,7 +34,7 @@ test('0.39.2 uses consistent Hebrew font and 24-hour windows input', () => {
   const css=read('patch-v0392.css'),html=read('index.html'),client=read('app.js');
   assert.match(html,/fonts\.googleapis\.com/);
   assert.match(css,/Heebo/);
-  assert.match(client,/Windows NT/);
-  assert.match(client,/HH:MM/);
+  assert.match(client,/pointer:fine/);
+  assert.match(client,/0730 → 07:30/);
   assert.match(client,/setCustomValidity/);
 });

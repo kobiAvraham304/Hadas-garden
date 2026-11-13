@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const read=name=>fs.readFileSync(path.join(__dirname,'..',name),'utf8');
-test('0.40.12 mobile tools are button-driven and independent of Safari details toggles',()=>{
+test('0.40.13 mobile tools are button-driven and independent of Safari details toggles',()=>{
  const html=read('index.html'),js=read('app.js'),css=read('styles.css');
  assert.match(html,/class="schedule-tools-trigger" aria-expanded="false" aria-controls="scheduleSecondaryActions"/);
  assert.match(html,/id="scheduleSecondaryActions" class="schedule-secondary-actions" hidden/);
@@ -32,11 +32,11 @@ test('weekly PDF uses distinct, clearly visible fill colors for every staffing r
  assert.match(legacy,/type === 'leave'\) return \{ fill: '#fff0c4'/);
  assert.match(legacy,/\/ColorSpace \/DeviceRGB/);
 });
-test('asset cache busting and version number follow 0.40.12',()=>{
+test('asset cache busting and version number follow 0.40.13',()=>{
  const html=read('index.html'),boot=read('patch-v025.js'),pkg=require('../package.json');
- assert.equal(pkg.version,'0.40.12');
- assert.ok(html.includes('styles.css?v=0411')); assert.ok(html.includes('app.js?v=0412'));
- assert.ok(html.includes('patch-v025.js?v=0412'));
+ assert.equal(pkg.version,'0.40.13');
+ assert.ok(html.includes('styles.css?v=0413')); assert.ok(html.includes('app.js?v=0413'));
+ assert.ok(html.includes('patch-v025.js?v=0413'));
  assert.match(boot,/patch-v0342\.js\?v=0409/);
  assert.match(boot,/patch-v026\.js\?v=0407/);
  assert.match(boot,/patch-v033\.js\?v=0407/);
