@@ -132,10 +132,12 @@ function monthStart(date) { const d = new Date(date); d.setHours(12, 0, 0, 0); d
 function monthParam(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`; }
 function formatDate(value, options = { day: '2-digit', month: '2-digit', year: 'numeric' }) { const parsed = parseDateValue(value); return Number.isNaN(parsed.getTime()) ? '—' : new Intl.DateTimeFormat('he-IL', options).format(parsed); }
 function trimTime(value) { return value ? String(value).slice(0, 5) : ''; }
-// On Windows Chromium/Edge, native time fields can depend on the OS locale and render AM/PM.
+// On desktop browsers, native time fields require entering ':' and vary by OS locale.
 // A constrained HH:MM text control keeps 24-hour formatting while preserving form values and validation.
 function initializeWindows24HourFields() {
-  if (!/Windows NT/i.test(navigator.userAgent)) return;
+  // Preserve the native clock picker on touch phones; use easy digits on desktops
+  // (Windows, macOS, Linux). Four digits such as 0730 become 07:30 instantly.
+  if (!window.matchMedia('(pointer:fine)').matches) return;
   const valid = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
   const enhance = (input) => {
     if (!input || input.dataset.hadas24h) return;
@@ -146,7 +148,7 @@ function initializeWindows24HourFields() {
     input.inputMode = 'numeric';
     input.maxLength = 5;
     input.pattern = '(?:[01]\\d|2[0-3]):[0-5]\\d';
-    input.placeholder = 'HH:MM';
+    input.placeholder = '0730 → 07:30';
     input.autocomplete = 'off';
     const normalize = () => {
       const current = input.value.trim();
@@ -159,7 +161,10 @@ function initializeWindows24HourFields() {
     input.addEventListener('change',normalize);
     input.addEventListener('blur',normalize);
     input.addEventListener('focus',normalize);
-    input.addEventListener('input',()=>{ input.setCustomValidity(''); if(valid.test(input.value.trim())) normalize(); });
+    input.addEventListener('input',()=>{
+      input.setCustomValidity('');
+      if(/^\d{4}$/.test(input.value.trim()) || valid.test(input.value.trim()))normalize();
+    });
     normalize();
   };
   document.querySelectorAll('input[type="time"]').forEach(enhance);
