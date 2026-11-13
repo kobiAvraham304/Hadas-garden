@@ -1,6 +1,6 @@
 /* מערכת ניהול שיבוצים מעון הדס — bootstrap יציב לגרסה 0.39.1 */
 (() => {
-  const VERSION = '0.40.13';
+  const VERSION = '0.40.14';
   const V026 = '/patch-v026.js?v=0407';
   const V033 = '/patch-v033.js?v=0407';
   const HOTFIX = '/patch-v0331-hotfix.js?v=0331hf2';
@@ -182,7 +182,7 @@
       if (!window.__hadasV0391Ready) throw new Error('עדכון הממשק 0.39.1 לא סיים להיטען');
       installReleaseVersionGuard();
     } catch (error) {
-      console.error('Hadas v0.40.13 bootstrap failed', error);
+      console.error('Hadas v0.40.14 bootstrap failed', error);
       const toast = document.querySelector('#toast');
       if (toast) {
         toast.textContent = 'טעינת עדכון המערכת נכשלה. המערכת תמשיך במצב בסיסי; מומלץ לרענן.';

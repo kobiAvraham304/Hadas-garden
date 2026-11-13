@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.13 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.14 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -2689,8 +2689,8 @@ function updateRequestFields() {
   const form = $('#requestForm'); const type = selectedRequestType(); const needsShift=['late_start','early_finish'].includes(type); const range=['leave','sick'].includes(type);
   $('#requestTypeHelp').textContent=REQUEST_HELP[type]||'';
   window.HadasWork?.onFieldsChange(type,form);
-  $('.request-start').forEach((element)=>element.classList.toggle('hidden',!['late_start','work'].includes(type)));
-  $('.request-end').forEach((element)=>element.classList.toggle('hidden',!['early_finish','work'].includes(type)));
+  $$('.request-start').forEach((element)=>element.classList.toggle('hidden',!['late_start','work'].includes(type)));
+  $$('.request-end').forEach((element)=>element.classList.toggle('hidden',!['early_finish','work'].includes(type)));
   $$('.request-range-end').forEach((element)=>element.classList.toggle('hidden',!range));
   $$('.shift-choice-field').forEach((element)=>element.classList.toggle('hidden',!needsShift));
   $$('.swap-field').forEach((element)=>element.classList.toggle('hidden',type!=='swap'));
