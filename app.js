@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.14 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.15 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -2744,7 +2744,9 @@ async function saveRequest(event){
       renderNavBadges();
       renderDashboard();
     }
-    showToast(data.request_type==='swap'?'הבקשה נשלחה לאישור העובד שנבחר':'הבקשה נשלחה','success');
+    if(data.request_type==='work'&&result?.shift_id)showToast('הבקשה אושרה ונוצר שיבוץ בטיוטה','success');
+    else if(data.request_type==='work'&&result?.approval_error)showToast('הבקשה נשמרה כממתינה, אך לא נוצר שיבוץ: '+result.approval_error,'error');
+    else showToast(data.request_type==='swap'?'הבקשה נשלחה לאישור העובד שנבחר':'הבקשה נשלחה','success');
     setTimeout(()=>refreshAll().catch(()=>{}),0);
   }catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}
 }

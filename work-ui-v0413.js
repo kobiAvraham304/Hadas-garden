@@ -1,12 +1,50 @@
 /* Request to work – supplemental UI; other request workflows remain unchanged. */
 (() => {
   let daysSequence=0;
+  let previousRequestType=null;
+  const isOnBehalf=()=>isManager()&&!document.getElementById('requestRequesterField').classList.contains('hidden');
+  function syncWorkSubmitLabel() {
+    const button=document.querySelector('#requestForm button[value="default"]');
+    const approved=document.querySelector('#v026PreApprovedField input[name="pre_approved"]')?.checked;
+    if(button&&!button.disabled)button.textContent=selectedRequestType()==='work'&&isOnBehalf()&&approved?'אישור ושיבוץ בטיוטה':'שליחת הבקשה';
+  }
+  function renderWorkClassChoices(form,visible) {
+    const field=document.getElementById('workRequestClassField');
+    if(!field)return;
+    field.classList.toggle('hidden',!visible);
+    field.disabled=!visible;
+    if(!visible)return;
+    const worker=state.employees.find(row=>row.id===form.elements.requester_id.value);
+    const choices=document.getElementById('workRequestClasses');
+    if(!worker){choices.innerHTML='<p class="work-day-hint">תחילה בוחרים עובד/ת.</p>';field.dataset.employeeId='';return;}
+    const classes=state.classes.filter(row=>row.active!==false);
+    const previous=field.dataset.employeeId===worker.id?choices.querySelector('input:checked')?.value:null;
+    const preferred=classes.find(row=>row.id===worker.primary_class_id)||classes[0];
+    if(field.dataset.employeeId===worker.id&&choices.querySelector('input[name="requested_class_id"]'))return;
+    choices.innerHTML=classes.map(row=>{
+      const primary=row.id===worker.primary_class_id;
+      return `<label class="work-class-choice"><input type="radio" name="requested_class_id" value="${escapeHtml(row.id)}" ${row.id===(previous||preferred?.id)?'checked':''} required/>
+        <span class="work-class-card"><span class="work-class-marker">▦</span><strong>${escapeHtml(row.name)}</strong>
+        <small>${primary?'✓ כיתה קבועה · מומלץ':'כיתה נוספת'}</small></span></label>`;
+    }).join('');
+    field.dataset.employeeId=worker.id;
+  }
   function onFieldsChange(type,form) {
     const work=type==='work';
     const box=document.getElementById('workDayBox');
     const dates=form.querySelector('.request-date-panel');
     box?.classList.toggle('hidden',!work);
     dates?.classList.toggle('hidden',work);
+    const onBehalf=work&&isOnBehalf();
+    renderWorkClassChoices(form,onBehalf);
+    if(onBehalf&&previousRequestType!=='work'){
+      requestAnimationFrame(()=>{
+        const checkbox=document.querySelector('#v026PreApprovedField input[name="pre_approved"]');
+        if(checkbox&&!checkbox.disabled)checkbox.checked=true;
+        syncWorkSubmitLabel();
+      });
+    }else requestAnimationFrame(syncWorkSubmitLabel);
+    previousRequestType=type;
     if(!work){daysSequence++;return;}
     if(!form.elements.requested_start.value)form.elements.requested_start.value=trimTime(state.settings?.opening_time)||'07:30';
     if(!form.elements.requested_end.value)form.elements.requested_end.value=trimTime(state.settings?.closing_time)||'15:30';
@@ -17,7 +55,7 @@
     const select=document.getElementById('workDaySelect');
     const hint=document.getElementById('workDayHint');
     if(selectedRequestType()!=='work')return;
-    const onBehalf=isManager()&&!document.getElementById('requestRequesterField').classList.contains('hidden');
+    const onBehalf=isOnBehalf();
     const target=onBehalf?form.elements.requester_id.value:null;
     const token=++daysSequence;
     if(onBehalf&&!target){
@@ -54,6 +92,9 @@
     const date=document.getElementById('workDaySelect').value;
     data.request_date=date;
     if(!date){showToast('יש לבחור יום חופשי פנוי','error');return false;}
+    if(isOnBehalf()&&!state.classes.some(row=>row.id===data.requested_class_id&&row.active!==false)){
+      showToast('יש לבחור כיתה עבור העובד/ת','error');return false;
+    }
     if(!data.requested_start||!data.requested_end||data.requested_start>=data.requested_end){
       showToast('יש להזין שעת התחלה וסיום תקינות','error');return false;
     }
@@ -70,11 +111,12 @@
         heading.querySelector('h3')?.insertAdjacentHTML('afterend','<span class="work-request-flag">✦ בקשה לעבוד</span>');
       if(banner&&!card.querySelector('.work-request-summary')){
         const approvedClass=request.application_snapshot?.class_id;
-        const className=approvedClass?classById(approvedClass)?.name:'';
+        const requestedClass=request.application_snapshot?.requested_class_id;
+        const className=classById(approvedClass||requestedClass)?.name||'';
         banner.insertAdjacentHTML('afterend',`<div class="work-request-summary">
           <span>↗ <strong>בקשת משמרת ביום חופש</strong></span>
           <span>${timeHtml(request.requested_start,request.requested_end)}</span>
-          ${className?`<span>שובץ בכיתת ${escapeHtml(className)}</span>`:''}
+          ${className?`<span>${approvedClass?'שובץ בכיתת':'כיתה מבוקשת:'} ${escapeHtml(className)}</span>`:''}
         </div>`);
       }
       const approve=card.querySelector('button[data-action="approve"]');
@@ -86,7 +128,7 @@
     if(!request||request.status!=='pending'||request.request_type!=='work')return;
     const person=employeeById(request.requester_id)||{};
     const classes=state.classes.filter(row=>row.active!==false);
-    const preferred=classes.find(row=>row.id===person.primary_class_id)||classes[0];
+    const preferred=classes.find(row=>row.id===request.application_snapshot?.requested_class_id)||classes.find(row=>row.id===person.primary_class_id)||classes[0];
     if(!classes.length){showToast('אין כיתות פעילות לשיבוץ','error');return;}
     const choices=document.getElementById('workApprovalClasses');
     choices.innerHTML=classes.map(row=>{
@@ -144,5 +186,8 @@
       }
     });
     document.getElementById('workApprovalForm')?.addEventListener('submit',submit);
+    document.getElementById('requestForm')?.addEventListener('change',event=>{
+      if(event.target.name==='pre_approved')syncWorkSubmitLabel();
+    });
   });
 })();

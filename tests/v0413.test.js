@@ -37,8 +37,8 @@ test('time fields allow 4 digit keyboard typing on desktop while preserving nati
  assert.match(s,/initializeWindows24HourFields\(\)/);
 });
 test('new version assets are aligned',()=>{
- assert.equal(require('../package.json').version,'0.40.14');
+ assert.equal(require('../package.json').version,'0.40.15');
  const html=read('index.html');
- for(const file of ['app.js?v=0414','work-ui-v0413.js?v=0414','styles.css?v=0414','patch-v025.js?v=0414'])assert.ok(html.includes(file));
- assert.match(read('patch-v025.js'),/const VERSION = '0\.40\.14'/);
+ for(const file of ['app.js?v=0415','work-ui-v0413.js?v=0415','styles.css?v=0415','patch-v025.js?v=0415'])assert.ok(html.includes(file));
+ assert.match(read('patch-v025.js'),/const VERSION = '0\.40\.15'/);
 });

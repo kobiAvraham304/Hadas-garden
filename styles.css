@@ -1368,6 +1368,11 @@ button,.nav-btn,.filter-chip,.request-type-card{touch-action:manipulation}
 .request-card.type-work{border-inline-start:4px solid #76b79d!important}
 .work-request-flag{display:inline-block;border-radius:999px;background:#e5f6ee;padding:3px 8px;font-size:.63rem;font-weight:900;margin-block:5px}
 .work-request-summary{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:10px 0;padding:10px 12px;border:1px solid #d7eee3;border-radius:13px;background:#f5fbf8;color:#407d63;font-size:.75rem}
+.work-request-class-field{padding-top:12px;border-top:1px solid #d3e9df;margin-top:4px}
+.work-request-class-field legend{font-size:.85rem;color:#285d4c}
+.work-request-class-field .work-class-card{min-height:88px}
+.work-request-class-field .work-class-card small{font-size:.66rem}
+.work-request-class-field .work-day-hint{margin:8px 0 0}
 .work-approval-dialog .modal-card{width:min(580px,calc(100vw - 24px));max-width:580px;gap:14px}
 .work-approve-tip{padding:11px 13px;border-radius:13px;background:#f3f5fb;color:#666b84;font-size:.78rem;line-height:1.6}
 .work-class-field{padding:0;border:0;min-width:0}

@@ -33,14 +33,14 @@
   <link rel="icon" href="/favicon-32x32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon-v0190.png?v=0190" sizes="180x180" />
   <link rel="manifest" href="/site.webmanifest?v=0405" />
-  <link rel="stylesheet" href="/styles.css?v=0414" />
+  <link rel="stylesheet" href="/styles.css?v=0415" />
   <link rel="stylesheet" href="/schedule-issues-v0403.css?v=0403" />
   <link rel="stylesheet" href="/patch-v025.css?v=0350" />
   <link rel="stylesheet" href="/push-v0372.css?v=0406" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-  <script src="/app.js?v=0414" defer></script>
-  <script src="/work-ui-v0413.js?v=0414" defer></script>
-  <script src="/patch-v025.js?v=0414" defer></script>
+  <script src="/app.js?v=0415" defer></script>
+  <script src="/work-ui-v0413.js?v=0415" defer></script>
+  <script src="/patch-v025.js?v=0415" defer></script>
   <script src="/schedule-issues-v0403.js?v=0403" defer></script>
   <script src="/push-v0372.js?v=0411" defer></script>
   <link rel="stylesheet" href="/library.css?v=0401" />
@@ -424,6 +424,11 @@
           <div class="work-day-head"><span class="work-day-symbol" aria-hidden="true">✦</span><div><strong>באיזה יום חופשי תרצו לעבוד?</strong><small>מוצגים רק ימים חופשיים קבועים שלא שובצתם בהם, ללא היעדרות מאושרת.</small></div></div>
           <label class="work-day-picker"><span>תאריך פנוי</span><select id="workDaySelect"><option value="">טוען ימים פנויים…</option></select></label>
           <p id="workDayHint" class="work-day-hint">בודק זמינות לפי הימים הקבועים שלך</p>
+          <fieldset id="workRequestClassField" class="work-class-field work-request-class-field hidden" disabled>
+            <legend>לאיזו כיתה לשבץ?</legend>
+            <div id="workRequestClasses" class="work-class-choices"></div>
+            <p class="work-day-hint">הכיתה הקבועה מוצעת כברירת מחדל. באישור מראש תיווצר משמרת בטיוטה בכיתה שנבחרה.</p>
+          </fieldset>
         </div>
         <div id="leaveManualReminder" class="notice warn full-field hidden"><strong>תזכורת:</strong> בחופשה של יותר מיומיים רצופים יש למלא גם טופס בקשת חופשה ידני.</div>
         <fieldset id="leaveDayOffField" class="day-off-exchange-box full-field hidden"><legend>אפשרות עבודה ביום חופשי קבוע</legend><p>אם יהיה צורך בכוח אדם, האם ניתן לשבץ אותך באחד מימי החופש הקבועים במקום?</p><div class="compact-radio-row"><label><input type="radio" name="allow_schedule_on_day_off" value="false" checked /><span>לא, להשאיר את ימי החופש</span></label><label><input type="radio" name="allow_schedule_on_day_off" value="true" /><span>כן, לפי צורך</span></label></div><div id="fixedDayOffChoice" class="fixed-day-off-choice hidden"><strong>באילו ימים חופשיים קבועים ניתן לעבוד? אפשר לבחור כמה</strong><div id="fixedDayOffOptions" class="weekday-choice-grid"></div><input type="hidden" name="available_fixed_day_weekday" /><details class="day-off-preference"><summary>＋ הוספת יום מועדף (לא חובה)</summary><label>עדיפות מבין הימים שנבחרו<select name="preferred_fixed_day_weekday"><option value="">ללא עדיפות</option></select></label></details></div></fieldset>
