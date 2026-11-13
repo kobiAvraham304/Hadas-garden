@@ -201,8 +201,8 @@
       const body={...options.body};
       if(String(body.action||'create')==='create'){
         const type=String(body.request_type||'');
-        body.requested_start=type==='late_start'?(body.requested_start||null):null;
-        body.requested_end=type==='early_finish'?(body.requested_end||null):null;
+        body.requested_start=['late_start','work'].includes(type)?(body.requested_start||null):null;
+        body.requested_end=['early_finish','work'].includes(type)?(body.requested_end||null):null;
         body.manual_leave_form_completed=Boolean(document.querySelector('#requestForm [name="manual_leave_form_completed"]')?.checked);
       }
       return previousApiFetch(url,{...options,body});
