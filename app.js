@@ -1,4 +1,4 @@
-/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.12 */
+/* מערכת ניהול שיבוצים מעון הדס — גרסה 0.40.13 */
 function resolveRoot(root = document) {
   if (typeof root === 'string') return document.querySelector(root);
   return root || null;
@@ -11,9 +11,9 @@ const ROLE_LABELS = { admin: 'מנהלת מעון', scheduler: 'אחראית ש�
 const SHIFT_ROLE_LABELS = { teacher: 'גננת/גנן — אחראי/ת כיתה', lead: 'מוביל/ת כיתה — אחראי/ת כיתה', staff: 'צוות כיתה', replacement: 'מילוי מקום / החלפה' };
 const SHIFT_ROLE_SHORT_LABELS = { teacher: 'גננת/גנן', lead: 'מוביל/ה', staff: 'צוות', replacement: 'מילוי מקום' };
 const SHIFT_STATUS_LABELS = { draft: 'ממתין לפרסום', published: 'פורסם' };
-const REQUEST_LABELS = { leave: 'חופשה', day_off: 'יום חופשי', late_start: 'התחלה מאוחרת', early_finish: 'סיום מוקדם', sick: 'מחלה', swap: 'החלפת שיבוץ', other: 'בקשה ישנה' };
+const REQUEST_LABELS = { work:'בקשה לעבוד',leave: 'חופשה', day_off: 'יום חופשי', late_start: 'התחלה מאוחרת', early_finish: 'סיום מוקדם', sick: 'מחלה', swap: 'החלפת שיבוץ', other: 'בקשה ישנה' };
 const REQUEST_STATUS_LABELS = { pending: 'ממתין', approved: 'אושר', rejected: 'נדחה', applied: 'אושר', cancelled: 'בוטל' };
-const REQUEST_ICONS = { leave: '☀', day_off: '⌂', late_start: '◷', early_finish: '◴', sick: '✚', swap: '↔', other: '✎' };
+const REQUEST_ICONS = { work:'✚',leave: '☀', day_off: '⌂', late_start: '◷', early_finish: '◴', sick: '✚', swap: '↔', other: '✎' };
 const ATTENDANCE_LABELS = { scheduled: 'טרם עודכן', present: 'נכח', late: 'איחר', left_early: 'שוחרר מוקדם', absent: 'נעדר', sick: 'מחלה', replacement: 'החליף עובד' };
 const EVENT_LABELS = { holiday: 'חופשה/חג', approved_leave: 'חופשה מאושרת', meeting: 'ישיבה', training: 'הדרכה', birthday: 'יום הולדת', activity: 'פעילות', other: 'אחר' };
 const EVENT_ICONS = { holiday: '☀', approved_leave: '☀', meeting: '◉', training: '✦', birthday: '🎈', activity: '★', other: '●' };
@@ -2610,7 +2610,8 @@ const REQUEST_HELP = {
   late_start:'התחלה מאוחרת — בוחרים שיבוץ קיים ושעת הגעה חדשה.',
   early_finish:'סיום מוקדם — בוחרים שיבוץ קיים ושעת יציאה חדשה.',
   sick:'דיווח מחלה — אפשר לבחור טווח ולצרף אישור רפואי.',
-  swap:'החלפה — בוחרים תאריך ועובד שנמצא ביום חופשי ואינו משובץ.'
+  swap:'החלפה — בוחרים תאריך ועובד שנמצא ביום חופשי ואינו משובץ.',
+  work:'משמרת ביום חופשי קבוע ופנוי, בשעות שתבחרו.'
 };
 function requestDateLabel(request) { return request.request_end_date && request.request_end_date !== request.request_date ? `${formatDate(request.request_date)} – ${formatDate(request.request_end_date)}` : formatDate(request.request_date); }
 function requestTargetEmployee(){const form=$('#requestForm');const requested=form?.elements.requester_id?.value;return employeeById(requested)||state.profile;}
@@ -2682,15 +2683,16 @@ function openLeaveFromShift(){const form=$('#shiftForm');const employeeId=form.e
 function updateRequestFields() {
   const form = $('#requestForm'); const type = selectedRequestType(); const needsShift=['late_start','early_finish'].includes(type); const range=['leave','sick'].includes(type);
   $('#requestTypeHelp').textContent=REQUEST_HELP[type]||'';
-  $$('.request-start').forEach((element)=>element.classList.toggle('hidden',type!=='late_start'));
-  $$('.request-end').forEach((element)=>element.classList.toggle('hidden',type!=='early_finish'));
+  window.HadasWork?.onFieldsChange(type,form);
+  $('.request-start').forEach((element)=>element.classList.toggle('hidden',!['late_start','work'].includes(type)));
+  $('.request-end').forEach((element)=>element.classList.toggle('hidden',!['early_finish','work'].includes(type)));
   $$('.request-range-end').forEach((element)=>element.classList.toggle('hidden',!range));
   $$('.shift-choice-field').forEach((element)=>element.classList.toggle('hidden',!needsShift));
   $$('.swap-field').forEach((element)=>element.classList.toggle('hidden',type!=='swap'));
   $$('.sick-attachment').forEach((element)=>element.classList.toggle('hidden',type!=='sick'));
   $('#leaveDayOffField').classList.toggle('hidden',!['leave','day_off'].includes(type));
   form.elements.shift_id.required=needsShift; form.elements.target_employee_id.required=type==='swap'; form.elements.request_end_date.required=range;
-  form.elements.requested_start.required=type==='late_start'; form.elements.requested_end.required=type==='early_finish';
+  form.elements.requested_start.required=['late_start','work'].includes(type); form.elements.requested_end.required=['early_finish','work'].includes(type);
   $('.request-date-start span',form).textContent=range?'מתאריך':'תאריך';
   if(range&&!form.elements.request_end_date.value)form.elements.request_end_date.value=form.elements.request_date.value;
   updateRequestDuration(); syncFixedDayOffChoice();
@@ -2719,6 +2721,7 @@ async function loadSwapCandidates(){
 function fileToDataUrl(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('לא ניתן לקרוא את הקובץ'));reader.readAsDataURL(file);});}
 async function saveRequest(event){
   event.preventDefault();const form=event.currentTarget;const button=form.querySelector('button[value="default"]');const data=formObject(form);data.request_type=selectedRequestType();delete data.sick_certificate;
+  if(data.request_type==='work'&&!window.HadasWork?.validateSubmission(data))return;
   const onBehalf=isManager()&&!$('#requestRequesterField').classList.contains('hidden'); if(!onBehalf)delete data.requester_id; data.apply_now=onBehalf&&String(data.manager_apply_now)==='true'; delete data.manager_apply_now;
   if(!['leave','sick'].includes(data.request_type))delete data.request_end_date;
   data.allow_schedule_on_day_off=['leave','day_off'].includes(data.request_type)&&String(data.allow_schedule_on_day_off)==='true';
@@ -2764,6 +2767,7 @@ function renderRequestsBase(){
   const visible=state.requests.filter((request)=>{const statusOk=state.requestStatusFilter==='all'||(state.requestStatusFilter==='approved'&&['approved','applied'].includes(request.status))||(state.requestStatusFilter==='pending'&&(request.status==='pending'||request.cancellation_status==='pending'))||(state.requestStatusFilter==='open'&&(request.status==='pending'||request.cancellation_status==='pending'))||(state.requestStatusFilter==='closed'&&['rejected','cancelled'].includes(request.status));const requester=employeeById(request.requester_id),target=employeeById(request.target_employee_id);const haystack=`${requester?.full_name||''} ${target?.full_name||''} ${request.reason||''} ${REQUEST_LABELS[request.request_type]||''}`.toLowerCase();return statusOk&&(!term||haystack.includes(term));});
   $('#requestsList').innerHTML=visible.length?visible.map((request)=>{const requester=employeeById(request.requester_id),target=employeeById(request.target_employee_id),statusClass=['rejected','cancelled'].includes(request.status)?'error':request.status==='applied'?'ok':'warn';const canApprove=isManager()&&request.status==='pending'&&(request.request_type!=='swap'||request.target_approved);const actionState=requestActionState(request);const fixedDay=(request.available_fixed_day_weekdays?.length?request.available_fixed_day_weekdays:request.available_fixed_day_weekday!=null?[request.available_fixed_day_weekday]:[]).map(d=>DAY_NAMES[d]).join(', ')+(request.preferred_fixed_day_weekday!=null?' · עדיפות: '+DAY_NAMES[request.preferred_fixed_day_weekday]:'');
     return `<article class="request-card type-${request.request_type} action-${actionState}" data-request-id="${request.id}"><div class="card-heading"><div class="request-title"><span class="request-avatar">${REQUEST_ICONS[request.request_type]||'●'}</span><div><h3>${REQUEST_LABELS[request.request_type]||'בקשה'}</h3><p class="muted">${escapeHtml(requester?.full_name||'')} · ${requestDateLabel(request)}</p></div></div><span class="status-chip ${statusClass}">${REQUEST_STATUS_LABELS[request.status]}</span></div>${requestFlowHtml(request)}<div class="request-key-details"><div><small>פירוט</small><strong>${escapeHtml(request.reason||'ללא פירוט')}</strong></div>${request.requested_start||request.requested_end?`<div><small>שעות</small><strong>${timeHtml(request.requested_start,request.requested_end)}</strong></div>`:''}${request.request_type==='swap'?`<div><small>החלפה עם</small><strong>${escapeHtml(target?.full_name||'טרם נבחר')}</strong><span>${request.target_approved?'העובד אישר':'ממתין להסכמת העובד'}</span></div>`:''}${['leave','day_off'].includes(request.request_type)?`<div><small>עבודה ביום חופשי קבוע</small><strong>${request.allow_schedule_on_day_off?`אפשרי${fixedDay?` ביום ${fixedDay}`:''}`:'לא'}</strong></div>`:''}</div>${request.request_type==='leave'&&request.request_end_date&&Math.floor((parseDateValue(request.request_end_date)-parseDateValue(request.request_date))/86400000)+1>2?'<div class="notice warn"><strong>תזכורת:</strong> נדרשת גם בקשת חופשה ידנית.</div>':''}${request.has_attachment?`<div class="attachment-row"><span>📎 צורף אישור מחלה</span><button class="ghost-btn" data-action="attachment_url" data-id="${request.id}">צפייה באישור</button></div>`:''}${request.manager_note?`<div class="notice"><strong>הערת הנהלה:</strong> ${escapeHtml(request.manager_note)}</div>`:''}<div class="request-action-zone">${leaveCancellationActions(request)}${request.request_type==='swap'&&request.target_employee_id===state.profile.id&&!request.target_approved&&request.status==='pending'?`<button class="secondary-btn" data-action="target_accept" data-id="${request.id}">אישור ההחלפה</button><button class="danger-btn" data-action="target_reject" data-id="${request.id}">דחיית ההחלפה</button>`:''}${request.requester_id===state.profile.id&&request.status==='pending'&&request.request_type!=='leave'?`<button class="ghost-btn" data-action="cancel" data-id="${request.id}">ביטול הבקשה</button>`:''}${canApprove?`<button class="primary-btn" data-action="approve" data-id="${request.id}">אישור מהיר</button><button class="danger-btn" data-action="reject" data-id="${request.id}">דחייה</button>`:''}${isManager()&&request.status==='pending'&&request.request_type==='swap'&&!request.target_approved?'<span class="small-note">ממתין לאישור העובד שנבחר לפני החלטת הנהלה.</span>':''}</div></article>`;}).join(''):'<div class="empty-state">אין בקשות לפי הסינון שנבחר.</div>';
+  window.HadasWork?.decorateCards();
 }
 async function handleRequestClickBase(event){const button=event.target.closest('[data-action]');if(!button)return;if(button.dataset.action==='attachment_url'){try{const result=await apiFetch('/api/requests',{method:'POST',body:{action:'attachment_url',id:button.dataset.id}});window.open(result.url,'_blank','noopener');}catch(error){showToast(error.message,'error');}return;}let body={id:button.dataset.id,action:button.dataset.action};if(button.dataset.action==='approve')body={...body,action:'decide',status:'approved',manager_note:''};if(button.dataset.action==='reject'){const note=prompt('אפשר לכתוב סיבה לדחייה:')||'';if(!confirm('לדחות את הבקשה?'))return;body={...body,action:'decide',status:'rejected',manager_note:note};}if(button.dataset.action==='apply'&&!confirm('לעדכן את הבקשה בשיבוץ?'))return;setBusy(button,true,'מעדכן…');try{const result=await apiFetch('/api/requests',{method:'POST',body});if(result.deleted_id)state.requests=state.requests.filter(r=>r.id!==result.deleted_id);if(result.request)state.requests=state.requests.map(r=>r.id===result.request.id?result.request:r);renderRequests();renderNavBadges();showToast(body.action==='request_cancellation'?'בקשת הביטול נשלחה לאישור':'הבקשה עודכנה','success');void refreshAll();}catch(error){showToast(error.message,'error');}finally{setBusy(button,false);}}
 
@@ -2816,6 +2820,7 @@ function focusRequestCard(requestId) {
 }
 function renderRequests(){renderRequestsBase();for(const request of state.requests){const card=document.querySelector(`[data-request-id="${request.id}"]`);if(card)card.insertAdjacentHTML('beforeend',requestConversationHtml(request));}}
 async function handleRequestClick(event){
+  if(window.HadasWork?.interceptApproval(event))return;
   const comment=event.target.closest('[data-action="comment"]');
   if(comment){const input=document.querySelector(`[data-request-reply-input="${comment.dataset.id}"]`);const message=input?.value.trim();if(!message)return showToast('יש לכתוב תגובה','error');setBusy(comment,true,'שולח…');try{await apiFetch('/api/requests',{method:'POST',body:{action:'comment',id:comment.dataset.id,message}});await refreshAll();showToast('התגובה נשלחה','success');}catch(error){showToast(error.message,'error');}finally{setBusy(comment,false);}return;}
   return handleRequestClickBase(event);
