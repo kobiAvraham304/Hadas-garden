@@ -405,6 +405,7 @@
       <fieldset class="request-type-picker"><legend class="sr-only">סוג בקשה</legend><div class="request-type-grid">
         <label class="request-type-card"><input type="radio" name="request_type" value="leave" checked /><span class="request-icon">☀</span><strong>חופשה</strong><small>יום אחד או טווח ימים מתוכנן מראש</small><b>מתאריך עד תאריך</b></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="day_off" /><span class="request-icon">⌂</span><strong>יום חופשי חד־פעמי</strong><small>בקשה שלא לעבוד ביום עבודה מסוים</small><b>תאריך אחד</b></label>
+        <label class="request-type-card request-type-work"><input type="radio" name="request_type" value="work" /><span class="request-icon">✚</span><strong>בקשה לעבוד</strong><small>משמרת ביום חופשי קבוע ופנוי</small><b>יום + שעות</b></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="late_start" /><span class="request-icon">◷</span><strong>התחלה מאוחרת</strong><small>אפשר לבקש גם לפני שיש שיבוץ</small></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="early_finish" /><span class="request-icon">◴</span><strong>סיום מוקדם</strong><small>שעת יציאה, גם לפני שיש שיבוץ</small></label>
         <label class="request-type-card"><input type="radio" name="request_type" value="sick" /><span class="request-icon">✚</span><strong>מחלה</strong><small>יום אחד או כמה ימים, כולל אישור</small></label>
@@ -418,6 +419,11 @@
         <div id="requestDuration" class="request-duration">יום אחד</div>
       </div>
       <div class="form-grid request-details">
+        <div id="workDayBox" class="work-day-box full-field hidden">
+          <div class="work-day-head"><span class="work-day-symbol" aria-hidden="true">✦</span><div><strong>באיזה יום חופשי תרצו לעבוד?</strong><small>מוצגים רק ימים חופשיים קבועים שלא שובצתם בהם, ללא היעדרות מאושרת.</small></div></div>
+          <label class="work-day-picker"><span>תאריך פנוי</span><select id="workDaySelect"><option value="">טוען ימים פנויים…</option></select></label>
+          <p id="workDayHint" class="work-day-hint">בודק זמינות לפי הימים הקבועים שלך</p>
+        </div>
         <div id="leaveManualReminder" class="notice warn full-field hidden"><strong>תזכורת:</strong> בחופשה של יותר מיומיים רצופים יש למלא גם טופס בקשת חופשה ידני.</div>
         <fieldset id="leaveDayOffField" class="day-off-exchange-box full-field hidden"><legend>אפשרות עבודה ביום חופשי קבוע</legend><p>אם יהיה צורך בכוח אדם, האם ניתן לשבץ אותך באחד מימי החופש הקבועים במקום?</p><div class="compact-radio-row"><label><input type="radio" name="allow_schedule_on_day_off" value="false" checked /><span>לא, להשאיר את ימי החופש</span></label><label><input type="radio" name="allow_schedule_on_day_off" value="true" /><span>כן, לפי צורך</span></label></div><div id="fixedDayOffChoice" class="fixed-day-off-choice hidden"><strong>באילו ימים חופשיים קבועים ניתן לעבוד? אפשר לבחור כמה</strong><div id="fixedDayOffOptions" class="weekday-choice-grid"></div><input type="hidden" name="available_fixed_day_weekday" /><details class="day-off-preference"><summary>＋ הוספת יום מועדף (לא חובה)</summary><label>עדיפות מבין הימים שנבחרו<select name="preferred_fixed_day_weekday"><option value="">ללא עדיפות</option></select></label></details></div></fieldset>
         <label class="request-start hidden">שעת התחלה מבוקשת<input name="requested_start" type="time" /></label>
@@ -428,6 +434,22 @@
         <label class="full-field"><span>פירוט או הערה</span><textarea name="reason" rows="3" placeholder="אפשר להוסיף מידע שיעזור לטפל בבקשה"></textarea></label>
       </div>
       <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button class="primary-btn" value="default">שליחת הבקשה</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="workApprovalDialog" class="modal work-approval-dialog" aria-labelledby="workApprovalTitle">
+    <form id="workApprovalForm" class="modal-card large-modal">
+      <input type="hidden" name="request_id" />
+      <div class="modal-heading"><div><p class="eyebrow">בקשה לעבוד · החלטת שיבוץ</p><h3 id="workApprovalTitle">לאשר וליצור משמרת</h3><p class="muted" id="workApprovalSummary"></p></div><button type="button" class="icon-btn close-dialog" aria-label="סגירה">×</button></div>
+      <div class="work-approve-tip">✦ הכיתה הקבועה מסומנת כהמלצה, אך אפשר לבחור כל כיתה שמותר לשבץ בה.</div>
+      <fieldset class="work-class-field"><legend>לאיזו כיתה לשבץ?</legend><div id="workApprovalClasses" class="work-class-choices"></div></fieldset>
+      <div class="form-grid work-approve-hours">
+        <label>התחלת משמרת<input type="time" name="approved_start" required /></label>
+        <label>סיום משמרת<input type="time" name="approved_end" required /></label>
+      </div>
+      <label class="work-approve-note">הערה לאישור (לא חובה)<textarea name="manager_note" rows="2" placeholder="הערה שתישלח לעובדת"></textarea></label>
+      <div class="work-approval-summary"><span aria-hidden="true">✓</span> עם האישור תיווצר משמרת בטיוטת השיבוצים. ניתן לערוך אותה בהמשך במסך השיבוצים.</div>
+      <div class="modal-actions"><button type="button" class="ghost-btn close-dialog">ביטול</button><button type="submit" class="primary-btn work-submit-btn">אישור ושיבוץ אוטומטי</button></div>
     </form>
   </dialog>
 
